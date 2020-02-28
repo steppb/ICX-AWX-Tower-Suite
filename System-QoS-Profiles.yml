@@ -1,0 +1,33 @@
+# Playbook Version: 1.1
+# =====================
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+
+  tasks:
+  - name: Configuring Quality of Service
+    icx_config:
+      lines: |
+        qos mechanism mixed-sp-wrr
+        qos profile qosp7 sp qosp6 sp qosp5 3 qosp4 24 qosp3 3 qosp2 64 qosp1 3 qosp0 3
+        qos egress-shape-ifg-bytes 20
+        qos-tos map dscp-priority 0 to 0
+        qos-tos map dscp-priority 8 to 1
+        qos-tos map dscp-priority 16 to 2
+        qos-tos map dscp-priority 38 to 3
+        qos-tos map dscp-priority 49 to 4
+        qos-tos map dscp-priority 48 to 7
+        ipv6 cache-lifetime 0
+      save_when: changed
+
+  - name: Display Results
+    icx_command:
+      commands: show qos-tos
+    register: output
+  - debug:
+      msg: "{{output.stdout_lines}}"

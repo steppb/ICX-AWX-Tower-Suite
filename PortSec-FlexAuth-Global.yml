@@ -1,0 +1,59 @@
+# Playbook Version: 1.1
+# =====================
+# The following variables will need to be defined prior to running this playbook:
+#
+# Required Variables:
+# <template_flexauth_default_vlan> FlexAuth default VLAN
+#
+# Optional Variables:
+# <template_flexauth_reauth> (true|false) enable re-authentication. Default is false
+# <template_flexauth_reauth_period> Reauth period in seconds. Default 3600
+# <template_flexauth_max_reauth_req> Max number of authentication attempts. Default 2
+# <template_flexauth_max_req> Max number of frame retransmissions. Default 2
+# <template_flexauth_timeout_tx> Tx-Period in seconds. Default 30
+# <template_flexauth_timeout_quiet> Quiet-period in seconds. Default 60
+# <template_flexauth_timeout_supplicant> Supplicant timeout in seconds. Default 30
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+    reauth:
+    template_flexauth_reauth_period: 3600
+    template_flexauth_max_reauth_req: 2
+    template_flexauth_max_req: 2
+    template_flexauth_timeout_tx: 30
+    template_flexauth_timeout_quiet: 60
+    template_flexauth_timeout_supplicant: 30
+
+  tasks:
+  - name: Verifying Re-authentication
+    set_fact:
+      reauth: re-authentication
+      cacheable: no
+    when: template_flexauth_reauth is defined and template_flexauth_reauth|lower == 'true'
+
+  - name: Configuring FlexAuth
+    icx_config:
+      lines: |
+        aaa authentication dot1x default radius
+        authentication
+         auth-default-vlan {{template_flexauth_default_vlan}}
+         {{reauth}}
+         reauth-period {{template_flexauth_reauth_period}}
+         dot1x max-reauth-req {{template_flexauth_max_reauth_req}}
+         dot1x max-req {{template_flexauth_max_req}}
+         dot1x timeout tx-period {{template_flexauth_timeout_tx}}
+         dot1x timeout quiet-period {{template_flexauth_timeout_quiet}}
+         dot1x timeout supplicant {{template_flexauth_timeout_supplicant}}
+      save_when: changed
+
+  - name: Display Results
+    icx_command:
+      commands: show run authentication
+    register: output
+  - debug:
+      msg: "{{output.stdout_lines}}"

@@ -1,0 +1,58 @@
+# Playbook Version: 1.1
+# =====================
+# The following variables will need to be defined prior to running this playbook:
+#
+# Required Variables:
+# <template_rtr_ospfv3_area> OSPF Area
+# <template_rtr_int> OSPF Interface
+#
+# Optional Variables:
+# <template_rtr_ospfv3_ipsec_spi> OSPFv3 IPsec Security Parameter Index
+# <template_rtr_ospfv3_ipsec_key> OSPFv3 40 hex character IPsec key
+# <template_rtr_ospfv3_retrans> OSPFv3 retransmit interval. Default 5
+# <template_rtr_ospfv3_transdelay> OSPFv3 transmit delay. Default 1
+# <template_rtr_ospfv3_passive> {true|false} IP OSPFv3 passive interface
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+    template_rtr_ospfv3_retrans: 5
+    template_rtr_ospfv3_transdelay: 1
+    template_rtr_ospfv3_passive: false
+    ospfv3_auth:
+    passive:
+
+  tasks:
+  - name: Setting OSPF Authentication
+    set_fact:
+      ospfv3_auth: "ipv6 ospf authentication ipsec spi {{template_rtr_ospfv3_ipsec_spi}} esp sha1 {{template_rtr_ospfv3_ipsec_key}}"
+      cacheable: no
+    when: template_rtr_ospfv3_ipsec_key is defined and template_rtr_ospfv3_ipsec_key != ''
+
+  - name: Setting OSPF Passive Interface
+    set_fact:
+      passive: "ipv6 ospf passive"
+      cacheable:
+    when: template_rtr_ospfv3_passive|lower == 'true'
+
+  - name: Configuring OSPFv3 Interface
+    icx_config:
+      lines: |
+        interface {{template_rtr_int}}
+         ipv6 ospf area {{template_rtr_ospfv3_area}}
+         ipv6 ospf retransmit-interval {{template_rtr_ospfv3_retrans}}
+         ipv6 transmit-delay {{template_rtr_ospfv3_transdelay}}
+         {{ospfv3_auth}}
+         {{passive}}
+      save_when: changed
+
+  - name: Display Results
+    icx_command:
+      commands: show ipv6 ospf interface {{template_rtr_int}}
+    register: output
+  - debug:
+      msg: "{{output.stdout_lines}}"

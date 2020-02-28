@@ -1,0 +1,16 @@
+# Playbook Version: 1.1
+# =====================
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+
+  tasks:
+  - name: Configuring Radius AAA Accounting
+    icx_config:
+      lines: aaa accounting commands 0 default start-stop radius
+      save_when: changed

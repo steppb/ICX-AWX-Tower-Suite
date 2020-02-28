@@ -1,0 +1,57 @@
+# Playbook Version: 1.1
+# =====================
+# The following variables will need to be defined prior to running this playbook:
+#
+# Required Variables:
+# <template_rtr_ospf_area> OSPF Area
+# <template_rtr_int> OSPF Interface
+#
+# Optional Variables:
+# <template_rtr_ospf_keyid> OSPF MD5 Key ID
+# <template_rtr_ospf_md5key> OSPF MD5 Key
+# <template_rtr_ospf_retrans> OSPF retransmit interval. Default 5
+# <template_rtr_ospf_transdelay> OSPF transmit delay
+# <template_rtr_ospf_passive> {true|false} IP OSPF passive interface
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+    template_rtr_ospf_retrans: 5
+    template_rtr_ospf_transdelay: 1
+    ospf_auth:
+    passive:
+
+  tasks:
+  - name: Setting OSPF Authentication
+    set_fact:
+      ospf_auth: "ip ospf md5-authentication key-id {{template_rtr_ospf_keyid}} key {{template_rtr_ospf_md5key}}"
+      cacheable: no
+    when: template_rtr_ospf_md5key is defined and template_rtr_ospf_md5key != ''
+
+  - name: Setting OSPF Passive Interface
+    set_fact:
+      passive: "ip ospf passive"
+      cacheable:
+    when: template_rtr_ospf_passive is defined and template_rtr_ospf_passive|lower == 'true'
+
+  - name: Configuring OSPF
+    icx_config:
+      lines: |
+        interface {{template_rtr_int}}
+         ip ospf area {{template_rtr_ospf_area}}
+         ip ospf retransmit-interval {{template_rtr_ospf_retrans}}
+         ip ospf transmit-delay {{template_rtr_ospf_transdelay}}
+         {{ospf_auth}}
+         {{passive}}
+      save_when: changed
+
+  - name: Display Results
+    icx_command:
+      commands: show ip ospf interface {{template_rtr_int}}
+    register: output
+  - debug:
+      msg: "{{output.stdout_lines}}"

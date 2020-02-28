@@ -1,0 +1,30 @@
+# Playbook Version: 1.1
+# =====================
+# The following variables will need to be defined prior to running this playbook:
+#
+# Required Variables:
+# <template_mcast_rtrint> Router interface to apply PIM Filter
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+
+  tasks:
+  - name: Applying PIM Neighbor Filter
+    icx_config:
+      lines: |
+        ipv6 pim neighbor-filter NoRemoteAccess
+      parents:
+        interface {{template_mcast_rtrint}}
+      save_when: changed
+
+  - name: Display Results
+    icx_command:
+      commands: show run int {{template_mcast_rtrint}}
+    register: output
+  - debug:
+      msg: "{{output.stdout_lines}}"

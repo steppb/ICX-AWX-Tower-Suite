@@ -1,0 +1,54 @@
+# Playbook Version: 1.1
+# =====================
+# The following variables will need to be defined prior to running this playbook:
+#
+# Required Variables:
+# <template_rtr_vrrp_int> L3 Interface
+# <template_rtr_vrrp_vrid> VRRP VRID
+# <template_rtr_vrrp_ip> VRRP IP address
+# <template_rtr_vrrp_mode> (owner|backup)
+#
+# Optional Variables:
+# <template_rtr_vrrp_ownerpri> Backup or Owner Priority. Default 100
+# <template_rtr_vrrp_version> (v2|v3) VRRP Version. Default v2.
+# <template_rtr_vrrp_v2checksum> (true|false) Use v2 checksum if using VRRP version 3
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+    template_rtr_vrrp_ownerpri: 100
+    template_rtr_vrrp_version: v2
+    template_rtr_vrrp_v2checksum: false
+    v2_checksum:
+
+  tasks:
+  - name: Set V2 Checksum
+    set_fact:
+      v2_checksum: "use-v2-checksum"
+      cacheable: no
+    when: template_rtr_vrrp_version == 'v3' and template_rtr_vrrp_v2checksum|lower == 'true'
+
+  - name: Configuring VRRP Interface
+    icx_config:
+      lines: |
+        router vrrp
+        interface {{template_rtr_vrrp_int}}
+         ip vrrp vrid {{template_rtr_vrrp_vrid}}
+          {{template_rtr_vrrp_mode}} priority {{template_rtr_vrrp_ownerpri}}
+          ip-address {{template_rtr_vrrp_ip}}
+          advertise backup
+          version {{template_rtr_vrrp_version}}
+          {{v2_checksum}}
+          activate
+      save_when: changed
+          
+  - name: Display Results
+    icx_command:
+      commands: show ip vrrp vrid {{template_rtr_vrrp_vrid}}
+    register: output
+  - debug:
+      msg: "{{output.stdout_lines}}"

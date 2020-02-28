@@ -1,0 +1,33 @@
+# Playbook Version: 1.1
+# =====================
+# The following variables will need to be defined prior to running this playbook:
+#
+# Required Variables:
+# <template_qos_rlimitint> Interface to rate-limit
+# <template_qos_rlimitkb> Rate limit in Kbps
+#
+# Optional Variables:
+# <template_qos_rlimitpri> Rate limit for specific Priority
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+    priority:
+
+  tasks:
+  - name: Setting Priority Value
+    set_fact:
+      priority: "priority {{template_qos_rlimitpri}}"
+      cacheable: no
+    when: template_qos_rlimitpri is defined and template_qos_rlimitpri != ''
+
+  - name: Configuring Rate-Limit on Interface
+    icx_config:
+      lines: |
+        interface {{template_qos_rlimitint}}
+         rate-limit output shaping {{template_qos_rlimitkb}} {{priority}}
+      save_when: changed

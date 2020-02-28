@@ -1,0 +1,115 @@
+# Playbook Version: 1.1
+# =====================
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+
+  tasks:
+  - name: Verify SSH ACL is configured
+    icx_command:
+      commands: sh access-list named-acl SSH_ACCESS
+    register: output
+    failed_when: "'is not configured' in output.stdout[0]"
+
+  - name: Get client IP
+    icx_command:
+      commands: sh who | incl client|you are connecting
+    register: output
+  - name: Parsing output
+    shell: echo {{output.stdout}} |
+      sed 's/\\n/\n/g' | \
+      while read line;
+      do
+        if [ -z $(echo $line | grep 'you are connecting') ] ; then
+          ipaddr=$(echo $line | awk '{print $5}');
+        else
+          IFS=',' read -ra ipline <<< $ipaddr;
+          echo ${ipline[0]};
+          break;
+        fi;
+      done
+    args:
+      executable: /bin/bash
+    register: output
+    changed_when: false
+  - name: Storing Client IP
+    set_fact:
+      ssh_client_ip: "{{output.stdout}}"
+      cacheable: false
+
+  - name: Retrieving SSH ACL from device
+    icx_command:
+      commands: |
+             sh ip access-list SSH_ACCESS
+             sh run | incl Current configuration
+    register: output
+  - name: Verify client IP against configured SSH ACL
+    shell: echo {{output.stdout}} |
+      sed -e 's/\\n/\n/g' |
+      while read line;
+      do
+        acl_line=$(echo $line | awk '{print $2}');
+        if [ ! -z $(echo $acl_line) ] ; then
+          if [ $(echo $acl_line) == 'permit' ] ; then
+            if [ $(echo $line | awk '{print $3}') == 'host' ] ; then
+              if [ $(echo $line | awk '{print $4}') == {{ssh_client_ip}} ] ; then
+                echo 'allowed';
+                break;
+              fi;
+            else
+              if [ $(echo $line | awk '{print $3}') == 'any' ] ; then
+                echo 'allowed';
+                break;
+              else
+                clientip={{ssh_client_ip}};
+                acl_net=$(echo $line | awk '{print $3}');
+                acl_mask=$(echo $line | awk '{print $4}');
+                clientip=$(printf '%02X' $(echo ${clientip//./ }));
+                acl_net=$(printf '%02X' $(echo ${acl_net//./ }));
+                acl_mask=$(printf '%02X' $(echo ${acl_mask//./ }));
+                if [ $((0x$clientip)) -gt $((0x$acl_net)) ] ; then
+                  if [ $((0x$clientip)) -lt $((0x$acl_net | 0x$acl_mask)) ] ; then
+                    echo 'allowed';
+                    break;
+                  fi;
+                fi;
+              fi;
+            fi;
+          else
+            if [ $(echo $acl_line) == 'deny' ] ; then
+              break;
+            fi;
+          fi;
+       fi;
+      done
+    args:
+      executable: /bin/bash
+    register: output
+    changed_when: false
+  - name: Assert Parse Results
+    assert:
+      that: output.stdout is defined and output.stdout == 'allowed'
+      msg: "ERROR: Your SSH client is blocked in ACL for switch. Aborting..."
+
+  - name: Hardening SSH Server
+    icx_config:
+      lines: |
+        ip ssh idle-time 10
+        ip ssh timeout 60
+        ssh access-group SSH_ACCESS
+        ssh access-group ipv6 RemoteAccess
+        ip ssh encryption disable-aes-cbc
+      save_when: changed
+
+  - name: Display Results
+    icx_command:
+      commands: show ip ssh config
+    register: output
+  - debug:
+      msg: "{{output.stdout_lines}}"
+

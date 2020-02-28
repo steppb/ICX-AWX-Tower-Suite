@@ -1,0 +1,30 @@
+# Playbook Version: 1.1
+# =====================
+# The following variables will need to be defined prior to running this playbook:
+#
+# Optional Variables:
+# <template_l2_mstp_pt2pt> MSTP Point-to-Point Interface
+# <template_l2_mstp_edgeint> MSTP Edge Interface
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+
+  tasks:
+  - name: Configuring MSTP Point-to-Point Interface(s)
+    icx_config:
+      lines: |
+        mstp admin-pt2pt-mac {{template_l2_mstp_pt2pt}}
+      save_when: changed
+    when: template_l2_mstp_pt2pt is defined and template_l2_mstp_pt2pt is not ''
+
+  - name: Configuring MSTP Edge Interface(s)
+    icx_config:
+      lines: |
+        mstp admin-edge-port {{template_l2_mstp_edgeint}}
+      save_when: changed
+    when: template_l2_mstp_edgeint is defined and template_l2_mstp_edgeint is not ''

@@ -1,0 +1,36 @@
+# Playbook Version: 1.1
+# =====================
+# The following variables will need to be defined prior to running this playbook:
+#
+# Required Variables:
+# <template_lag_name> LAG Name
+# <template_lag_mode> (dynamic|static|keep-alive)
+# <template_lag_port> LAG interface written as: 1/1/1
+#
+# Optional Variables:
+# <template_lag_id> LAG ID. Default auto.
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+    template_lag_id: auto
+
+  tasks:
+  - name: Adding Ports to Lag
+    icx_config:
+      lines: |
+        lag {{template_lag_name}} {{template_lag_mode}} id {{template_lag_id}}
+        ports ethe {{template_lag_port}}
+      save_when: changed
+
+  - name: Display Results
+    icx_command:
+      commands: show lag brief {{template_lag_name}}
+    register: output
+
+  - debug:
+      msg: "{{output.stdout_lines}}"

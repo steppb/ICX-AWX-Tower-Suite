@@ -1,0 +1,22 @@
+# Playbook Version: 1.1
+# =====================
+# The following variables will need to be defined prior to running this playbook:
+#
+# Required Variables:
+# <template_l2_mstpinst> MSTP instance
+# <template_l2_mstppri> MSTP Instance Bridge Priority
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+
+  tasks:
+  - name: Configuring MSTP Instance Priority
+    icx_config:
+      lines: |
+        mstp instance {{template_l2_mstpinst}} priority {{template_l2_mstppri}}
+      save_when: changed

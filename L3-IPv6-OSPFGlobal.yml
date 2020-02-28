@@ -1,0 +1,33 @@
+# Playbook Version: 1.1
+# =====================
+# The following variables will need to be defined prior to running this playbook:
+#
+# Required Variables:
+# <template_rtr_ospfv3_area> OSPFv3 area
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+
+  tasks:
+  - name: Configuring OSPFv3
+    icx_config:
+      lines: |
+        ipv6 unicast-routing
+        ipv6 router ospf
+         area {{template_rtr_ospfv3_area}}
+         nonstop-routing
+         log-status-change
+         redistribute connected
+      save_when: changed
+
+  - name: Display Results
+    icx_command:
+      commands: show ipv6 ospf area {{template_rtr_ospfv3_area}}
+    register: output
+  - debug:
+      msg: "{{output.stdout_lines}}"

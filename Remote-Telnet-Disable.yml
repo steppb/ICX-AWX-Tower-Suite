@@ -1,0 +1,28 @@
+# Playbook Version: 1.1
+# =====================
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+
+  tasks:
+  - icx_config: 
+      lines: |
+        no telnet server
+        enable telnet password I+sJus+B33nR3v0k3d
+        telnet access-group 86
+        telnet access-group ipv6 NoRemoteAccess
+        telnet timeout 10
+        enable telnet authentication
+      save_when: changed
+
+  - name: Display Results
+    icx_command:
+      commands: show telnet config
+    register: output
+  - debug:
+      msg: "{{output.stdout_lines}}"

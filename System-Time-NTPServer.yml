@@ -1,0 +1,44 @@
+# Playbook Version: 1.1
+# =====================
+# The following variables will need to be defined prior to running this playbook:
+#
+# Required Variables:
+# <template_ntp_server> NTP server IP address
+#
+# Optional Variables:
+# <template_ntp_key> Pre-shared NTP key string
+# <template_ntp_keyid> NTP key id integer
+# <template_ntp_authmethod> (md5|sha1) 
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+
+  tasks:
+  - name: Configuring Authenticated NTP
+    icx_config:
+      lines: |
+        ntp
+         authentication-key key-id {{template_ntp_keyid}} {{template_ntp_authmethod}} {{template_ntp_key}}
+         server {{template_ntp_server}} key {{template_ntp_keyid}}
+      save_when: changed
+    when: template_ntp_key is defined and template_ntp_key != ''
+
+  - name: Configuring Non-Authenticated NTP
+    icx_config:
+      lines: |
+        ntp
+          server {{template_ntp_server}}
+      save_when: changed
+    when: template_ntp_key is not defined
+
+  - name: Display Results
+    icx_command:
+      commands: show ntp associations
+    register: output
+  - debug: 
+      msg: "{{output.stdout_lines}}"

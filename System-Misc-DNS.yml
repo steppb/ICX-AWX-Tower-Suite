@@ -1,0 +1,29 @@
+# Playbook Version: 1.1
+# =====================
+# The following variables will need to be defined prior to running this playbook:
+# <template_dns_domain> Domain Name
+# <template_dns_server> DNS server ip
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+
+  tasks:
+  - name: Configuring DNS
+    icx_config:
+      lines: |
+        ip dns domain-list {{template_dns_domain}}
+        ip dns server-address {{template_dns_server}}
+      save_when: changed
+
+  - name: Display Results
+    icx_command:
+      commands: |
+        show ip dns
+    register: output
+  - debug: 
+      msg: "{{output.stdout_lines}}"

@@ -1,0 +1,30 @@
+# Playbook Version: 1.1
+# =====================
+# The following variables will need to be defined prior to running this playbook:
+#
+# Required Variables:
+# <template_tz> Timezone
+#
+# Optional Variables:
+# <template_tz_summertime> (true|false)
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+    template_tz_summertime: false
+
+  tasks:
+  - name: Configuring Timezone
+    icx_config:
+      lines: clock timezone {{template_tz}}
+      save_when: changed
+
+  - name: Configuring Summer-Time
+    icx_config:
+      lines: clock summer-time
+      save_when: changed
+    when: template_tz_summertime|lower == 'true'

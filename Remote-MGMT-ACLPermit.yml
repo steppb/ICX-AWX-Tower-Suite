@@ -1,0 +1,54 @@
+# Playbook Version: 1.1
+# =====================
+# The following variables will need to be defined prior to running this playbook:
+#
+# Required Variables: 
+# <template_mgmt_acl> ACL number to create/modify
+# <template_mgmt_allow> host or subnet to allow ssh access.
+#
+# Optional Variables:
+# <template_mgmt_ipv6> (true|false) Is IPv6. Default false
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+    template_mgmt_ipv6: false
+
+  tasks:
+  - name: Add IPv4 Host or Subnet to ACL
+    icx_config:
+      lines: |
+        ip access-list standard {{template_mgmt_acl}}
+         no deny any
+         permit {{template_mgmt_allow}}
+         deny any
+      save_when: changed
+    when: template_mgmt_ipv6|lower != 'true'
+
+  - name: Gather IPv4 Results
+    icx_command:
+      commands: show ip access-list {{template_mgmt_acl}}
+    register: output
+    when: template_mgmt_ipv6|lower != 'true'
+
+  - name: Add IPv6 Host to ACL
+    icx_config:
+      lines: |
+        ipv6 access-list {{template_mgmt_acl}}
+         permit ipv6 host {{template_mgmt_allow}}
+      save_when: changed
+    when: template_mgmt_ipv6|lower == 'true'
+
+  - name: Gather IPv6 Results
+    icx_command:
+      commands: show ipv6 access-list {{template_mgmt_acl}}
+    register: output
+    when: template_mgmt_ipv6|lower == 'true'
+
+  - name: Display Results
+    debug:
+      msg: "{{output.stdout_lines}}"

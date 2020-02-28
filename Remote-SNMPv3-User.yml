@@ -1,0 +1,30 @@
+# Playbook Version: 1.1
+# =====================
+# The following variables will need to be defined prior to running this playbook:
+# <template_snmp_user> SNMPv3 User name
+# <template_snmp_group> SNMPv3 Group name
+# <template_snmp_auth> SNMPv3 auth string
+# <template_snmp_priv> SNMPv3 priv string
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+
+  tasks:
+  - name: Configuring SNMPv3 User
+    icx_config:
+      lines: |
+        snmp-server user {{template_snmp_user}} {{template_snmp_group}} v3 auth sha {{template_snmp_auth}} priv aes {{template_snmp_priv}}
+      save_when: changed
+
+  - name: Display Results
+    icx_command:
+      commands: |
+        show snmp user
+    register: output
+  - debug: 
+      msg: "{{output.stdout_lines}}"

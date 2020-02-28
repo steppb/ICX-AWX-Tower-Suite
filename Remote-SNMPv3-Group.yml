@@ -1,0 +1,28 @@
+# Playbook Version: 1.1
+# =====================
+# The following variables will need to be defined prior to running this playbook:
+# <template_snmp_group> name of SNMPv3 group
+# <template_snmp_acl> SNMPv3 ACL number
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+
+  tasks:
+  - name: Configuring SNMPv3 Group
+    icx_config:
+      lines: |
+        snmp-server group {{template_snmp_group}} v3 priv access {{template_snmp_acl}} read all write all notify all
+      save_when: changed
+
+  - name: Display Results
+    icx_command:
+      commands: |
+        show snmp group
+    register: output
+  - debug: 
+      msg: "{{output.stdout_lines}}"

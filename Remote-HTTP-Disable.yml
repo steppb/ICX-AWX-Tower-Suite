@@ -1,0 +1,25 @@
+# Playbook Version: 1.1
+# =====================
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+
+  tasks:
+  - icx_config:
+      lines: |
+        no web-management http
+        web access-group 86
+        web access-group ipv6 NoRemoteAccess
+      save_when: changed
+
+  - name: Display Results
+    icx_command:
+      commands: show web
+    register: output
+  - debug:
+      msg: "{{output.stdout_lines}}"

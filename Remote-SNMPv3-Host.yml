@@ -1,0 +1,20 @@
+# Playbook Version: 1.1
+# =====================
+# The following variables will need to be defined prior to running this playbook:
+# <template_snmp_user> SNMPv3 User name
+# <template_snmp_host> SNMPv3 Host IP address
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+
+  tasks:
+  - name: Configuring SNMPv3 Host
+    icx_config:
+      lines: |
+        snmp-server host {{template_snmp_host}} version v3 priv {{template_snmp_user}}
+      save_when: changed

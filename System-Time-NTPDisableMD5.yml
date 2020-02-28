@@ -1,0 +1,18 @@
+# Playbook Version: 1.1
+# =====================
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+
+  tasks:
+  - name: Disabling MD5 NTP Authentication
+    icx_config:
+      lines: |
+        ntp
+         disable authenticate md5
+      save_when: changed

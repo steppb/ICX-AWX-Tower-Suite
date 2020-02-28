@@ -1,0 +1,44 @@
+# Playbook Version: 1.1
+# =====================
+# The following variables will need to be defined prior to running this playbook:
+#
+# Required Variables:
+# <template_rem_radiusip> Radius Server IP address
+# <template_rem_radiuskey> Radius Server Shared Secret
+#
+# Optional Variables:
+# <template_rem_radiusauth> Radius Server Auth UDP port. Default: 1812
+# <template_rem_radiusacct> Radius Server Acct UDP port. Defualt: 1813
+# <template_rem_radiusdot1x> (true|false) Use radius server for dot1x
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+    template_rem_radiusauth: 1812
+    template_rem_radiusacct: 1813
+    dot1x:
+
+  tasks:
+  - name: Setup Radius Server for Dot1X
+    set_fact:
+      dot1x: dot1x
+      cacheable: no
+    when: template_rem_radiusdot1x is defined and template_rem_radiusdot1x|lower == 'true'
+
+  - name: Configuring Radius Host
+    icx_config:
+      lines: |
+        radius-server host {{template_rem_radiusip}} auth-port {{template_rem_radiusauth}} acct-port {{template_rem_radiusacct}} default key {{template_rem_radiuskey}} {{dot1x}}
+      save_when: changed
+
+  - name: Display Results
+    icx_command:
+      commands: show radius server
+    register: output
+
+  - debug:
+      msg: "{{output.stdout_lines}}"

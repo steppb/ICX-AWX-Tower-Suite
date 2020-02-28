@@ -1,0 +1,64 @@
+# Playbook Version: 1.1
+# =====================
+# The following variables will need to be defined prior to running this playbook:
+#
+# Required Variables:
+# <template_l2_vlandefault> VLAN ID of default VLAN
+#
+# Optional Variables:
+# <template_l2_unusedint> Interface To disable
+# <template_l2_unusedname> String to set name of unused interfaces
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+    unused_int_name:
+
+  tasks:
+  - name: Get Untagged Ports in Default VLAN
+    icx_command:
+      commands: show vlan {{template_l2_vlandefault}} | incl Untagged Ports
+    register: output
+    when: template_l2_unusedint is not defined or template_l2_unusedint == ''
+
+  - name: Parsing Interfaces
+    shell: |
+      echo "{{ output.stdout[0] }}" | \
+        sed -e 's/\\n/\n/g' -e 's/\s\+\([0-9]\+\)/\n\1/g' \
+            -e 's/Untagged Ports: (U\([0-9]\+\)\/M\([0-9]\+\))/Unit \1 Module \2/g' | \
+        awk '/Unit/ { mU = $2; mM = $4 } /^[0-9]+/ { printf "e%s/%s/%s\n", mU, mM, $1 }' | \
+        sed ':a;$!{N;s/\n/ /;ba;}'
+    register: output
+    changed_when: false
+    when: template_l2_unusedint is not defined or template_l2_unusedint == ''
+
+  - name: Setting Ports to Disable
+    set_fact:
+      template_l2_unusedint: "{{output.stdout}}"
+      cacheable: no
+    when: template_l2_unusedint is not defined or template_l2_unusedint == ''
+
+  - name: Setting Name for Unused Ports
+    set_fact:
+      unused_int_name: "port-name {{template_l2_unusedname}}"
+      cacheable: no
+    when: template_l2_unusedname is defined and template_l2_unusedname != ''
+
+  - name: Disabling Interfaces
+    icx_config:
+      lines: |
+        interface {{template_l2_unusedint}}
+         {{unused_int_name}}
+         disable
+      save_when: changed
+
+  - name: Display Results
+    icx_command:
+      commands: show int bri {{template_l2_unusedint}}
+    register: output
+  - debug:
+      msg: "{{output.stdout_lines}}"

@@ -1,0 +1,24 @@
+# Playbook Version: 1.1
+# =====================
+# The following variables will need to be defined prior to running this playbook:
+#
+# Optional Variables:
+# <template_rem_pwminlength> Minimum length for user passwords. Template default 12
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+    template_rem_pwminlength: 12
+
+  tasks:
+  - name: Setting Strict Standards for Passwords
+    icx_config:
+      lines: |
+        enable strict-password-enforcement
+        enable password-min-length {{template_rem_pwminlength}}
+        enable user password-masking
+      save_when: changed

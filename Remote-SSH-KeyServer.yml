@@ -1,0 +1,16 @@
+# Playbook Version: 1.1
+# =====================
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+
+  tasks:
+  - name: Generating SSH Server Key
+    icx_config:
+      lines: crypto key generate rsa modulus 2048
+      save_when: changed

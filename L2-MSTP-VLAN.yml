@@ -1,0 +1,22 @@
+# Playbook Version: 1.1
+# =====================
+# The following variables will need to be defined prior to running this playbook:
+#
+# Required Variables:
+# <template_l2_mstpinst> MSTP instance
+# <template_l2_mstvlan> VLAN ID to add to MSTP Instance
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+
+  tasks:
+  - name: Adding VLAN to MSTP Instance
+    icx_config:
+      lines: |
+        mstp instance {{template_l2_mstpinst}} vlan {{template_l2_mstpvlan}}
+      save_when: changed

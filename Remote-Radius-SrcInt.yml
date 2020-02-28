@@ -1,0 +1,20 @@
+# Playbook Version: 1.1
+# =====================
+# The following variables will need to be defined prior to running this playbook:
+#
+# Required Variables:
+# <template_srcint_radius> Source interface for Radius communication
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+
+  tasks:
+  - name: Configuring Radius Host
+    icx_config:
+      lines: ip radius source-interface {{template_srcint_radius}}
+      save_when: changed

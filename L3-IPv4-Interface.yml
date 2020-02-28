@@ -1,0 +1,23 @@
+# Playbook Version: 1.1
+# =====================
+# The following variables will need to be defined prior to running this playbook:
+#
+# Required Variables:
+# <template_rtr_int> Router interface
+# <template_rtr_int_addr> IP address and mask of interface
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+
+  tasks:
+  - name: Configuring Router Interface
+    icx_config:
+      lines: |
+        interface {{template_rtr_int}}
+         ip address {{template_rtr_int_addr}}
+      save_when: changed

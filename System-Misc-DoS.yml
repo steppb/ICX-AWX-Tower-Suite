@@ -1,0 +1,20 @@
+# Playbook Version: 1.1
+# =====================
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+
+  tasks:
+  - name: Configuring DoS Protection
+    icx_config:
+      lines: |
+        ip icmp attack-rate burst-normal 5000 burst-max 10000 lockup 300
+        ip tcp burst-normal 10 burst-max 100 lockup 300
+        no ip icmp unreachable
+        no ip source-route
+      save_when: changed

@@ -1,0 +1,55 @@
+# Playbook Version: 1.1
+# =====================
+# The following variables will need to be defined prior to running this playbook:
+#
+# Required Variables:
+# <template_rtr_vrrpv3_int> L3 Interface
+# <template_rtr_vrrpv3_vrid> VRRPv3 VRID
+# <template_rtr_vrrpv3_ip> VRRPv3 IPv6 address
+# <template_rtr_vrrpv3_mode> (owner|backup)
+#
+# Optional Variables:
+# <template_rtr_vrrpv3_priority> Backup or Owner Priority. Default 100
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+    template_rtr_vrrpv3_priority: 100
+    vrrpv3_priority:
+
+  tasks:
+  - name: Configuring VRRPv3 Owner Interface
+    icx_config:
+      lines: |
+        ipv6 router vrrp
+        interface {{template_rtr_vrrpv3_int}}
+         ipv6 vrrp vrid {{template_rtr_vrrpv3_vrid}}
+          owner
+          ipv6-address {{template_rtr_vrrpv3_ip}}
+          activate
+      save_when: changed
+    when: template_rtr_vrrpv3_mode == 'owner'
+
+  - name: Configuring VRRPv3 Backup Interface
+    icx_config:
+      lines: |
+        ipv6 router vrrp
+        interface {{template_rtr_vrrpv3_int}}
+         ipv6 vrrp vrid {{template_rtr_vrrpv3_ip}}
+          backup priority {{template_rtr_vrrpv3_priority}}
+          ipv6-address {{template_rtr_vrrpv3_ip}}
+          advertise backup
+          activate
+      save_when: changed
+    when: template_rtr_vrrpv3_mode == 'backup'
+
+  - name: Display Results
+    icx_command:
+      commands: show ipv6 vrrp vrid {{template_rtr_vrrpv3_vrid}}
+    register: output
+  - debug:
+      msg: "{{output.stdout_lines}}"

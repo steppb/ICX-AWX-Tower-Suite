@@ -1,0 +1,19 @@
+# Playbook Version: 1.1
+# =====================
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+
+  tasks:
+  - name: Configuring Radius AAA Authentication
+    icx_config:
+      lines: |
+        aaa authentication enable default radius local
+        aaa authentication login default radius local
+        aaa authentication login privilege-mode
+      save_when: changed

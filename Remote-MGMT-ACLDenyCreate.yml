@@ -1,0 +1,31 @@
+# Playbook Version: 1.1
+# =====================
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+
+  tasks:
+  - name: Create Access Control List 86
+    icx_config:
+      lines: |
+        ip access-list standard 86
+         remark DENY ALL ACCESS
+         deny any
+         exit
+        ipv6 access-list NoRemoteAccess
+         deny ipv6 any any
+      save_when: changed
+
+  - name: Display Results
+    icx_command:
+      commands: |
+        show ip access-list 86
+        show ipv6 access-list NoRemoteAccess
+    register: output
+  - debug:
+      msg: "{{output.stdout_lines}}"

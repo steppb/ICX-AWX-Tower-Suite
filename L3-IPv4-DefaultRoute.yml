@@ -1,0 +1,38 @@
+# Playbook Version: 1.1
+# =====================
+# The following variables will need to be defined prior to running this playbook:
+#
+# Required Variables:
+# <template_rtr_defrtr> IP Address of default router
+#
+# Optional Variables:
+# <template_rtr_ospf_definfo> (true|false) Redistribute default route
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+
+  tasks:
+  - name: Configuring Default Route
+    icx_config:
+      lines: |
+        ip route 0.0.0.0/0 {{template_rtr_defrtr}}
+      save_when: changed
+
+  - name: Configuring OSPF Default Information Originate
+    icx_config:
+      lines: |
+        router ospf
+         default-information-originate
+    when: template_rtr_ospf_definfo is defined and template_rtr_ospf_definfo|lower == 'true'
+
+  - name: Display Results
+    icx_command:
+      commands: show ip route
+    register: output
+  - debug:
+      msg: "{{output.stdout_lines}}"

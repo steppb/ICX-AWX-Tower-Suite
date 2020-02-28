@@ -1,0 +1,59 @@
+# Playbook Version: 1.1
+# =====================
+# The following variables will need to be defined prior to running this playbook:
+# Required Variables:
+# <template_snmp_community> SNMPv2 Community string
+# <template_snmp_acl> SNMPv2 ACL number or name if ipv6
+#
+# Optional Variables:
+# <template_snmp_host> SNMPv2 Host IP
+# <host_ipv6> (true|false) false by default
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+    ipv6:
+
+  tasks:
+  - name: Verify IPv4 ACL is configured
+    icx_command:
+      commands: show ip access-list {{template_snmp_acl}}
+    register: output
+    failed_when: "'is not available' in output.stdout[0] or output.stdout[0] == ''"
+    when: host_ipv6 is not defined or host_ipv6|lower != 'true'
+
+  - name: Verify IPv6 ACL is configured
+    icx_command:
+      commands: show ipv6 access-list {{template_snmp_acl}}
+    register: output
+    when: host_ipv6 is defined and host_ipv6|lower == 'true'
+
+  - name: Setup IPv6
+    set_fact:
+      ipv6: ipv6
+      cacheable: false
+    when: host_ipv6 is defined and host_ipv6|lower == 'true'
+
+  - name: Configuring SNMPv2 Community
+    icx_config:
+      lines: |
+        snmp-server community {{template_snmp_community}} ro {{ipv6}} {{template_snmp_acl}}
+      save_when: changed
+
+  - name: Configure SNMPv2 Host
+    icx_config:
+      lines: |
+        snmp-server host {{template_snmp_host}} version v2c {{template_snmp_community}}
+      save_when: changed
+    when: template_snmp_host is defined and template_snmp_host != ''
+
+  - name: Display Results
+    icx_command:
+      commands: show snmp server
+    register: output
+  - debug: 
+      msg: "{{output.stdout_lines}}"
