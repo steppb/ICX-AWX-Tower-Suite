@@ -1,0 +1,102 @@
+#! Description: Creates a Job Template for each playbook in a project.
+# Required Variables:
+# <template_project_name>
+#
+# Optional Variables:
+# <template_validate_certs>
+---
+- hosts: all
+  connection: local
+  gather_facts: no
+  module_defaults:
+    uri:
+      validate_certs: '{{template_validate_certs}}'
+      method: GET
+      user: '{{awxlogin_user}}'
+      password: '{{awxlogin_pass}}'
+      force_basic_auth: yes
+    set_fact:
+      cacheable: no
+  vars:
+    awx_api: https://{{ansible_host}}/api/v2
+    yaml_ext: '.yml'
+    desc_var: '#! Description: '
+    template_validate_certs: no
+
+  tasks:
+  - name: Get Project Directory
+    uri:
+      url: '{{awx_api}}/config/'
+    register: awxcfg
+
+  - name: Get Project Info
+    uri:
+      url: '{{awx_api}}/projects/?name={{template_project_name|urlencode}}'
+    register: pjinfo
+    failed_when: pjinfo.json.results[0] is not defined
+
+  - name: Get Inventory Info
+    uri:
+      url: '{{awx_api}}/inventories/?name={{template_project_inventory|urlencode}}'
+    register: invinfo
+
+  - name: Set Project Variables
+    set_fact:
+      pjid: "{{pjinfo.json.results[0].id}}"
+      pjpath: "{{awxcfg.json.project_base_dir}}/{{pjinfo.json.results[0].local_path}}"
+      invid: "{{invinfo.json.results[0].id}}"
+
+  - name: Get Playbook List
+    uri:
+      url: '{{awx_api}}/projects/{{pjid}}/playbooks/'
+    register: playbooks
+
+  - name: Get Playbook Info
+    shell: cat {{pjpath}}/{{item}} | grep '^# ' && echo '---'
+    register: extravar
+    loop: "{{playbooks.json}}"
+    changed_when: false
+    failed_when: false
+
+  - name: Get Playbook Descriptions
+    shell: cat {{pjpath}}/{{item}} | grep '^#! Description'
+    register: description
+    loop: "{{playbooks.json}}"
+    changed_when: false
+    failed_when: false
+
+  - name: Get Existing Template List
+    uri:
+      url: '{{awx_api}}/job_templates/?name={{item|regex_replace(yaml_ext)}}'
+    loop: '{{playbooks.json}}'
+    register: existing_templates
+
+  - name: Build Template Payload
+    set_fact:
+      template_struct: 
+        name: "{{item|regex_replace(yaml_ext)}}"
+        description: "{{description.results[idx].stdout|regex_replace(desc_var)}}"
+        extra_vars: "{{extravar.results[idx].stdout}}"
+        project: "{{pjid}}"
+        inventory: "{{invid}}"
+        playbook: "{{item}}"
+        ask_credential_on_launch: true
+    loop: "{{playbooks.json}}"
+    loop_control:
+      index_var: idx
+    register: job_templates
+
+  - name: Create Templates
+    uri:
+      url: '{{awx_api}}/job_templates/'
+      method: POST
+      headers:
+        Content-Type: "application/json"
+      body: "{{item.ansible_facts.template_struct}}"
+      body_format: json
+      status_code: 201
+      timeout: 60
+    loop: "{{job_templates.results}}"
+    loop_control:
+      index_var: idx
+    when: existing_templates.results[idx].json.results[0] is not defined

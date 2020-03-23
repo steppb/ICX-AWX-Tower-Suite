@@ -1,0 +1,58 @@
+#! Description: Removes all job templates for a project
+#
+# Required Variables:
+# <template_project_name>
+---
+- hosts: all
+  connection: local
+  gather_facts: no
+  vars:
+    template_validate_certs: no
+    job_templates: []
+
+  tasks:
+  - name: Get Project ID
+    uri:
+      url: https://{{ansible_host}}/api/v2/projects/?name={{template_project_name|urlencode}}
+      validate_certs: "{{template_validate_certs}}"
+      method: GET
+      user: '{{awxlogin_user}}'
+      password: '{{awxlogin_pass}}'
+      force_basic_auth: yes
+    register: pjinfo
+
+  - name: Get Playbook List
+    uri:
+      url: https://{{ansible_host}}/api/v2/projects/{{pjinfo.json.results[0].id}}/playbooks/
+      validate_certs: "{{template_validate_certs}}"
+      method: GET
+      user: '{{awxlogin_user}}'
+      password: '{{awxlogin_pass}}'
+      force_basic_auth: yes
+    register: playbooks
+
+  - name: Get Template List
+    uri:
+      url: https://{{ansible_host}}/api/v2/job_templates/?name={{item|regex_replace(yaml_ext)}}
+      validate_certs: '{{template_validate_certs}}'
+      method: GET
+      user: '{{awxlogin_user}}'
+      password: '{{awxlogin_pass}}'
+      force_basic_auth: yes
+    loop: '{{playbooks.json}}'
+    vars:
+      yaml_ext: '.yml'
+    register: job_templates
+
+  - name: Remove Templates
+    uri:
+      url: https://{{ansible_host}}/api/v2/job_templates/{{item.json.results[0].id}}/
+      validate_certs: '{{template_validate_certs}}'
+      method: DELETE
+      user: '{{awxlogin_user}}'
+      password: '{{awxlogin_pass}}'
+      force_basic_auth: yes
+      return_content: no
+      status_code: 204
+    loop: '{{job_templates.results}}'
+    when: item.json.results[0] is defined
