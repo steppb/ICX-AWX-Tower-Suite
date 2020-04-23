@@ -1,6 +1,9 @@
 #! Description: Creates a Job Template for each playbook in a project.
+# ====================
 # Required Variables:
-# <template_project_name>
+# <template_project_name>: Name of project to add job templates to.
+# <template_project_inventory>: Name of inventory to be added to new job templates.
+# <awxlogin_user> & <awxlogin_pass>: Login credentials for REST API.
 #
 # Optional Variables:
 # <template_validate_certs>
@@ -21,6 +24,7 @@
     awx_api: https://{{ansible_host}}/api/v2
     yaml_ext: '.yml'
     desc_var: '#! Description: '
+    newline_var: '\\\\n'
     template_validate_certs: no
 
   tasks:
@@ -99,4 +103,50 @@
     loop: "{{job_templates.results}}"
     loop_control:
       index_var: idx
+    register: new_job_templates
     when: existing_templates.results[idx].json.results[0] is not defined
+
+  - name: Scrape Playbook Prompts
+    shell: "grep '^#! Prompt' {{pjpath}}/{{item.json.playbook}} | sed 's/^.*Prompt: //g'"
+    register: rawprompt
+    failed_when: false
+    changed_when: false
+    loop: '{{new_job_templates.results}}'
+    when: item.status is defined and item.status == 201
+
+  - name: Prepare Survey Prompt Payload
+    set_fact:
+      template_url: 'https://{{ansible_host}}{{item.item.json.url}}'
+      payload:
+        name: ''
+        description: ''
+        spec: "{{item.stdout_lines[0]|from_yaml|regex_replace(newline_var, '\\\\n')}}"
+    loop: '{{rawprompt.results}}'
+    register: pbprompts
+    when: item.stdout_lines[0] is defined
+
+  - name: Add Survey Prompts
+    uri:
+      url: '{{item.ansible_facts.template_url}}survey_spec/'
+      method: POST
+      headers:
+        Content-Type: "application/json"
+      body: "{{item.ansible_facts.payload|regex_replace('@colon',':')|regex_replace('@question','?')}}"
+      body_format: json
+      timeout: 60
+    loop: '{{pbprompts.results}}'
+    register: prompt_status
+    when: item.ansible_facts is defined
+
+  - name: Enable Survey Prompts
+    uri:
+      url: '{{item.item.ansible_facts.template_url}}'
+      method: PATCH
+      headers:
+        Content-Type: "application/json"
+      body:
+        survey_enabled: true
+      body_format: json
+      timeout: 60
+    loop: '{{prompt_status.results}}'
+    when: item.status is defined and item.status == 200
