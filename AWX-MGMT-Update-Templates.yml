@@ -86,7 +86,6 @@
     changed_when: false
     loop: '{{template_list.results}}'
     when: item.json.results[0] is defined and item.json.results[0].project == pjid|int
-    p
 
   - name: Scrape Playbook Comments
     shell: grep '^# ' {{pjpath}}/{{item.json.results[0].playbook}} && echo '---'
