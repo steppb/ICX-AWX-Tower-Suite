@@ -1,12 +1,8 @@
-# Playbook Version: 1.1
+#! Description: Modify the local timezone.
+#! Prompt: [{question_name: Timezone, question_description: Select Timezone, required: true, type: multiplechoice, variable: template_tz, default: '', choices: us alaska\nus aleutian\nus arizona\nus central\nus east-indiana\nus eastern\nus hawaii\nus michigan\nus mountain\nus pacific\nus samoa\ngmt gmt+00\ngmt gmt+01\ngmt gmt+02\ngmt gmt+03\ngmt gmt+03@colon30\ngmt gmt+04\ngmt gmt+04@colon30\ngmt gmt+05\ngmt gmt+05@colon30\ngmt gmt+06\ngmt gmt+06@colon30\ngmt gmt+07\ngmt gmt+08\ngmt gmt+09\ngmt gmt+09@colon30\ngmt gmt+10\ngmt gmt+10@colon30\ngmt gmt+11\ngmt gmt+11@colon30\ngmt gmt+12\ngmt gmt-01\ngmt gmt-02\ngmt gmt-03\ngmt gmt-03@colon30\ngmt gmt-04\ngmt gmt-05\ngmt gmt-06\ngmt gmt-07\ngmt gmt-08\ngmt gmt-08@colon30\ngmt gmt-09\ngmt gmt-09@colon30\ngmt gmt-10\ngmt gmt-11\ngmt gmt-12, new_question: true}, {question_name: Summer-Time, question_description: Configure Summer-Time@question, required: true, type: multiplechoice, variable: template_tz_summertime, default: 'False', choices: True\nFalse, new_question: true} ]
+#
+# Playbook Version: 1.2
 # =====================
-# The following variables will need to be defined prior to running this playbook:
-#
-# Required Variables:
-# <template_tz> Timezone
-#
-# Optional Variables:
-# <template_tz_summertime> (true|false)
 ---
 - hosts: all
   connection: network_cli
@@ -16,15 +12,28 @@
     ansible_become: true
     ansible_become_method: enable
     template_tz_summertime: false
+    newline_var: "\r"
+    error_parse: '^.*ConnectionError: '
 
   tasks:
-  - name: Configuring Timezone
+  - name: Configure Timezone
     icx_config:
       lines: clock timezone {{template_tz}}
       save_when: changed
+    register: icxconfig_status
+    failed_when: icxconfig_status.msg is defined and "MODULE FAILURE" not in icxconfig_status.msg
 
-  - name: Configuring Summer-Time
+  - name: Parse Switch Error
+    set_fact:
+      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"
+    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: error_msg is not defined, fail_msg: '{{error_msg.split(newline_var)}}'}
+    when: error_msg is defined
+
+  - name: Configure Summer-Time
     icx_config:
       lines: clock summer-time
       save_when: changed
-    when: template_tz_summertime|lower == 'true'
+    when: template_tz_summertime|bool

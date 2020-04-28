@@ -1,9 +1,18 @@
-# Playbook Version: 1.1
-# =====================
-# The following variables will need to be defined prior to running this playbook:
+#! Description: Configure the source interface for RADIUS traffic.
+#! Prompt: [{question_name: Source Interface Type, question_description: Choose the interface type@colon, required: false, type: multiplechoice, variable: prompt_rad_inttype, default: '', choices: ethernet\nloopback\nve\nmanagement},{question_name: Source Interface Number, question_description: Enter the interface number. (i.e. 1/2/2), required: false, type: text, variable: prompt_rad_intnum, min: 0, max: 1024, default: '', choices: '', new_question: true}]
 #
-# Required Variables:
-# <template_srcint_radius> Source interface for Radius communication
+# Playbook Version: 1.2
+# =====================
+# Note: The variable will need to be defined with a space between the interface type and number.
+# (i.e. ethe 1/2/1, ve 100)
+#
+# The following variables can be used to set the RADIUS source interface.
+# They are listed in order of precedence (higher overrides lower).
+# 
+# <host_radius_srcint>: Defined at the Inventory Host. Only defines the RADIUS source interface for the host.
+# <host_srcint>: Defined at the Inventory Host.  Define source interface for all services. Valid interface types: (ethernet|loopback|ve)
+# <prompt_rad_inttype> & <prompt_rad_intnum>: Defined with job template Survey Prompt.
+# <template_radius_srcint>: Set at template to configure all inventory hosts with the same source interface.
 ---
 - hosts: all
   connection: network_cli
@@ -12,9 +21,56 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
+    newline_var: "\r"
+    error_parse: '^.*ConnectionError: '
 
   tasks:
-  - name: Configuring Radius Host
+  - name: Check For Deprecated Variable
+    fail:
+      msg: "WARNING: 'template_srcint_radius' is deprecated. Please use 'template_radius_srcint'."
+    ignore_errors: yes
+    when: template_srcint_radius is defined
+
+  - name: Use 'host_radius_srcint' Variable
+    set_fact: {rad_srcint: "{{host_radius_srcint}}"}
+    when: host_radius_srcint is defined
+
+  - name: Use 'host_srcint' Variable
+    set_fact: {rad_srcint: "{{host_srcint}}"}
+    when: host_srcint is defined and rad_srcint is not defined
+
+  - name: Use AWX Survey Prompt Variables
+    set_fact: {rad_srcint: "{{prompt_rad_inttype}} {{prompt_rad_intnum}}"}
+    when: prompt_rad_inttype is defined and prompt_rad_intnum is defined and rad_srcint is not defined
+
+  - name: Use 'template_radius_srcint' Variable
+    set_fact: {rad_srcint: "{{template_radius_srcint}}"}
+    when: template_radius_srcint is defined and rad_srcint is not defined
+
+  - name: Use Deprecated Variable
+    set_fact: {rad_srcint: "{{template_srcint_radius}}"}
+    when: template_srcint_radius is defined and rad_srcint is not defined
+
+  - name: Check Variable
+    assert: {that: rad_srcint is defined, fail_msg: "No variable defined"}
+
+  - name: Validate Variable Syntax
+    assert:
+      that: "' ' in rad_srcint"
+      fail_msg: "There needs to be a space between the interface type and number (i.e. ethe 1/1/1)"
+
+  - name: Configure Radius Host
     icx_config:
-      lines: ip radius source-interface {{template_srcint_radius}}
+      lines: ip radius source-interface {{rad_srcint}}
       save_when: changed
+    register: icxconfig_status
+    failed_when: icxconfig_status.msg is defined and "MODULE FAILURE" not in icxconfig_status.msg
+
+  - name: Parse Switch Error
+    set_fact:
+      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"
+    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: error_msg is not defined, fail_msg: '{{error_msg.split(newline_var)}}'}
+    when: error_msg is defined

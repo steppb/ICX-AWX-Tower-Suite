@@ -1,14 +1,8 @@
-# Playbook Version: 1.1
+#! Description: Add NTP Server and/or NTP authentication key.
+#! Prompt: [{question_name: NTP Server IP, question_description: Enter the NTP server IP address., required: false, type: text, variable: template_ntp_server, min: 0, max: 1024, default: '', choices: '', new_question: true}, {question_name: NTP Key ID, question_description: Enter the NTP Key ID. (Required if adding authenticated NTP server and/or adding authentication key), required: false, type: integer, variable: template_ntp_keyid, min: 1, max: 65535, default: '', choices: ''}, {question_name: NTP Authentication Method, question_description: Choose the authentication method. (Required if adding authentication key), required: false, type: multiplechoice, variable: template_ntp_authmethod, min: null, max: null, default: '', choices: md5\nsha1, new_question: true}, {question_name: NTP Key, question_description: Enter the NTP key string. (Required if adding authentication key), required: false, type: password, variable: template_ntp_key, min: 1, max: 16, default: '', choices: ''}]
+#
+# Playbook Version: 1.2
 # =====================
-# The following variables will need to be defined prior to running this playbook:
-#
-# Required Variables:
-# <template_ntp_server> NTP server IP address
-#
-# Optional Variables:
-# <template_ntp_key> Pre-shared NTP key string
-# <template_ntp_keyid> NTP key id integer
-# <template_ntp_authmethod> (md5|sha1) 
 ---
 - hosts: all
   connection: network_cli
@@ -17,24 +11,73 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
+    ntp_key_remove_cmd:
+    ntp_server_remove_cmd:
+    ntp_keyid:
+    newline_var: "\r"
+    error_parse: '^.*ConnectionError: '
 
   tasks:
-  - name: Configuring Authenticated NTP
-    icx_config:
-      lines: |
-        ntp
-         authentication-key key-id {{template_ntp_keyid}} {{template_ntp_authmethod}} {{template_ntp_key}}
-         server {{template_ntp_server}} key {{template_ntp_keyid}}
-      save_when: changed
-    when: template_ntp_key is defined and template_ntp_key != ''
+  - name: Set Key ID
+    set_fact:
+      ntp_keyid: key {{template_ntp_keyid}}
+    when: template_ntp_keyid is defined
 
-  - name: Configuring Non-Authenticated NTP
+  - name: Check For Existing NTP KeyID
+    icx_command: {commands: "show run | incl authentication-key key-id {{template_ntp_keyid}}"}
+    register: ntp_keyid_status
+    when: ntp_keyid != '' and template_ntp_authmethod is defined and template_ntp_key is defined
+
+  - name: Check For Existing NTP Server
+    icx_command: {commands: "show ntp associations | incl {{template_ntp_server}}"}
+    register: ntp_server_status
+    when: template_ntp_server is defined and template_ntp_server != ''
+
+  - name: Generate Command to Remove Existing NTP Key
+    set_fact:
+      ntp_key_remove_cmd: no authentication-key {{ntp_keyid}}
+    when: ntp_keyid_status.stdout is defined and ntp_keyid_status.stdout[0] != ''
+
+  - name: Generate Command to Remove Existing NTP Server
+    set_fact:
+      ntp_server_remove_cmd: no server {{template_ntp_server}}
+    when: ntp_server_status.stdout is defined and ntp_server_status.stdout[0] != ''
+
+  - name: Add NTP Authentication Key
     icx_config:
       lines: |
-        ntp
-          server {{template_ntp_server}}
+        {{ntp_key_remove_cmd}}
+        authentication-key {{ntp_keyid}} {{template_ntp_authmethod}} {{template_ntp_key}}
+      parents: ntp
       save_when: changed
-    when: template_ntp_key is not defined
+    register: icxconfig_status
+    failed_when: false
+    when: ntp_keyid_status.stdout is defined
+
+  - name: Parse Switch Error
+    set_fact:
+      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"
+    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
+
+  - name: Add NTP Server
+    icx_config:
+      lines: |
+        {{ntp_server_remove_cmd}}
+        server {{template_ntp_server}} {{ntp_keyid}}
+      parents: ntp
+      save_when: changed
+    register: icxconfig_status
+    failed_when: false
+    when: ntp_server_status.stdout is defined and error_msg is not defined
+
+  - name: Parse Switch Error
+    set_fact:
+      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"
+    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: error_msg is not defined, fail_msg: '{{error_msg.split(newline_var)}}'}
+    when: error_msg is defined
 
   - name: Display Results
     icx_command:

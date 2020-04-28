@@ -1,7 +1,18 @@
-# Playbook Version: 1.1
+#! Description: Configure the source interface for syslog traffic.
+#! Prompt: [{question_name: Source Interface Type, question_description: Choose the interface type@colon, required: false, type: multiplechoice, variable: prompt_log_inttype, default: '', choices: ethernet\nloopback\nve\nmanagement},{question_name: Source Interface Number, question_description: Enter the interface number. (i.e. 1/2/2), required: false, type: text, variable: prompt_log_intnum, min: 0, max: 1024, default: '', choices: '', new_question: true}]
+#
+# Playbook Version: 1.2
 # =====================
-# The following variables will need to be defined prior to running this playbook:
-# <template_log_srcint> IP address of source interface
+# Note: The variable will need to be defined with a space between the interface type and number.
+# (i.e. ethe 1/2/1, ve 100)
+#
+# The following variables can be used to set the Syslog source interface.
+# They are listed in order of precedence (higher overrides lower).
+#
+# <host_log_srcint>: Defined at the Inventory Host. Only defines the Syslog source interface for the host.
+# <host_srcint>: Defined at the Inventory Host.  Define source interface for all services. Valid interface types: (ethernet|loopback|ve)
+# <prompt_log_inttype> & <prompt_log_intnum>: Defined with job template Survey Prompt.
+# <template_log_srcint>: Set at template to configure all inventory hosts with the same source interface.
 ---
 - hosts: all
   connection: network_cli
@@ -10,9 +21,46 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
+    newline_var: "\r"
+    error_parse: '^.*ConnectionError: '
 
   tasks:
-  - name: Configuring Syslog
+  - name: Use 'host_log_srcint' Variable
+    set_fact: {log_srcint: "{{host_log_srcint}}"}
+    when: host_log_srcint is defined
+
+  - name: Use 'host_srcint' Variable
+    set_fact: {log_srcint: "{{host_srcint}}"}
+    when: host_srcint is defined and log_srcint is not defined
+
+  - name: Use AWX Survey Prompt Variables
+    set_fact: {log_srcint: "{{prompt_log_inttype}} {{prompt_log_intnum}}"}
+    when: prompt_log_inttype is defined and prompt_log_intnum is defined and log_srcint is not defined
+
+  - name: Use 'template_log_srcint' Variable
+    set_fact: {log_srcint: "{{template_log_srcint}}"}
+    when: template_log_srcint is defined and log_srcint is not defined
+
+  - name: Check Variable
+    assert: {that: log_srcint is defined, fail_msg: "No variable defined"}
+
+  - name: Validate Variable Syntax
+    assert:
+      that: "' ' in log_srcint"
+      fail_msg: "There needs to be a space between the interface type and number (i.e. ethe 1/1/1)"
+
+  - name: Configure Syslog Source-Interface
     icx_config:
-      lines: ip syslog source-interface {{template_log_srcint}}
+      lines: ip syslog source-interface {{log_srcint}}
       save_when: changed
+    register: icxconfig_status
+    failed_when: icxconfig_status.msg is defined and "MODULE FAILURE" not in icxconfig_status.msg
+
+  - name: Parse Switch Error
+    set_fact:
+      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"
+    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: error_msg is not defined, fail_msg: '{{error_msg.split(newline_var)}}'}
+    when: error_msg is defined

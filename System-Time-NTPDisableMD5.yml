@@ -1,4 +1,6 @@
-# Playbook Version: 1.1
+#! Description: Disable NTP MD5 Authentication.
+#
+# Playbook Version: 1.2
 # =====================
 ---
 - hosts: all
@@ -12,7 +14,6 @@
   tasks:
   - name: Disabling MD5 NTP Authentication
     icx_config:
-      lines: |
-        ntp
-         disable authenticate md5
+      lines: disable authenticate md5
+      parents: ntp
       save_when: changed
