@@ -3,15 +3,12 @@
 #
 # Playbook Version: 1.2
 # =====================
-# Note: The variable will need to be defined with a space between the interface type and number.
-# (i.e. ethe 1/2/1, ve 100)
-#
 # The following variables can be used to set the RADIUS source interface.
 # They are listed in order of precedence (higher overrides lower).
 # 
 # <host_radius_srcint>: Defined at the Inventory Host. Only defines the RADIUS source interface for the host.
 # <host_srcint>: Defined at the Inventory Host.  Define source interface for all services. Valid interface types: (ethernet|loopback|ve)
-# <prompt_rad_inttype> & <prompt_rad_intnum>: Defined with job template Survey Prompt.
+# <prompt_rad_inttype> & <prompt_rad_intnum>: Defined by AWX Survey Prompt.
 # <template_radius_srcint>: Set at template to configure all inventory hosts with the same source interface.
 ---
 - hosts: all
@@ -54,10 +51,9 @@
   - name: Check Variable
     assert: {that: rad_srcint is defined, fail_msg: "No variable defined"}
 
-  - name: Validate Variable Syntax
-    assert:
-      that: "' ' in rad_srcint"
-      fail_msg: "There needs to be a space between the interface type and number (i.e. ethe 1/1/1)"
+  - name: Correct Variable Spacing
+    set_fact: {rad_srcint: '{{rad_srcint|regex_replace("^([a-z]*)","\1 ")}}'}
+    when: "' ' not in rad_srcint"
 
   - name: Configure Radius Host
     icx_config:

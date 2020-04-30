@@ -3,15 +3,12 @@
 #
 # Playbook Version: 1.2
 # =====================
-# Note: The variable will need to be defined with a space between the interface type and number.
-# (i.e. ethe 1/2/1, ve 100)
-#
 # The following variables can be used to set the Syslog source interface.
 # They are listed in order of precedence (higher overrides lower).
 #
 # <host_log_srcint>: Defined at the Inventory Host. Only defines the Syslog source interface for the host.
 # <host_srcint>: Defined at the Inventory Host.  Define source interface for all services. Valid interface types: (ethernet|loopback|ve)
-# <prompt_log_inttype> & <prompt_log_intnum>: Defined with job template Survey Prompt.
+# <prompt_log_inttype> & <prompt_log_intnum>: Defined with AWX Survey Prompt.
 # <template_log_srcint>: Set at template to configure all inventory hosts with the same source interface.
 ---
 - hosts: all
@@ -44,10 +41,9 @@
   - name: Check Variable
     assert: {that: log_srcint is defined, fail_msg: "No variable defined"}
 
-  - name: Validate Variable Syntax
-    assert:
-      that: "' ' in log_srcint"
-      fail_msg: "There needs to be a space between the interface type and number (i.e. ethe 1/1/1)"
+  - name: Correct Variable Spacing
+    set_fact: {log_srcint: '{{log_srcint|regex_replace("^([a-z]*)","\1 ")}}'}
+    when: "' ' not in log_srcint"
 
   - name: Configure Syslog Source-Interface
     icx_config:

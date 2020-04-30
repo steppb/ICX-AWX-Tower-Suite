@@ -1,16 +1,14 @@
 #! Description: Configure the source interface for network time queries.
-#! Prompt: [{question_name: Source Interface, question_description: Type the NTP source interface. (example@colon ethe 1/2/1), required: true, type: textarea, variable: template_ntp_srcint, min: 0, max: 4096, default: host_srcint, choices: ''}]
+#! Prompt: [{question_name: Source Interface Type, question_description: Select the interface type@colon, required: false, type: multiplechoice, variable: prompt_ntp_srcint, min: null, max: null, default: '', choices: ethernet\nloopback\nve}, {question_name: Source Interface Number, question_description: Enter the interface number, required: false, type: text, variable: prompt_ntp_intnum, min: 0, max: 1024, default: '', choices: '', new_question: true}]
+#
 # Playbook Version: 1.2
 # =====================
-# Note: The variable will need to be defined with a space between the interface type and number.
-# (i.e. ethe 1/2/1, ve 100)
-# 
 # The following variables can be used to set the NTP source interface.
 # They are listed in order of precedence (higher overrides lower).
 # 
 # <host_ntp_srcint>: Define at the Inventory Host. Only defines the NTP source interface for the host.
 # <host_srcint>: Define at the Inventory Host.  Define source interface for all services.  Valid interface types: (ethernet|loopback|ve)
-# <prompt_ntp_inttype> & <prompt_ntp_intnum>: Defined with job template Survey Prompt.
+# <prompt_ntp_inttype> & <prompt_ntp_intnum>: Defined by AWX Survey Prompt.
 # <template_ntp_srcint>: Set at template to configure all inventory hosts with the same source interface
 ---
 - hosts: all
@@ -43,10 +41,9 @@
   - name: Check Variable
     assert: {that: ntp_srcint is defined, fail_msg: "No variable defined"}
 
-  - name: Validate Variable Syntax
-    assert:
-      that: "' ' in ntp_srcint"
-      fail_msg: "There needs to be a space between the interface type and number (i.e. ethe 1/1/1)"
+  - name: Correct Variable Spacing
+    set_fact: {ntp_srcint: '{{ntp_srcint|regex_replace("^([a-z]*)","\1 ")}}'}
+    when: "' ' not in ntp_srcint"
 
   - name: Configure NTP Source Interface
     icx_config:
