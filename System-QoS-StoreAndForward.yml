@@ -1,0 +1,37 @@
+#! Description: (ICX7750 only) Configure store-and-forward mode and reload switch.
+#
+# Playbook Version: 1.2
+# =====================
+# Note: Device will reload after successfully configuring store-and-forward mode.
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+
+  tasks:
+  - name: Gather Hardware Info
+    icx_facts: {gather_subset: hardware}
+    when: ansible_net_model is not defined
+
+  - name: Verify Switch Model
+    debug: msg="Cannot configure store-and-forward on {{ansible_net_model}}"
+    when: "'ICX7750' not in ansible_net_model"
+
+  - name: Configure Store-and-Forward mode
+    icx_config: {lines: store-and-forward, save_when: changed}
+    register: icxconfig_status
+    when: "'ICX7750' in ansible_net_model"
+
+  - name: Setting Reload Timer
+    icx_command:
+      commands: reload after 00:00:00
+    register: reload_status
+    when: icxconfig_status.changed|bool
+
+  - name: Display Reload Status
+    debug: var=reload_status.stdout_lines[0]
+    when: reload_status.stdout_lines[0] is defined
