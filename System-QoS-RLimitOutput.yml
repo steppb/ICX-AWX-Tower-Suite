@@ -1,13 +1,10 @@
-# Playbook Version: 1.1
+#! Description: Configure rate-limiting on an interface.
+#! Prompt: [{question_name: Target Interface, question_description: Enter the interface. (i.e. e1/1/1), required: true, type: text, variable: template_qos_rlimitint, min: 0, max: 1024, default: '', choices: '' }, {question_name: Target Rate-Limit, question_description: Enter the rate-limit (in Kbps), required: true, type: text, variable: template_qos_rlimitkb, min: 0, max: 1024, default: '', choices: '', new_question: true}, {question_name: Target Priority, question_description: Enter the target priority for the rate-limit. (optional), required: false, type: integer, variable: template_qos_rlimitpri, min: 0, max: 7, default: '', choices: '', new_question: true}]
+#
+# Playbook Version: 1.2
 # =====================
-# The following variables will need to be defined prior to running this playbook:
-#
-# Required Variables:
-# <template_qos_rlimitint> Interface to rate-limit
-# <template_qos_rlimitkb> Rate limit in Kbps
-#
-# Optional Variables:
-# <template_qos_rlimitpri> Rate limit for specific Priority
+# Note: ICX7750 requires running the System-QoS-StoreAndForward
+#       template before this template can be applied.
 ---
 - hosts: all
   connection: network_cli
@@ -16,9 +13,27 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
+    newline_var: "\r"
+    error_parse: '^.*ConnectionError: '
     priority:
 
   tasks:
+  - name: Gather Hardware Info
+    icx_facts: {gather_subset: hardware}
+    when: ansible_net_model is not defined
+
+  - name: Query Store-and-Forward Mode
+    icx_command:
+      commands: show run | incl store-and-forward
+    register: mode_config
+    when: "'ICX7750' in ansible_net_model"
+
+  - name: Verify Store-and-Forward Mode
+    assert:
+      that: "'store-and-forward' in mode_config.stdout_lines[0]"
+      fail_msg: "ERROR: System-QoS-StoreAndForward needs to be applied before running this template"
+    when: "'ICX7750' in ansible_net_model"
+
   - name: Setting Priority Value
     set_fact:
       priority: "priority {{template_qos_rlimitpri}}"
@@ -27,7 +42,17 @@
 
   - name: Configuring Rate-Limit on Interface
     icx_config:
-      lines: |
-        interface {{template_qos_rlimitint}}
-         rate-limit output shaping {{template_qos_rlimitkb}} {{priority}}
+      lines: rate-limit output shaping {{template_qos_rlimitkb}} {{priority}}
+      parents: interface {{template_qos_rlimitint}}
       save_when: changed
+    register: icxconfig_status
+    failed_when: false
+
+  - name: Parse Switch Error
+    set_fact:
+      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"
+    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: error_msg is not defined, fail_msg: '{{error_msg.split(newline_var)}}'}
+    when: error_msg is defined

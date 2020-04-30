@@ -1,9 +1,9 @@
-# Playbook Version: 1.1
-# =====================
-# The following variables will need to be defined prior to running this playbook:
+#! Description: Configure interface to inspect ingress traffic and map to matching queues.
+#! Prompt: [{question_name: Target Interface, question_description: Enter the interface. (i.e. e1/1/2), required: true, type: text, variable: template_qos_int, min: 0, max: 1024, default: '', choices: '', new_question: true}]
 #
-# Required Variables:
-# <template_qos_int> Interface to set DSCP Trust
+# Playbook Version: 1.2
+# =====================
+# Note: DSCP trust can only be configured on physical ethernet interfaces.
 ---
 - hosts: all
   connection: network_cli
@@ -12,11 +12,28 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
+    newline_var: "\r"
+    error_parse: '^.*ConnectionError: '
 
   tasks:
-  - name: Setting QoS Trust on Interface
+  - name: Verify Interface type
+    assert:
+      that: template_qos_int is match("^e.*")
+      fail_msg: "ERROR: DSCP Trust can only be applied to ethernet interfaces"
+
+  - name: Configure QoS Trust on Interface
     icx_config:
-      lines: |
-        interface {{template_qos_int}}
-         trust dscp
+      lines: trust dscp
+      parents: interface {{template_qos_int}}
       save_when: changed
+    register: icxconfig_status
+    failed_when: icxconfig_status.msg is defined and "MODULE FAILURE" not in icxconfig_status.msg
+
+  - name: Parse Switch Error
+    set_fact:
+      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"
+    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: error_msg is not defined, fail_msg: '{{error_msg.split(newline_var)}}'}
+    when: error_msg is defined
