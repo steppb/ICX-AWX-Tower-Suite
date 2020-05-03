@@ -1,10 +1,9 @@
-# Playbook Version: 1.1
-# =====================
-# The following variables will need to be defined prior to running this playbook:
+#! Description: Add VLAN(s) to MSTP Instance.
+#! Prompt: [{question_name: MSTI ID, question_description: Enter the MSTP Instance ID, required: true, type: integer, variable: template_l2_mstpinst, min: 0, max: 4094, default: '', choices: '', new_question: true}, {question_name: MSTP VLAN ID, question_description: Enter a single VLAN or a VLAN range to add to MSTI. (e.g. 1 to 100), required: true, type: text, variable: template_l2_mstpvlan, min: 0, max: 1024, default: '', choices: '', new_question: true}]
 #
-# Required Variables:
-# <template_l2_mstpinst> MSTP instance
-# <template_l2_mstvlan> VLAN ID to add to MSTP Instance
+# Playbook Version: 1.2
+# =====================
+# Note: L2-MSTP-Config template needs to be applied before running this template.
 ---
 - hosts: all
   connection: network_cli
@@ -13,10 +12,39 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
+    newline_var: "\r"
+    error_parse: '^.*ConnectionError: '
 
   tasks:
-  - name: Adding VLAN to MSTP Instance
+  - name: Get MSTP Config
+    icx_command: {commands: show mstp config}
+    register: mstp_status
+
+  - name: Verify MSTP Mode
+    assert:
+      that: mstp_status.stdout is defined and mstp_status.stdout[0] != ''
+      fail_msg: "ERROR: L2-MSTP-Config needs to be applied before running this template"
+
+  - name: Add VLAN(s) to MSTP Instance
     icx_config:
-      lines: |
-        mstp instance {{template_l2_mstpinst}} vlan {{template_l2_mstpvlan}}
+      lines: mstp instance {{template_l2_mstpinst}} vlan {{template_l2_mstpvlan}}
       save_when: changed
+    register: icxconfig_status
+    failed_when: false
+
+  - name: Parse Switch Error
+    set_fact:
+      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"
+    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: error_msg is not defined, fail_msg: '{{error_msg.split(newline_var)}}'}
+    when: error_msg is defined
+
+  - name: Get MSTP Config
+    icx_command: {commands: show mstp configuration}
+    register: mstp_config
+
+  - name: Display MSTP Config
+    debug: var=mstp_config.stdout_lines[0]
+    when: mstp_config.stdout_lines[0] is defined

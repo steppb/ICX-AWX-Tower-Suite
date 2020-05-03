@@ -1,10 +1,10 @@
-# Playbook Version: 1.1
-# =====================
-# The following variables will need to be defined prior to running this playbook:
+#! Description: Configure interfaces as MSTP admin-edge or point-to-point ports.
+#! Prompt: [{question_name: MSTP Point-to-Point Interface, question_description: Enter the MSTP Point-to-Point Interface(s). (e.g. e 1/1/1 or e1/1/1 to 1/1/24), required: false, type: text, variable: template_l2_mstp_pt2pt, min: 0, max: 1024, default: '', choices: '', new_question: true}, {question_name: MSTP Edge Interface, question_description: Enter the MSTP Edge Interface(s). (e.g. e1/1/1 or e1/1/1 to 1/1/24), required: false, type: text, variable: template_l2_mstp_edgeint, min: 0, max: 1024, default: '', choices: '', new_question: true}]
 #
-# Optional Variables:
-# <template_l2_mstp_pt2pt> MSTP Point-to-Point Interface
-# <template_l2_mstp_edgeint> MSTP Edge Interface
+# Playbook Version: 1.2
+# =====================
+# Note: L2-MSTP-Config template needs to be applied before running this template.
+#       Only interfaces in an MSTP VLAN will be added to config.
 ---
 - hosts: all
   connection: network_cli
@@ -13,18 +13,51 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
+    newline_var: "\r"
+    error_parse: '^.*ConnectionError: '
+    pt2pt_int:
+    edge_int:
 
   tasks:
+  - name: Get MSTP Config
+    icx_command: {commands: show mstp config}
+    register: mstp_status
+
+  - name: Verify MSTP Mode
+    assert:
+      that: mstp_status.stdout is defined and mstp_status.stdout[0] != ''
+      fail_msg: "ERROR: L2-MSTP-Config needs to be applied before running this template"
+
+  - name: Set MSTP Point-to-Point Interface Command
+    set_fact: {pt2pt_int: "mstp admin-pt2pt-mac {{template_l2_mstp_pt2pt}}"}
+    when: template_l2_mstp_pt2pt is defined and template_l2_mstp_pt2pt != ''
+
+  - name: Set MSTP Edge Interface Command
+    set_fact: {edge_int: "mstp admin-edge-port {{template_l2_mstp_edgeint}}"}
+    when: template_l2_mstp_edgeint is defined and template_l2_mstp_edgeint != ''
+
   - name: Configuring MSTP Point-to-Point Interface(s)
     icx_config:
       lines: |
-        mstp admin-pt2pt-mac {{template_l2_mstp_pt2pt}}
+        {{pt2pt_int}}
+        {{edge_int}}
       save_when: changed
-    when: template_l2_mstp_pt2pt is defined and template_l2_mstp_pt2pt is not ''
+    register: icxconfig_status
+    failed_when: false
 
-  - name: Configuring MSTP Edge Interface(s)
-    icx_config:
-      lines: |
-        mstp admin-edge-port {{template_l2_mstp_edgeint}}
-      save_when: changed
-    when: template_l2_mstp_edgeint is defined and template_l2_mstp_edgeint is not ''
+  - name: Parse Switch Error
+    set_fact:
+      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"
+    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: error_msg is not defined, fail_msg: '{{error_msg.split(newline_var)}}'}
+    when: error_msg is defined
+
+  - name: Get MSTP Config
+    icx_command: {commands: show run | incl mstp}
+    register: mstp_config
+
+  - name: Display MSTP Config
+    debug: var=mstp_config.stdout_lines[0]
+    when: mstp_config.stdout_lines[0] is defined

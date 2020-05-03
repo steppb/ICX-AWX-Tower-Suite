@@ -1,10 +1,9 @@
-# Playbook Version: 1.1
-# =====================
-# The following variables will need to be defined prior to running this playbook:
+#! Description: Configure MSTP instance priority.
+#! Prompt: [{question_name: MSTI ID, question_description: Enter the MSTP Instance ID, required: true, type: integer, variable: template_l2_mstpinst, min: 0, max: 4094, default: '', choices: ''}, {question_name: MSTI Priority, question_description: Enter the MSTP Instance Priority (0 to 61440 in increments of 4096), required: true, type: integer, variable: template_l2_mstppri, min: 0, max: 61440, default: '', choices: '', new_question: true}]
 #
-# Required Variables:
-# <template_l2_mstpinst> MSTP instance
-# <template_l2_mstppri> MSTP Instance Bridge Priority
+# Playbook Version: 1.2
+# =====================
+# Note: L2-MSTP-Config template needs to be applied before running this template.
 ---
 - hosts: all
   connection: network_cli
@@ -13,10 +12,48 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
+    newline_var: "\r"
+    error_parse: '^.*ConnectionError: '
 
   tasks:
-  - name: Configuring MSTP Instance Priority
+  - name: Get MSTP Config
+    icx_command: {commands: show mstp config}
+    register: mstp_status
+
+  - name: Verify MSTP Mode
+    assert:
+      that: mstp_status.stdout is defined and mstp_status.stdout[0] != ''
+      fail_msg: "ERROR: L2-MSTP-Config needs to be applied before running this template"
+
+  - name: Get MSTP Instance(s)
+    icx_command: {commands: 'show run | incl mstp instance {{template_l2_mstpinst}}'}
+    register: msti_status
+
+  - name: Verify MSTP Instance
+    assert:
+      that: msti_status.stdout is defined and msti_status.stdout[0] != ''
+      fail_msg: "ERROR: L2-MSTP-VLAN needs to be applied before running this template"
+
+  - name: Configure MSTP Instance Priority
     icx_config:
-      lines: |
-        mstp instance {{template_l2_mstpinst}} priority {{template_l2_mstppri}}
+      lines: mstp instance {{template_l2_mstpinst}} priority {{template_l2_mstppri}}
       save_when: changed
+    register: icxconfig_status
+    failed_when: false
+
+  - name: Parse Switch Error
+    set_fact:
+      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"
+    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: error_msg is not defined, fail_msg: '{{error_msg.split(newline_var)}}'}
+    when: error_msg is defined
+
+  - name: Get MSTP Config
+    icx_command: {commands: show mstp configuration}
+    register: mstp_config
+
+  - name: Display MSTP Config
+    debug: var=mstp_config.stdout_lines[0]
+    when: mstp_config.stdout_lines[0] is defined
