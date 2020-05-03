@@ -1,9 +1,10 @@
-# Playbook Version: 1.1
-# =====================
-# The following variables will need to be defined prior to running this playbook:
+#! Description: Configure Enable Password
+#! Prompt: [{question_name: Target Enable Password, question_description: Enter the Enable Password, required: true, type: password, variable: template_remote_enablepw, min: 1, max: 32, default: '', choices: '', new_question: true}]
 #
-# Required Variables:
-# <template_remote_enablepw> Enable password
+# Playbook Version: 1.2
+# =====================
+# Note: If passsword-masking is enabled, it will be removed before setting password,
+#       then reenabled.
 ---
 - hosts: all
   connection: network_cli
@@ -12,9 +13,38 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
+    newline_var: "\r"
+    error_parse: '^.*ConnectionError: '
+    enable_pwmask_cmd:
 
   tasks:
-  - name: Configuring Enable Password
-    icx_config:
-      lines: enable super-user-password {{template_remote_enablepw}}
-      save_when: changed
+  - name: Check Password String
+    assert:
+      that: template_remote_enablepw is search("[a-zA-Z]")
+      fail_msg: "Invalid Password"
+
+  - name: Check Password Masking
+    icx_command: {commands: show run | incl user password-masking}
+    register: pwmask_status
+
+  - name: Disable Password Masking
+    icx_config: {lines: no enable user password-masking, save_when: changed}
+    when: pwmask_status.stdout is defined and pwmask_status.stdout[0] != ''
+
+  - name: Configure Enable Password
+    icx_config: {lines: "enable super-user-password {{template_remote_enablepw}}", save_when: changed}
+    register: icxconfig_status
+    failed_when: false
+
+  - name: Parse Switch Error
+    set_fact:
+      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"
+    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: error_msg is not defined, fail_msg: '{{error_msg.split(newline_var)}}'}
+    when: error_msg is defined
+
+  - name: Reenable Password Masking
+    icx_config: {lines: enable user password-masking, save_when: changed}
+    when: pwmask_status.stdout is defined and pwmask_status.stdout[0] != ''
