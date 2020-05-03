@@ -1,4 +1,6 @@
-# Playbook Version: 1.1
+#! Description: Configure DoS protection on device.
+#
+# Playbook Version: 1.2
 # =====================
 ---
 - hosts: all
@@ -8,13 +10,42 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
+    newline_var: "\r"
+    error_parse: '^.*ConnectionError: '
+    tcp_rate_cmd: ip tcp burst-normal 10 burst-max 100 lockup 300
+    attack_rate_cmd:
 
   tasks:
+  - name: Gather Hardware Info
+    icx_facts: {gather_subset: hardware}
+    when: ansible_net_model is not defined
+
+  - name: Set Attack-Rate Command
+    set_fact:
+      attack_rate_cmd: ip icmp attack-rate burst-normal 5000 burst-max 10000 lockup 300
+    when: "'ICX7' in ansible_net_model"
+
+  - name: Set TCP Burst Rate Command for ICX7750
+    set_fact:
+      tcp_rate_cmd: ip tcp burst-normal 300 burst-max 3000 lockup 300
+    when: "'ICX7750' in ansible_net_model"
+
   - name: Configuring DoS Protection
     icx_config:
       lines: |
-        ip icmp attack-rate burst-normal 5000 burst-max 10000 lockup 300
-        ip tcp burst-normal 10 burst-max 100 lockup 300
+        {{attack_rate_cmd}}
+        {{tcp_rate_cmd}}
         no ip icmp unreachable
         no ip source-route
       save_when: changed
+    register: icxconfig_status
+    failed_when: icxconfig_status.msg is defined and "MODULE FAILURE" not in icxconfig_status.msg
+
+  - name: Parse Switch Error
+    set_fact:
+      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"
+    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: error_msg is not defined, fail_msg: '{{error_msg.split(newline_var)}}'}
+    when: error_msg is defined
