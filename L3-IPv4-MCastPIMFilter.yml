@@ -1,9 +1,11 @@
-# Playbook Version: 1.1
-# =====================
-# The following variables will need to be defined prior to running this playbook:
+#! Description: Configure IP PIM Neighbor-Filter ACL.
+#! Prompt: [{question_name: PIM Interface, question_description: Enter the PIM Interface (e.g. ve20 or e1/1/1), required: true, type: text, variable: prompt_pimint, min: 0, max: 1024, default: '', choices: '', new_question: true}, {question_name: PIM ACL, question_description: Enter the ACL Name or Number, required: true, type: text, variable: prompt_pimacl, min: 0, max: 1024, default: '86', choices: '', new_question: true}]
 #
-# Required Variables:
-# <template_mcast_rtrint> Router interface to apply PIM Filter
+# Playbook Version: 1.2
+# =====================
+# Note: The following templates need to be applied before running this template:
+#       L3-IPv4-MCastPIM
+#       L3-IPv4-MCastPIMInterface
 ---
 - hosts: all
   connection: network_cli
@@ -12,19 +14,56 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
+    newline_var: "\r"
+    error_parse: '^.*ConnectionError: '
+    remove_filter_cmd:
 
   tasks:
-  - name: Applying PIM Neighbor Filter
+  - name: Get Global PIM Config
+    icx_command: {commands: show run | incl ^router pim}
+    register: pimrtr_status
+
+  - name: Verify Global PIM Config
+    assert:
+      that: pimrtr_status is defined and pimrtr_status.stdout[0] != ''
+      fail_msg: "ERROR: L3-IPv4-MCastPIM needs to be applied before running this template"
+
+  - name: Get Interface Config
+    icx_command: {commands: 'show run int {{prompt_pimint}}'}
+    register: int_status
+
+  - name: Verify Interface PIM Config
+    assert:
+      that: "int_status is defined and 'ip pim-sparse' in int_status.stdout[0]"
+      fail_msg: "ERROR: L3-IPv4-MCastPIMInterface needs to be applied to interface {{prompt_pimint}}"
+
+  - name: Set Remove PIM Neighbor Filter Command
+    set_fact: {remove_filter_cmd: 'no {{item}}'}
+    when: "'ip pim neighbor-filter' in item"
+    loop: '{{int_status.stdout_lines[0]}}'
+
+  - name: Apply PIM Neighbor Filter
     icx_config:
       lines: |
-        ip pim neighbor-filter 86
-      parents:
-        interface {{template_mcast_rtrint}}
+        {{remove_filter_cmd}}
+        ip pim neighbor-filter {{prompt_pimacl}}
+      parents: interface {{prompt_pimint}}
       save_when: changed
+    register: icxconfig_status
+    failed_when: false
 
-  - name: Display Results
-    icx_command:
-      commands: show run int {{template_mcast_rtrint}}
+  - name: Parse Switch Error
+    set_fact:
+      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"
+    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: error_msg is not defined, fail_msg: '{{error_msg.split(newline_var)}}'}
+    when: error_msg is defined
+
+  - name: Get PIM Interface Info
+    icx_command: {commands: 'show ip pim interface {{prompt_pimint}}'}
     register: output
-  - debug:
-      msg: "{{output.stdout_lines}}"
+
+  - name: Display PIM Interface Info
+    debug: var=output.stdout_lines[0]
