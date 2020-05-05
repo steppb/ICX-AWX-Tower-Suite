@@ -1,14 +1,8 @@
-# Playbook Version: 1.1
+#! Description: Create and deploy a new LAG.
+#! Prompt: [{question_name: New LAG Name, question_description: Enter a name for the new LAG@colon, required: true, type: text, variable: template_lag_name, min: 1, max: 64, default: '', choices: ''}, {question_name: LAG Mode, question_description: Select the LAG Mode@colon, required: true, type: multiplechoice, variable: template_lag_mode, min: null, max: null, default: '', choices: dynamic\nstatic\nkeep-alive}, {question_name: LAG ID, question_description: Enter the LAG ID@colon (Optional), required: false, type: integer, variable: template_lag_id, min: 0, max: 2047, default: '', choices: ''}, {question_name: LAG Ports, question_description: Enter the LAG ports@colon (e.g. e 1/1/1 e 1/1/2), required: true, type: text, variable: template_lag_port, min: 5, max: 1024, default: '', choices: '', new_question: true}]
+#
+# Playbook Version: 1.2
 # =====================
-# The following variables will need to be defined prior to running this playbook:
-#
-# Required Variables:
-# <template_lag_name> LAG Name
-# <template_lag_mode> (dynamic|static|keep-alive)
-# <template_lag_port> LAG interface written as: 1/1/1
-#
-# Optional Variables:
-# <template_lag_id> LAG ID. Default auto.
 ---
 - hosts: all
   connection: network_cli
@@ -17,20 +11,69 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
-    template_lag_id: auto
+    newline_var: "\r"
+    error_parse: '^.*ConnectionError: '
+    eth_var: '(e|et|eth|ethe|ether|ethern|etherne|ethernet)'
+    port_var: '([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2})'
+    range_var: '^.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*to.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*$'
+    primary_port_var: '^e ([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*$'
+    primary_port_cmd:
+    deploy_cmd:
+    lagid:
 
   tasks:
+  - name: Gather Hardware Info
+    icx_facts: {gather_subset: hardware}    
+    when: ansible_net_image is not defined
+
+  - name: Parse Version
+    set_fact: {sw_ver: '{{ansible_net_image|regex_replace("^.*([0-9]{5}).*$", "\1")}}'}
+
+  - name: Set LAG ID
+    set_fact: {lagid: 'id {{template_lag_id}}'}
+    when: "template_lag_id is defined and 'keep-alive' not in template_lag_mode"
+
+  - name: Set Automatic LAG ID
+    set_fact: {lagid: id auto}
+    when: template_lag_id is not defined and sw_ver|int >= 8061
+
+  - name: Format Interface List
+    set_fact: {lagports: '{{template_lag_port|regex_replace(eth_var)|regex_replace(port_var, "e \1")}}'}
+    when: "'to' not in template_lag_port"
+
+  - name: Format Interface Range
+    set_fact: {lagports: '{{template_lag_port|regex_replace(range_var, "e \1 to \2")}}'}
+    when: "'to' in template_lag_port"
+
+  - name: Set Legacy LAG Commands
+    set_fact:
+      primary_port_cmd: 'primary-port {{lagports|regex_replace(primary_port_var, "\1")}}'
+      deploy_cmd: deploy
+    when: sw_ver|int < 8061
+
   - name: Adding Ports to Lag
     icx_config:
       lines: |
-        lag {{template_lag_name}} {{template_lag_mode}} id {{template_lag_id}}
-        ports ethe {{template_lag_port}}
+        lag {{template_lag_name}} {{template_lag_mode}} {{lagid}}
+        ports {{lagports}}
+        {{primary_port_cmd}}
+        {{deploy_cmd}}
       save_when: changed
+    register: icxconfig_status
+    failed_when: icxconfig_status.msg is defined and "MODULE FAILURE" not in icxconfig_status.msg
 
-  - name: Display Results
-    icx_command:
-      commands: show lag brief {{template_lag_name}}
+  - name: Parse Switch Error
+    set_fact:
+      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"
+    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: error_msg is not defined, fail_msg: '{{error_msg.split(newline_var)}}'}
+    when: error_msg is defined
+
+  - name: Get LAG Config
+    icx_command: {commands: 'show lag {{template_lag_name}}'}
     register: output
 
-  - debug:
-      msg: "{{output.stdout_lines}}"
+  - name: Display LAG Config
+    debug: var=output.stdout_lines[0]
