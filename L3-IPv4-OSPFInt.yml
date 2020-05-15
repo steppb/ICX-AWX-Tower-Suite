@@ -1,17 +1,10 @@
-# Playbook Version: 1.1
+#! Description: Configure OSPF interface.
+#! Prompt: [{question_name: OSPF Area@colon, question_description: '', required: true, type: text, variable: prompt_rtr_ospf_area, min: 1, max: 1024, default: '', choices: '', new_question: true}, {question_name: Interface@colon, question_description: (e.g. e1/1/2 or ve20), required: true, type: text, variable: prompt_rtr_int, min: 1, max: 1024, default: '', choices: ''}, {question_name: OSPF Retransmit-Interval@colon, question_description: '', required: false, type: integer, variable: prompt_rtr_ospf_retrans, min: 0, max: 3600, default: 5, choices: '', new_question: true}, {question_name: OSPF Transmit Delay@colon, question_description: '', required: false, type: integer, variable: prompt_rtr_ospf_transdelay, min: 0, max: 3600, default: 1, choices: '', new_question: true}, {question_name: OSPF Authentication Key ID@colon, question_description: '', required: false, type: integer, variable: prompt_rtr_ospf_keyid, min: 1, max: 255, default: '', choices: '', new_question: true}, {question_name: OSPF MD5 Authentication Key, question_description: '', required: false, type: password, variable: prompt_rtr_ospf_md5key, min: 1, max: 16, default: '', choices: '', new_question: true}]
+#
+# Playbook Version: 1.2
 # =====================
-# The following variables will need to be defined prior to running this playbook:
-#
-# Required Variables:
-# <template_rtr_ospf_area> OSPF Area
-# <template_rtr_int> OSPF Interface
-#
-# Optional Variables:
-# <template_rtr_ospf_keyid> OSPF MD5 Key ID
-# <template_rtr_ospf_md5key> OSPF MD5 Key
-# <template_rtr_ospf_retrans> OSPF retransmit interval. Default 5
-# <template_rtr_ospf_transdelay> OSPF transmit delay
-# <template_rtr_ospf_passive> {true|false} IP OSPF passive interface
+# Note: OSPF Area needs to be created globally with 'L3-IPv4-OSPFGlobal' before running
+#       this template.
 ---
 - hosts: all
   connection: network_cli
@@ -20,38 +13,77 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
-    template_rtr_ospf_retrans: 5
-    template_rtr_ospf_transdelay: 1
-    ospf_auth:
-    passive:
+    newline_var: "\r"
+    error_parse: '^.*ConnectionError: '
+    OspfAuthCmd:
+    PassiveIntCmd:
 
   tasks:
-  - name: Setting OSPF Authentication
-    set_fact:
-      ospf_auth: "ip ospf md5-authentication key-id {{template_rtr_ospf_keyid}} key {{template_rtr_ospf_md5key}}"
-      cacheable: no
-    when: template_rtr_ospf_md5key is defined and template_rtr_ospf_md5key != ''
+  - name: Get Router OSPF Config
+    icx_command: {commands: show run | include ^router ospf}
+    register: OspfConfig
 
-  - name: Setting OSPF Passive Interface
-    set_fact:
-      passive: "ip ospf passive"
-      cacheable:
-    when: template_rtr_ospf_passive is defined and template_rtr_ospf_passive|lower == 'true'
+  - name: Verify Router OSPF Config
+    assert:
+      that:
+        - OspfConfig.stdout[0] is defined
+        - OspfConfig.stdout[0] != ''
+      fail_msg:
+        - "ERROR: Router OSPF not configured!"
+        - "L3-IPv4-OSPFGlobal needs to be applied before running this template"
 
-  - name: Configuring OSPF
+  - name: Get OSPF Area Config
+    icx_command: {commands: 'show ip ospf area {{prompt_rtr_ospf_area}}'}
+    register: OspfConfig
+
+  - name: Verify Configuration of OSPF Area
+    assert:
+      that:
+        - OspfConfig.stdout[0] is defined
+        - OspfConfig.stdout[0] != ''
+      fail_msg:
+        - "ERROR: OSPF area {{prompt_rtr_ospf_area}} does not exist"
+        - "Create OSPF area {{prompt_rtr_ospf_area}} with L3-IPv4-OSPFGlobal template"
+
+  - name: Set OSPF Authentication Command
+    set_fact:
+      OspfAuthCmd: "ip ospf md5-authentication key-id {{prompt_rtr_ospf_keyid}} key {{prompt_rtr_ospf_md5key}}"
+    when:
+      - prompt_rtr_ospf_md5key is defined
+      - prompt_rtr_ospf_keyid is defined
+      - prompt_rtr_ospf_md5key != ''
+      - prompt_rtr_ospf_keyid != ''
+
+  - name: Set OSPF Passive Interface
+    set_fact:
+      PassiveIntCmd: "ip ospf passive"
+    when: prompt_rtr_ospf_passive is defined and prompt_rtr_ospf_passive|bool
+
+  - name: Apply OSPF Interface Config
     icx_config:
       lines: |
-        interface {{template_rtr_int}}
-         ip ospf area {{template_rtr_ospf_area}}
-         ip ospf retransmit-interval {{template_rtr_ospf_retrans}}
-         ip ospf transmit-delay {{template_rtr_ospf_transdelay}}
-         {{ospf_auth}}
-         {{passive}}
+         ip ospf area {{prompt_rtr_ospf_area}}
+         ip ospf retransmit-interval {{prompt_rtr_ospf_retrans|default("5")}}
+         ip ospf transmit-delay {{prompt_rtr_ospf_transdelay|default("1")}}
+         {{OspfAuthCmd}}
+         {{PassiveIntCmd}}
+      parents: int {{prompt_rtr_int}}
       save_when: changed
+    register: icxconfig_status
+    failed_when: false
 
-  - name: Display Results
-    icx_command:
-      commands: show ip ospf interface {{template_rtr_int}}
+  - name: Parse Switch Error
+    set_fact:
+      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"
+    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: error_msg is not defined, fail_msg: '{{error_msg.split(newline_var)}}'}
+    when: error_msg is defined
+
+  - name: Get OSPF Interface Info
+    icx_command: {commands: 'show ip ospf interface {{prompt_rtr_int}}'}
     register: output
-  - debug:
-      msg: "{{output.stdout_lines}}"
+
+  - name: Display OSPF Interface Info
+    debug: var=output.stdout_lines[0]

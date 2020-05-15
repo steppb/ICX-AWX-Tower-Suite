@@ -1,9 +1,8 @@
-# Playbook Version: 1.1
-# =====================
-# The following variables will need to be defined prior to running this playbook:
+#! Description: Configure OSPFv3 area.
+#! Prompt: [{question_name: OSPFv3 Area@colon, question_description: '', required: true, type: text, variable: prompt_rtr_ospfv3_area, min: 0, max: 1024, default: '', choices: '', new_question: true}]
 #
-# Required Variables:
-# <template_rtr_ospfv3_area> OSPFv3 area
+# Playbook Version: 1.2
+# =====================
 ---
 - hosts: all
   connection: network_cli
@@ -12,22 +11,35 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
+    newline_var: "\r"
+    error_parse: '^.*ConnectionError: '
 
   tasks:
-  - name: Configuring OSPFv3
+  - name: Configure OSPFv3
     icx_config:
       lines: |
         ipv6 unicast-routing
         ipv6 router ospf
-         area {{template_rtr_ospfv3_area}}
+         area {{prompt_rtr_ospfv3_area}}
          nonstop-routing
          log-status-change
          redistribute connected
       save_when: changed
+    register: icxconfig_status
+    failed_when: icxconfig_status.msg is defined and "MODULE FAILURE" not in icxconfig_status.msg
 
-  - name: Display Results
-    icx_command:
-      commands: show ipv6 ospf area {{template_rtr_ospfv3_area}}
+  - name: Parse Switch Error
+    set_fact:
+      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"
+    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: error_msg is not defined, fail_msg: '{{error_msg.split(newline_var)}}'}
+    when: error_msg is defined
+
+  - name: Get OSPF Info
+    icx_command: {commands: 'show ipv6 ospf area {{prompt_rtr_ospfv3_area}}'}
     register: output
-  - debug:
-      msg: "{{output.stdout_lines}}"
+
+  - name: Display OSPF Info
+    debug: var=output.stdout_lines[0]

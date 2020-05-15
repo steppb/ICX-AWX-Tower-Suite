@@ -1,15 +1,54 @@
-# Playbook Version: 1.1
+#! Description: Add or modify VRRPv3 VRID on interface.
+#! Prompt: [{question_name: Interface@colon, question_description: Enter the interface to configure VRRPv3 on@colon (e.g. e1/1/1 or ve20), required: false, type: text, variable: prompt_rtr_vrrpv3_int, min: 1, max: 1024, default: '', choices: ''}, {question_name: VRRPv3 VRID@colon, question_description: '', required: false, type: integer, variable: prompt_rtr_vrrpv3_vrid, min: 1, max: 255, default: '', choices: ''}, {question_name: VRRPv3 Router Mode@colon, question_description: '', required: false, type: multiplechoice, variable: prompt_rtr_vrrpv3_mode, min: null, max: null, default: '', choices: backup\nowner}, {question_name: VRRPv3 IPv6 Address@colon, question_description: '', required: false, type: text, variable: prompt_rtr_vrrpv3_ip, min: 1, max: 1024, default: '', choices: ''}, {question_name: VRRPv3 Priority@colon, question_description: '', required: false, type: integer, variable: prompt_rtr_vrrpv3_priority, min: 1, max: 254, default: '', choices: ''}]
+#
+# Playbook Version: 1.2
 # =====================
-# The following variables will need to be defined prior to running this playbook:
+# Note: If template is run on more than one switch, the 'host_icx_int' variable needs to be
+#       defined for each host in the 'VARIABLES' section of the AWX Inventory Host page.
 #
-# Required Variables:
-# <template_rtr_vrrpv3_int> L3 Interface
-# <template_rtr_vrrpv3_vrid> VRRPv3 VRID
-# <template_rtr_vrrpv3_ip> VRRPv3 IPv6 address
-# <template_rtr_vrrpv3_mode> (owner|backup)
+#       Prompt variables will be ignored if more than one host is in the play.
+#       Host variables will take precedence over prompt variables if only one host is in play.
+#       VRRPv3 address for an 'owner' router will be automatically set to the interface IPv6 address.
+#       Backup router has an optional 'priority' variable that can be set.
+#       
 #
-# Optional Variables:
-# <template_rtr_vrrpv3_priority> Backup or Owner Priority. Default 100
+# host_icx_int examples:
+#
+# Add Owner VRRPv3 Router Interface (Required Variables)
+# ----------------------------------------------------
+# host_icx_int:
+#   - iface: ve997
+#     ipv6:
+#       addr: fc02::1/64
+#       vrrp:
+#         vrid: 97
+#         mode: owner
+# ----------------------------------------------------
+#
+# Add Backup VRRPv3 Router Interface (Required Variables)
+# -----------------------------------------------------
+# host_icx_int:
+#   - iface: ve997
+#     ipv6:
+#       addr: fc02::2/64
+#       vrrp:
+#         vrid: 97
+#         addr: fc02::1
+#         mode: backup
+# -----------------------------------------------------
+#
+# Add VRRP router interface (With Optional 'priority' Variable)
+# ---------------------------------------------------
+# host_icx_int:
+#   - iface: ve 997
+#     ipv6:
+#       addr: fc02::2/64
+#       vrrp:
+#         vrid: 97
+#         addr: fc02::1
+#         mode: backup
+#         priority: 150
+# --------------------------------------------------
 ---
 - hosts: all
   connection: network_cli
@@ -18,38 +57,371 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
-    template_rtr_vrrpv3_priority: 100
-    vrrpv3_priority:
+    newline_var: "\r"
+    err_parse: '^.*ConnectionError: '
+    CfgLstCnt: 1
 
   tasks:
-  - name: Configuring VRRPv3 Owner Interface
-    icx_config:
-      lines: |
-        ipv6 router vrrp
-        interface {{template_rtr_vrrpv3_int}}
-         ipv6 vrrp vrid {{template_rtr_vrrpv3_vrid}}
-          owner
-          ipv6-address {{template_rtr_vrrpv3_ip}}
-          activate
-      save_when: changed
-    when: template_rtr_vrrpv3_mode == 'owner'
+  - name: Check Host Variables and Setup Config List
+    set_fact:
+      iface: '{{item.iface}}'
+      vrid: '{{item.ipv6.vrrp.vrid}}'
+      addr: '{{item.ipv6.vrrp.addr|default("")|regex_replace("^([0-9a-f:]*).*$", "\1")}}'
+      mode: '{{item.ipv6.vrrp.mode|regex_replace("^.*(owner|backup).*$", "\1")}}'
+      priority: '{{item.ipv6.vrrp.priority|default("100")}}'
+    register: HostVarCfg
+    loop: '{{host_icx_int}}'
+    when:
+      - item.iface is defined
+      - item.iface != ''
+      - item.ipv6.vrrp.vrid is defined
+      - item.ipv6.vrrp.mode is defined
+      - "'owner' in item.ipv6.vrrp.mode or ('backup' in item.ipv6.vrrp.mode and item.ipv6.vrrp.addr is defined and item.ipv6.vrrp.addr != '')"
 
-  - name: Configuring VRRPv3 Backup Interface
-    icx_config:
-      lines: |
-        ipv6 router vrrp
-        interface {{template_rtr_vrrpv3_int}}
-         ipv6 vrrp vrid {{template_rtr_vrrpv3_ip}}
-          backup priority {{template_rtr_vrrpv3_priority}}
-          ipv6-address {{template_rtr_vrrpv3_ip}}
-          advertise backup
-          activate
-      save_when: changed
-    when: template_rtr_vrrpv3_mode == 'backup'
+  - name: Store Host Variable List
+    set_fact: {ConfigList: '{{HostVarCfg.results}}', CfgLstCnt: '{{HostVarCfg.results|length}}'}
+    when: HostVarCfg.results is defined
 
-  - name: Display Results
+  - name: Check Prompt Variables and Setup Config List
+    set_fact:
+      iface: '{{prompt_rtr_vrrpv3_int}}'
+      vrid: '{{prompt_rtr_vrrpv3_vrid}}'
+      addr: '{{prompt_rtr_vrrpv3_ip|default("")|regex_replace("^([0-9a-f:]*).*$", "\1")}}'
+      mode: '{{prompt_rtr_vrrpv3_mode}}'
+      priority: '{{prompt_rtr_vrrpv3_priority|default("")}}'
+    register: PromptVarCfg
+    with_items: 1
+    when:
+      - ansible_play_hosts|length == 1
+      - HostVarCfg.results is not defined
+      - prompt_rtr_vrrpv3_int is defined
+      - prompt_rtr_vrrpv3_vrid is defined
+      - prompt_rtr_vrrpv3_mode is defined
+      - "'owner' in prompt_rtr_vrrpv3_mode or ('backup' in prompt_rtr_vrrpv3_mode and prompt_rtr_vrrpv3_ip is defined and prompt_rtr_vrrpv3_ip != '')"
+
+  - name: Store Prompt Variable List
+    set_fact: {ConfigList: '{{PromptVarCfg.results}}'}
+    when: PromptVarCfg.results[0].ansible_facts is defined
+
+  - name: Check Config List
+    debug: msg="No valid configuration found for host"
+    when: ConfigList is not defined
+
+  - name: End Play For Hosts Without Config
+    meta: end_host
+    when: ConfigList is not defined
+
+  - name: Get IPv6 Interface Info
+    icx_command: {commands: 'sh run int {{ConfigList[idx].ansible_facts.iface}} | incl ipv6 address'}
+    register: IpIntInfo
+    loop: '{{range(0, CfgLstCnt|int)|list}}'
+    loop_control: {index_var: idx}
+    when: ConfigList[idx].ansible_facts is defined
+
+  - name: Get Existing VRRP IPv6 Address
     icx_command:
-      commands: show ipv6 vrrp vrid {{template_rtr_vrrpv3_vrid}}
-    register: output
-  - debug:
-      msg: "{{output.stdout_lines}}"
+      commands: 'show ipv6 vrrp vrid {{ConfigList[idx].ansible_facts.vrid}} | incl ipv6-address'
+    register: VrrpIpAddr
+    loop: '{{range(0, CfgLstCnt|int)|list}}'
+    loop_control: {index_var: idx}
+    when: ConfigList[idx].ansible_facts is defined
+
+  - name: Check Interface(s) for IPv6 Address
+    set_fact: {FailedInt: '{{ConfigList[idx].ansible_facts.iface}}'}
+    loop: '{{range(0, CfgLstCnt|int)|list}}'
+    loop_control: {index_var: idx}
+    when:
+      - ConfigList[idx].ansible_facts is defined
+      - IpIntInfo.results[idx].stdout[0] is not defined or IpIntInfo.results[idx].stdout[0] == ''
+
+  - name: Ensure IP on Interface(s)
+    assert:
+      that: FailedInt is not defined
+      fail_msg: "ERROR: Interface {{FailedInt|default('')}} not configured with IPv6 address"
+
+  - name: Configure IPv6 VRRP Router
+    icx_config: {lines: ipv6 router vrrp, save_when: changed}
+    register: icxconfig_status
+    failed_when: false
+
+  - name: Parse Switch Error
+    set_fact:
+      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(err_parse)}}"
+    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: error_msg is not defined, fail_msg: '{{error_msg.split(newline_var)}}'}
+    when: error_msg is defined
+
+  - name: Get Existing VRRPv3 Interface Info
+    icx_command: {commands: 'show ipv6 vrrp vrid {{ConfigList[idx].ansible_facts.vrid}}'}
+    register: VrrpIntInfo
+    loop: '{{range(0, CfgLstCnt|int)|list}}'
+    loop_control: {index_var: idx}
+    when: ConfigList[idx].ansible_facts is defined
+
+  - name: Get Existing VRRP Priority
+    icx_command: {commands: 'show run int {{ConfigList[idx].ansible_facts.iface}} | include priority'}
+    register: VrrpPriInfo
+    loop: '{{range(0, CfgLstCnt|int)|list}}'
+    loop_control: {index_var: idx}
+    when: ConfigList[idx].ansible_facts is defined
+
+  - name: Store IPv6 Interface Info
+    set_fact:
+      IntIp: '{{IpIntInfo.results[idx].stdout_lines[0][0].split(" ")[2]|regex_replace(ipv6var, "\1")}}'
+      VrrpIp: '{{VrrpIpAddr.results[idx].stdout_lines[0][0].split(" ")[1]|default("")}}'
+    loop: '{{range(0, CfgLstCnt|int)|list}}'
+    loop_control: {index_var: idx}
+    register: IpIntList
+    vars:
+      ipv6var: "^([0-9a-f:]*).*$"
+    when: IpIntInfo.results[idx].stdout[0] is defined
+
+  - name: Store Existing VRRPv3 Config
+    set_fact:
+      AdminStatus: '{{VrrpIntInfo.results[idx].stdout_lines[0][3].split(" ")[3]}}'
+      Mode: '{{VrrpIntInfo.results[idx].stdout_lines[0][5].split(" ")[3]|regex_replace(modevar, "\1")}}'
+      Priority: '{{VrrpPriInfo.results[idx].stdout[0].split(" ")[2]|default("")}}'
+      BackupAdv: '{{VrrpIntInfo.results[idx].stdout[0]|regex_replace("\n")|regex_replace(advar, "\1")}}'
+    loop: '{{range(0, CfgLstCnt|int)|list}}'
+    loop_control: {index_var: idx}
+    register: VrrpIntList
+    vars:
+      modevar: "^.*(backup).*$"
+      advar: "^.*se backup: (enabled|disabled).*$"
+    when:
+      - VrrpIntInfo.results[idx].stdout[0] is defined
+      - VrrpIntInfo.results[idx].stdout[0] != ''
+
+  - name: Remove VRID from Interface (Mode Change)
+    icx_config:
+      lines: no ipv6 vrrp vrid {{ConfigList[idx].ansible_facts.vrid}}
+      parents: int {{ConfigList[idx].ansible_facts.iface}}
+      save_when: changed
+    loop: '{{range(0, CfgLstCnt|int)|list}}'
+    loop_control: {index_var: idx}
+    register: IcxCfgStatus
+    failed_when: false
+    when:
+      - ConfigList[idx].ansible_facts is defined
+      - VrrpIntList.results[idx].ansible_facts.Mode is defined
+      - VrrpIntList.results[idx].ansible_facts.Mode != ConfigList[idx].ansible_facts.mode
+
+  - name: Parse Switch Error
+    set_fact:
+      ErrMsg: "{{IcxCfgStatus.results[idx].module_stderr|regex_replace('\n')|regex_replace(err_parse)}}"
+    loop: '{{range(0, CfgLstCnt|int)|list}}'
+    loop_control: {index_var: idx}
+    when:
+      - IcxCfgStatus.results[idx].rc is defined
+      - IcxCfgStatus.results[idx].rc == 1
+
+  - name: Remove VRID from Interface (IPv6 Address Change)
+    icx_config:
+      lines: no ipv6 vrrp vrid {{ConfigList[idx].ansible_facts.vrid}}
+      parents: int {{ConfigList[idx].ansible_facts.iface}}
+      save_when: changed
+    loop: '{{range(0, CfgLstCnt|int)|list}}'
+    loop_control: {index_var: idx}
+    register: IcxCfgStatus
+    failed_when: false
+    when:
+      - ErrMsg is not defined
+      - ConfigList[idx].ansible_facts is defined
+      - VrrpIntList.results[idx].ansible_facts.Mode is defined
+      - VrrpIntList.results[idx].ansible_facts.Mode == 'backup'
+      - VrrpIntList.results[idx].ansible_facts.Mode == ConfigList[idx].ansible_facts.mode
+      - IpIntList.results[idx].ansible_facts.VrrpIp is defined
+      - IpIntList.results[idx].ansible_facts.VrrpIp != ConfigList[idx].ansible_facts.addr
+
+  - name: Parse Switch Error
+    set_fact:
+      ErrMsg: "{{IcxCfgStatus.results[idx].module_stderr|regex_replace('\n')|regex_replace(err_parse)}}"
+    loop: '{{range(0, CfgLstCnt|int)|list}}'
+    loop_control: {index_var: idx}
+    when:
+      - IcxCfgStatus.results[idx].rc is defined
+      - IcxCfgStatus.results[idx].rc == 1
+
+  - name: Configure VRRPv3 Mode
+    icx_config:
+      lines: |
+        ipv6 vrrp vrid {{ConfigList[idx].ansible_facts.vrid}}
+          {{ConfigList[idx].ansible_facts.mode}}
+      parents: int {{ConfigList[idx].ansible_facts.iface}}
+      save_when: changed
+    loop: '{{range(0, CfgLstCnt|int)|list}}'
+    loop_control: {index_var: idx}
+    register: IcxCfgStatus
+    failed_when: false
+    when:
+      - ErrMsg is not defined
+      - ConfigList[idx].ansible_facts is defined
+      - VrrpIntList.results[idx].ansible_facts is not defined or ConfigList[idx].ansible_facts.mode != VrrpIntList.results[idx].ansible_facts.Mode
+
+  - name: Parse Switch Error
+    set_fact:
+      ErrMsg: "{{IcxCfgStatus.results[idx].module_stderr|regex_replace('\n')|regex_replace(err_parse)}}"
+    loop: '{{range(0, CfgLstCnt|int)|list}}'
+    loop_control: {index_var: idx}
+    when:
+      - IcxCfgStatus.results[idx].rc is defined
+      - IcxCfgStatus.results[idx].rc == 1
+
+  - name: Configure VRRPv3 IPv6 Address (Owner Router)
+    icx_config:
+      lines: |
+        ipv6 vrrp vrid {{ConfigList[idx].ansible_facts.vrid}}
+         ipv6-address {{IpIntList.results[idx].ansible_facts.IntIp}}
+      parents: int {{ConfigList[idx].ansible_facts.iface}}
+      save_when: changed
+    loop: '{{range(0, CfgLstCnt|int)|list}}'
+    loop_control: {index_var: idx}
+    register: IcxCfgStatus
+    failed_when: false
+    when:
+      - ErrMsg is not defined
+      - ConfigList[idx].ansible_facts.mode is defined
+      - "'owner' in ConfigList[idx].ansible_facts.mode"
+      - IpIntList.results[idx].ansible_facts.VrrpIp == '' or VrrpIntList.results[idx].ansible_facts.Mode == 'backup'
+
+  - name: Parse Switch Error
+    set_fact:
+      ErrMsg: "{{IcxCfgStatus.results[idx].module_stderr|regex_replace('\n')|regex_replace(err_parse)}}"
+    loop: '{{range(0, CfgLstCnt|int)|list}}'
+    loop_control: {index_var: idx}
+    when:
+      - IcxCfgStatus.results[idx].rc is defined
+      - IcxCfgStatus.results[idx].rc == 1
+
+  - name: Configure VRRPv3 IPv6 Address (Backup Router)
+    icx_config:
+      lines: |
+        ipv6 vrrp vrid {{ConfigList[idx].ansible_facts.vrid}}
+         ipv6-address {{ConfigList[idx].ansible_facts.addr}}
+      parents: int {{ConfigList[idx].ansible_facts.iface}}
+      save_when: changed
+    loop: '{{range(0, CfgLstCnt|int)|list}}'
+    loop_control: {index_var: idx}
+    register: IcxCfgStatus
+    failed_when: false
+    when:
+      - ErrMsg is not defined
+      - ConfigList[idx].ansible_facts.mode is defined
+      - "'backup' in ConfigList[idx].ansible_facts.mode"
+      - IpIntList.results[idx].ansible_facts.VrrpIp is not defined or (IpIntList.results[idx].ansible_facts.VrrpIp != ConfigList[idx].ansible_facts.addr)
+
+  - name: Parse Switch Error
+    set_fact:
+      ErrMsg: "{{IcxCfgStatus.results[idx].module_stderr|regex_replace('\n')|regex_replace(err_parse)}}"
+    loop: '{{range(0, CfgLstCnt|int)|list}}'
+    loop_control: {index_var: idx}
+    when:
+      - IcxCfgStatus.results[idx].rc is defined
+      - IcxCfgStatus.results[idx].rc == 1
+
+  - name: Configure Backup Advertisements (Backup Router)
+    icx_config:
+      lines: |
+        ipv6 vrrp vrid {{ConfigList[idx].ansible_facts.vrid}}
+         advertise backup
+      parents: int {{ConfigList[idx].ansible_facts.iface}}
+      save_when: changed
+    loop: '{{range(0, CfgLstCnt|int)|list}}'
+    loop_control: {index_var: idx}
+    register: IcxCfgStatus
+    failed_when: false
+    when:
+      - ErrMsg is not defined
+      - ConfigList[idx].ansible_facts.mode is defined
+      - "'backup' in ConfigList[idx].ansible_facts.mode"
+      - VrrpIntList.results[idx].ansible_facts is not defined or VrrpIntList.results[idx].ansible_facts.BackupAdv == 'disabled'
+
+  - name: Parse Switch Error
+    set_fact:
+      ErrMsg: "{{IcxCfgStatus.results[idx].module_stderr|regex_replace('\n')|regex_replace(err_parse)}}"
+    loop: '{{range(0, CfgLstCnt|int)|list}}'
+    loop_control: {index_var: idx}
+    when:
+      - IcxCfgStatus.results[idx].rc is defined
+      - IcxCfgStatus.results[idx].rc == 1
+
+  - name: Configure VRRPv3 Backup Priority
+    icx_config:
+      lines: |
+        ipv6 vrrp vrid {{ConfigList[idx].ansible_facts.vrid}}
+         backup priority {{ConfigList[idx].ansible_facts.priority}}
+      parents: int {{ConfigList[idx].ansible_facts.iface}}
+      save_when: changed
+    loop: '{{range(0, CfgLstCnt|int)|list}}'
+    loop_control: {index_var: idx}
+    register: IcxCfgStatus
+    failed_when: false
+    when:
+      - ErrMsg is not defined
+      - ConfigList[idx].ansible_facts is defined
+      - ConfigList[idx].ansible_facts.priority != ''
+      - "'backup' in ConfigList[idx].ansible_facts.mode"
+      - VrrpIntList.results[idx].ansible_facts.Priority is not defined or ConfigList[idx].ansible_facts.priority != VrrpIntList.results[idx].ansible_facts.Priority
+
+  - name: Parse Switch Error
+    set_fact:
+      ErrMsg: "{{IcxCfgStatus.results[idx].module_stderr|regex_replace('\n')|regex_replace(err_parse)}}"
+    loop: '{{range(0, CfgLstCnt|int)|list}}'
+    loop_control: {index_var: idx}
+    when:
+      - IcxCfgStatus.results[idx].rc is defined
+      - IcxCfgStatus.results[idx].rc == 1
+
+  - name: Check VRID Status
+    icx_command: 
+      commands: show ipv6 vrrp vrid {{ConfigList[idx].ansible_facts.vrid}} | include administrative
+    register: AdminStatus
+    loop: '{{range(0, CfgLstCnt|int)|list}}'
+    loop_control: {index_var: idx}
+    when: ErrMsg is not defined and ConfigList[idx].ansible_facts is defined
+
+  - name: Activate VRID
+    icx_config:
+      lines: |
+        ipv6 vrrp vrid {{ConfigList[idx].ansible_facts.vrid}}
+         activate
+      parents: int {{ConfigList[idx].ansible_facts.iface}}
+      save_when: changed
+    loop: '{{range(0, CfgLstCnt|int)|list}}'
+    loop_control: {index_var: idx}
+    register: IcxCfgStatus
+    failed_when: false
+    when:
+      - ErrMsg is not defined
+      - ConfigList[idx].ansible_facts is defined
+      - AdminStatus.results[idx].stdout[0] is defined
+      - AdminStatus.results[idx].stdout[0] != ''
+      - AdminStatus.results[idx].stdout_lines[0][0].split(' ')[1] == 'disabled'
+
+  - name: Parse Switch Error
+    set_fact:
+      ErrMsg: "{{IcxCfgStatus.results[idx].module_stderr|regex_replace('\n')|regex_replace(err_parse)}}"
+    loop: '{{range(0, CfgLstCnt|int)|list}}'
+    loop_control: {index_var: idx}
+    when:
+      - IcxCfgStatus.results[idx].rc is defined
+      - IcxCfgStatus.results[idx].rc == 1
+
+  - name: Display Switch Error
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(newline_var)}}'}
+    when: ErrMsg is defined
+
+  - name: Get VRRPv3 Info
+    icx_command: {commands: 'show ipv6 vrrp vrid {{ConfigList[idx].ansible_facts.vrid}}'}
+    loop: '{{range(0, CfgLstCnt|int)|list}}'
+    loop_control: {index_var: idx}
+    register: VrrpStatus
+    when: ConfigList[idx].ansible_facts is defined
+
+  - name: Display VRRPv3 Info
+    debug: var=VrrpStatus.results[idx].stdout_lines[0]
+    loop: '{{range(0, CfgLstCnt|int)|list}}'
+    loop_control: {index_var: idx}
+    when: VrrpStatus.results[idx].stdout[0] is defined

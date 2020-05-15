@@ -1,9 +1,13 @@
-# Playbook Version: 1.1
-# =====================
-# The following variables will need to be defined prior to running this playbook:
+#! Description: Configure OSPF area.
+#! Prompt: [{question_name: OSPF Area ID@colon, question_description: '', required: true, type: text, variable: template_rtr_ospf_area, min: 1, max: 1024, default: '', choices: ''}]
 #
-# Required Variables:
-# <template_rtr_ospf_area> OSPF Area
+# Playbook Version: 1.2
+# =====================
+# Note: In addition to creating a new OSPF area, the following global options are also applied:
+#       auto-cost reference-bandwidth 10000
+#       graceful-restart restart-time 60
+#       log adjacency
+#       redistribute connected
 ---
 - hosts: all
   connection: network_cli
@@ -12,23 +16,35 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
+    newline_var: "\r"
+    error_parse: '^.*ConnectionError: '
 
   tasks:
-  - name: Configuring OSPF
+  - name: Configure OSPF
     icx_config:
       lines: |
         router ospf
          area {{template_rtr_ospf_area}}
          auto-cost reference-bandwidth 10000
          graceful-restart restart-time 60
-         graceful-restart
          log adjacency
          redistribute connected
       save_when: changed
+    register: icxconfig_status
+    failed_when: icxconfig_status.msg is defined and "MODULE FAILURE" not in icxconfig_status.msg
 
-  - name: Display Results
-    icx_command:
-      commands: show ip ospf
+  - name: Parse Switch Error
+    set_fact:
+      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"
+    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: error_msg is not defined, fail_msg: '{{error_msg.split(newline_var)}}'}
+    when: error_msg is defined
+
+  - name: Get OSPF Info
+    icx_command: {commands: show ip ospf}
     register: output
-  - debug:
-      msg: "{{output.stdout_lines}}"
+
+  - name: Display OSPF Info
+    debug: var=output.stdout_lines[0]

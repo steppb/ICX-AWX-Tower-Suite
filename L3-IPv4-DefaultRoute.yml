@@ -1,12 +1,8 @@
-# Playbook Version: 1.1
+#! Description: Configure default route.
+#! Prompt: [{question_name: Default Router, question_description: Enter IP address of default router@colon, required: true, type: text, variable: template_rtr_defrtr, min: 7, max: 15, default: '', choices: '', new_question: true}, {question_name: OSPF Default Information Originate, question_description: Include default route in OSPF updates@question, required: true, type: multiplechoice, variable: template_rtr_ospf_definfo, min: null, max: null, default: 'no', choices: yes\nno}]
+#
+# Playbook Version: 1.2
 # =====================
-# The following variables will need to be defined prior to running this playbook:
-#
-# Required Variables:
-# <template_rtr_defrtr> IP Address of default router
-#
-# Optional Variables:
-# <template_rtr_ospf_definfo> (true|false) Redistribute default route
 ---
 - hosts: all
   connection: network_cli
@@ -15,24 +11,38 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
+    newline_var: "\r"
+    error_parse: '^.*ConnectionError: '
 
   tasks:
-  - name: Configuring Default Route
-    icx_config:
-      lines: |
-        ip route 0.0.0.0/0 {{template_rtr_defrtr}}
-      save_when: changed
+  - name: Configure Default Route
+    icx_config: {lines: 'ip route 0.0.0.0/0 {{template_rtr_defrtr}}', save_when: changed}
+    register: icxconfig_status
+    failed_when: icxconfig_status.msg is defined and "MODULE FAILURE" not in icxconfig_status.msg
+
+  - name: Parse Switch Error
+    set_fact:
+      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"
+    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
 
   - name: Configuring OSPF Default Information Originate
-    icx_config:
-      lines: |
-        router ospf
-         default-information-originate
-    when: template_rtr_ospf_definfo is defined and template_rtr_ospf_definfo|lower == 'true'
+    icx_config: {lines: default-information-originate, parents: router ospf, save_when: changed}
+    register: icxconfig_status
+    failed_when: false
+    when: error_msg is not defined and template_rtr_ospf_definfo|bool
 
-  - name: Display Results
-    icx_command:
-      commands: show ip route
+  - name: Parse Switch Error
+    set_fact:
+      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"
+    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: error_msg is not defined, fail_msg: '{{error_msg.split(newline_var)}}'}
+    when: error_msg is defined
+
+  - name: Get Route Table
+    icx_command: {commands: show ip route}
     register: output
-  - debug:
-      msg: "{{output.stdout_lines}}"
+
+  - name: Display Route Table
+    debug: var=output.stdout_lines[0]

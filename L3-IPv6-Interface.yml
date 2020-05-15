@@ -1,10 +1,38 @@
-# Playbook Version: 1.1
-# =====================
-# The following variables will need to be defined prior to running this playbook:
+#! Description: Add/Remove/Replace IPv6 address on interface.
+#! Prompt: [{question_name: IP Interface (For single host deployment), question_description: Enter the interface to configure as L3@colon (e.g. ve20 or e1/1/1), required: false, type: text, variable: prompt_rtr_int, min: 1, max: 1024, default: '', choices: ''}, {question_name: IPv6 Address and Mask@colon, question_description: (e.g. fc01@colon@colon1/64), required: false, type: text, variable: prompt_rtr_int_ip, min: 0, max: 1024, default: '', choices: ''}]
 #
-# Required Variables:
-# <template_rtr_int> Router interface
-# <template_rtr_int_v6addr> IPv6 address and mask of interface
+# Playbook Version: 1.2
+# =====================
+# Note: If template is run on more than one switch, the 'host_icx_int' variable needs to be
+#       defined for each host in the 'VARIABLES' section of the AWX Inventory Host page.
+#       To remove an IP address from the interface, define the 'iface' field and leave the
+#       'ipv6.addr' field blank.
+#       Playbook will not configure interfaces if the IP address matches the IP defined in
+#       'ansible_host'.
+#       Prompt variables will be ignored if more than one host is in the play.
+#       Host variables will take precedence over prompt variables if only one host is in play.
+#       'ipv6.addr' field requires both the address and mask. (e.g. fc02::1/64)
+#
+# host_icx_int examples:
+#
+# Adding multiple IP interfaces:
+# ------------------------------
+# host_icx_int:
+#   - iface: e1/3/1
+#     ipv6:
+#       addr: fc01::1/64
+#   - iface: ve997
+#     ipv6:
+#       addr: fc02::1/64
+# ------------------------------
+#
+# Removing IP address from interface:
+# -----------------------------------
+# host_icx_int:
+#   - iface: e1/3/1
+#     ipv6:
+#       addr:
+# -----------------------------------
 ---
 - hosts: all
   connection: network_cli
@@ -13,12 +41,112 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
+    newline_var: "\r"
+    error_parse: '^.*ConnectionError: '
 
   tasks:
-  - name: Configuring Router Interface
+  - name: Check Host Variables and Setup Config List
+    set_fact:
+      iface: '{{item.iface}}'
+      ipaddr: '{{item.ipv6.addr|default("")}}'
+    register: HostVarCfg
+    loop: '{{host_icx_int}}'
+    when:
+      - item.iface is defined
+      - item.iface != ''
+      - item.ipv6.addr is defined
+
+  - name: Store Host Variable List
+    set_fact: {ConfigList: '{{HostVarCfg.results}}'}
+    when: HostVarCfg.results is defined
+
+  - name: Check Prompt Variables and Setup Config List
+    set_fact:
+      iface: '{{prompt_rtr_int}}'
+      ipaddr: '{{prompt_rtr_int_v6addr|default("")}}'
+    register: PromptVarCfg
+    with_items: 1
+    when: ansible_play_hosts|length == 1 and ConfigList is not defined and prompt_rtr_int is defined
+
+  - name: Store Prompt Variable List
+    set_fact: {ConfigList: '{{PromptVarCfg.results}}'}
+    when: PromptVarCfg.results[0].ansible_facts is defined
+
+  - name: Get IP Interface Info
+    icx_command: {commands: 'show run interface {{item.ansible_facts.iface}} | include ipv6 address'}
+    register: IpIntInfo
+    loop: '{{ConfigList}}'
+    when: item.ansible_facts is defined
+
+  - name: Store IP Interface Info
+    set_fact: {OldIp: '{{item.stdout[0].split(" ")[2]}}'}
+    loop: '{{IpIntInfo.results}}'
+    register: IpIntList
+    when:
+      - item.stdout[0] is defined
+      - item.stdout[0] != ""
+      - 'item.stdout[0].split(" ")[2] != ansible_host'
+
+  - name: Remove Old IPv6 Address
     icx_config:
       lines: |
-        interface {{template_rtr_int}}
-         ipv6 enable
-         ipv6 address {{template_rtr_int_v6addr}}
+        no ipv6 address {{item.ansible_facts.OldIp}}
+        no ipv6 enable
+      parents: int {{ConfigList[idx].ansible_facts.iface}}
       save_when: changed
+    loop: '{{IpIntList.results}}'
+    loop_control:
+      index_var: idx
+    register: IcxCfgStatus
+    when:
+      - ConfigList[idx].ansible_facts is defined
+      - item.ansible_facts is defined
+      - item.ansible_facts.OldIp != ansible_host
+      - item.ansible_facts.OldIp != ConfigList[idx].ansible_facts.ipaddr
+
+  - name: Parse Switch Error
+    set_fact: {ErrMsg: "{{item.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"}
+    loop: '{{IcxCfgStatus.results}}'
+    when: item.rc is defined and item.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(newline_var)}}'}
+    when: ErrMsg is defined
+
+  - name: Configure Router Interface
+    icx_config:
+      lines: |
+         ipv6 enable
+         ipv6 address {{item.ansible_facts.ipaddr}}
+      parents: int {{item.ansible_facts.iface}}
+      save_when: changed
+    loop: '{{ConfigList}}'
+    loop_control:
+      index_var: idx
+    register: IcxCfgStatus
+    failed_when: false
+    when:
+      - item.ansible_facts is defined
+      - item.ansible_facts.ipaddr != ansible_host
+      - item.ansible_facts.ipaddr != ''
+      - IpIntList.results[idx].ansible_facts.OldIp is not defined or IpIntList.results[idx].ansible_facts.OldIp != item.ansible_facts.ipaddr
+
+  - name: Parse Switch Error
+    set_fact: {ErrMsg: "{{item.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"}
+    loop: '{{IcxCfgStatus.results}}'
+    when: item.rc is defined and item.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(newline_var)}}'}
+    when: ErrMsg is defined
+
+  - name: Get Interface Config
+    icx_command: {commands: 'show run interface {{item.ansible_facts.iface}}'}
+    loop: '{{ConfigList}}'
+    register: IntConfig
+    when: ConfigList is defined and item.ansible_facts is defined
+
+  - name: Display Interface Config
+    debug: var=item.stdout_lines[0]
+    loop: '{{IntConfig.results}}'
+    when: item.stdout_lines[0] is defined

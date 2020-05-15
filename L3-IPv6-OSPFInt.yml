@@ -1,17 +1,10 @@
-# Playbook Version: 1.1
+#! Description: Configure OSPFv3 interface.
+#! Prompt: [{question_name: OSPFv3 Area@colon, question_description: '', required: true, type: text, variable: prompt_rtr_ospfv3_area, min: 0, max: 1024, default: '', choices: '', new_question: true}, {question_name: Interface@colon, question_description: (e.g. e1/1/2 or ve20), required: true, type: text, variable: prompt_rtr_int, min: 0, max: 1024, default: '', choices: '', new_question: true}, {question_name: OSPFv3 Retransmit-Interval@colon, question_description: '', required: false, type: integer, variable: prompt_rtr_ospfv3_retrans, min: 0, max: 3600, default: 5, choices: '', new_question: true}, {question_name: OSPFv3 Transmit-Delay@colon, question_description: '', required: false, type: integer, variable: prompt_rtr_ospfv3_transdelay, min: 0, max: 3600, default: 1, choices: ''}, {question_name: OSPFv3 IPSec Auth Security Parameter Index@colon, question_description: '', required: false, type: integer, variable: prompt_rtr_ospfv3_ipsec_spi, min: 256, max: 4294967295, default: '', choices: '', new_question: true}, {question_name: OSPFv3 IPSec Auth SHA1 Key@colon, question_description: (40 character hex key), required: false, type: password, variable: prompt_rtr_ospfv3_ipsec_key, min: 40, max: 40, default: '', choices: '', new_question: true}]
+#
+# Playbook Version: 1.2
 # =====================
-# The following variables will need to be defined prior to running this playbook:
-#
-# Required Variables:
-# <template_rtr_ospfv3_area> OSPF Area
-# <template_rtr_int> OSPF Interface
-#
-# Optional Variables:
-# <template_rtr_ospfv3_ipsec_spi> OSPFv3 IPsec Security Parameter Index
-# <template_rtr_ospfv3_ipsec_key> OSPFv3 40 hex character IPsec key
-# <template_rtr_ospfv3_retrans> OSPFv3 retransmit interval. Default 5
-# <template_rtr_ospfv3_transdelay> OSPFv3 transmit delay. Default 1
-# <template_rtr_ospfv3_passive> {true|false} IP OSPFv3 passive interface
+# Note: OSPFv3 Area needs to be created globally with 'L3-IPv6-OSPFGlobal' before running
+#       this template.
 ---
 - hosts: all
   connection: network_cli
@@ -20,39 +13,76 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
-    template_rtr_ospfv3_retrans: 5
-    template_rtr_ospfv3_transdelay: 1
-    template_rtr_ospfv3_passive: false
-    ospfv3_auth:
-    passive:
+    newline_var: "\r"
+    error_parse: '^.*ConnectionError: '
+    OspfAuthCmd:
+    PassiveIntCmd:
 
   tasks:
-  - name: Setting OSPF Authentication
-    set_fact:
-      ospfv3_auth: "ipv6 ospf authentication ipsec spi {{template_rtr_ospfv3_ipsec_spi}} esp sha1 {{template_rtr_ospfv3_ipsec_key}}"
-      cacheable: no
-    when: template_rtr_ospfv3_ipsec_key is defined and template_rtr_ospfv3_ipsec_key != ''
+  - name: Get Router OSPFv3 Config
+    icx_command: {commands: show run | include ^ipv6 router ospf}
+    register: OspfConfig
 
-  - name: Setting OSPF Passive Interface
-    set_fact:
-      passive: "ipv6 ospf passive"
-      cacheable:
-    when: template_rtr_ospfv3_passive|lower == 'true'
+  - name: Verify Router OSPFv3 Config
+    assert:
+      that:
+        - OspfConfig.stdout[0] is defined
+        - OspfConfig.stdout[0] != ''
+      fail_msg:
+        - "ERROR: IPv6 Router OSPF not configured!"
+        - "L3-IPv6-OSPFGlobal needs to be applied before running this template"
 
-  - name: Configuring OSPFv3 Interface
+  - name: Get OSPFv3 Area Config
+    icx_command: {commands: 'show ipv6 ospf area {{prompt_rtr_ospfv3_area}}'}
+    register: OspfConfig
+
+  - name: Verify Configuration of OSPFv3 Area
+    assert:
+      that:
+        - OspfConfig.stdout[0] is defined
+        - OspfConfig.stdout[0] != 'No such area available'
+      fail_msg:
+        - "ERROR: OSPFv3 area {{prompt_rtr_ospfv3_area}} does not exist"
+        - "Create OSPFv3 area {{prompt_rtr_ospfv3_area}} with L3-IPv6-OSPFGlobal template"
+
+  - name: Set OSPFv3 Authentication Command
+    set_fact:
+      OspfAuthCmd: "ipv6 ospf authentication ipsec spi {{prompt_rtr_ospfv3_ipsec_spi}} esp sha1 {{prompt_rtr_ospfv3_ipsec_key}}"
+    when:
+      - prompt_rtr_ospfv3_ipsec_key is defined
+      - prompt_rtr_ospfv3_ipsec_spi is defined
+      - prompt_rtr_ospfv3_ipsec_key != ''
+      - prompt_rtr_ospfv3_ipsec_spi != ''
+
+  - name: Set OSPFv3 Passive Interface Command
+    set_fact: {PassiveIntCmd: "ipv6 ospf passive"}
+    when: prompt_rtr_ospfv3_passive is defined and prompt_rtr_ospfv3_passive|bool
+
+  - name: Apply OSPFv3 Interface Config
     icx_config:
       lines: |
-        interface {{template_rtr_int}}
-         ipv6 ospf area {{template_rtr_ospfv3_area}}
-         ipv6 ospf retransmit-interval {{template_rtr_ospfv3_retrans}}
-         ipv6 transmit-delay {{template_rtr_ospfv3_transdelay}}
-         {{ospfv3_auth}}
-         {{passive}}
+         ipv6 ospf area {{prompt_rtr_ospfv3_area}}
+         ipv6 ospf retransmit-interval {{prompt_rtr_ospfv3_retrans|default("5")}}
+         ipv6 ospf transmit-delay {{prompt_rtr_ospfv3_transdelay|default("1")}}
+         {{OspfAuthCmd}}
+         {{PassiveIntCmd}}
+      parents: int {{prompt_rtr_int}}
       save_when: changed
+    register: icxconfig_status
+    failed_when: false
 
-  - name: Display Results
-    icx_command:
-      commands: show ipv6 ospf interface {{template_rtr_int}}
+  - name: Parse Switch Error
+    set_fact:
+      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"
+    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: error_msg is not defined, fail_msg: '{{error_msg.split(newline_var)}}'}
+    when: error_msg is defined
+
+  - name: Get OSPF Interface Info
+    icx_command: {commands: 'show ipv6 ospf interface {{prompt_rtr_int}}'}
     register: output
-  - debug:
-      msg: "{{output.stdout_lines}}"
+
+  - name: Display OSPF Info
+    debug: var=output.stdout_lines[0]
