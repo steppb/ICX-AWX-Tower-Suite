@@ -1,5 +1,8 @@
-# Playbook Version: 1.1
+#! Description: Apply SSH hardening config.
+#
+# Playbook Version: 1.2
 # =====================
+# Note: Remote-SSH-ACLPermit needs to be applied before running this template.
 ---
 - hosts: all
   connection: network_cli
@@ -8,18 +11,25 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
+    newline_var: "\r"
+    error_parse: '^.*ConnectionError: '
 
   tasks:
-  - name: Verify SSH ACL is configured
-    icx_command:
-      commands: sh access-list named-acl SSH_ACCESS
+  - name: Get SSH_ACCESS ACL
+    icx_command: {commands: sh access-list named-acl SSH_ACCESS}
     register: output
-    failed_when: "'is not configured' in output.stdout[0]"
+
+  - name: Verify SSH_ACCESS ACL
+    assert:
+      that: "'is not configured' not in output.stdout[0]"
+      fail_msg:
+        - "ERROR: ACL 'SSH_ACCESS' is not configured"
+        - "Remote-SSH-ACLPermit needs to be applied before running this template"
 
   - name: Get client IP
-    icx_command:
-      commands: sh who | incl client|you are connecting
+    icx_command: {commands: sh who | incl client|you are connecting}
     register: output
+
   - name: Parsing output
     shell: echo {{output.stdout}} |
       sed 's/\\n/\n/g' | \
@@ -37,17 +47,17 @@
       executable: /bin/bash
     register: output
     changed_when: false
-  - name: Storing Client IP
-    set_fact:
-      ssh_client_ip: "{{output.stdout}}"
-      cacheable: false
 
-  - name: Retrieving SSH ACL from device
+  - name: Store Client IP
+    set_fact: {ssh_client_ip: "{{output.stdout}}"}
+
+  - name: Get SSH ACL from device
     icx_command:
       commands: |
              sh ip access-list SSH_ACCESS
              sh run | incl Current configuration
     register: output
+
   - name: Verify client IP against configured SSH ACL
     shell: echo {{output.stdout}} |
       sed -e 's/\\n/\n/g' |
@@ -91,12 +101,13 @@
       executable: /bin/bash
     register: output
     changed_when: false
+
   - name: Assert Parse Results
     assert:
       that: output.stdout is defined and output.stdout == 'allowed'
       msg: "ERROR: Your SSH client is blocked in ACL for switch. Aborting..."
 
-  - name: Hardening SSH Server
+  - name: Harden SSH Server
     icx_config:
       lines: |
         ip ssh idle-time 10
@@ -105,11 +116,21 @@
         ssh access-group ipv6 RemoteAccess
         ip ssh encryption disable-aes-cbc
       save_when: changed
+    register: icxconfig_status
+    failed_when: false
 
-  - name: Display Results
-    icx_command:
-      commands: show ip ssh config
+  - name: Parse Switch Error
+    set_fact:
+      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"
+    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: error_msg is not defined, fail_msg: '{{error_msg.split(newline_var)}}'}
+    when: error_msg is defined
+
+  - name: Get SSH Config
+    icx_command: {commands: show ip ssh config}
     register: output
-  - debug:
-      msg: "{{output.stdout_lines}}"
 
+  - name: Display SSH Config
+    debug: var=output.stdout_lines[0]

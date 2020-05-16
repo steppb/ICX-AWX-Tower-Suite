@@ -1,12 +1,8 @@
-# Playbook Version: 1.1
+#! Description: Add SSH ACL permit entry for IPv4/6 host or range.
+#! Prompt: [{question_name: IPv4/6 Address or Range@colon, question_description: (e.g. 10.10.10.0/24 or fc00@colon@colon0/64 for range), required: true, type: text, variable: prompt_ssh_allow, min: 1, max: 1024, default: '', choices: ''}, {question_name: Log Matches@question, question_description: '', required: false, type: multiplechoice, variable: prompt_log_match, min: null, max: null, default: no, choices: yes\nno, new_question: true}]
+#
+# Playbook Version: 1.2
 # =====================
-# The following variables will need to be defined prior to running this playbook:
-#
-# Required Variables:
-# <template_ssh_allow> host or subnet to allow ssh access.
-#
-# Optional Variables:
-# <template_mgmt_ipv6> (true|false) Is IPv6. Default false
 ---
 - hosts: all
   connection: network_cli
@@ -15,39 +11,74 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
-    template_mgmt_ipv6: false
+    newline_var: "\r"
+    error_parse: '^.*ConnectionError: '
+    log_match:
 
   tasks:
+  - name: Set Log Option
+    set_fact: {log_match: log}
+    when: prompt_log_match|bool
+
   - name: Add IPv4 Host or Subnet to ACL
     icx_config:
-      lines: |
-        ip access-list standard SSH_ACCESS
-         no deny any
-         permit {{template_ssh_allow}}
-         deny any
+      lines: permit {{prompt_ssh_allow}} {{log_match}}
+      parents: ip access-list standard SSH_ACCESS
       save_when: changed
-    when: template_mgmt_ipv6|lower != 'true'
+    register: icxconfig_status
+    failed_when: icxconfig_status.msg is defined and "MODULE FAILURE" not in icxconfig_status.msg
+    when: "':' not in prompt_ssh_allow"
 
-  - name: Gather IPv4 Results
-    icx_command:
-      commands: show ip access-list SSH_ACCESS
+  - name: Parse Switch Error
+    set_fact:
+      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"
+    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: error_msg is not defined, fail_msg: '{{error_msg.split(newline_var)}}'}
+    when: error_msg is defined
+
+  - name: Get IPv4 ACL
+    icx_command: {commands: show ip access-list SSH_ACCESS}
     register: output
-    when: template_mgmt_ipv6|lower != 'true'
+    when: "':' not in prompt_ssh_allow"
+
+  - name: Display IPv4 ACL
+    debug: var=output.stdout_lines[0]
+    when: "':' not in prompt_ssh_allow"
+
+  - name: End Play for IPv4 Config
+    meta: end_host
+    when: "':' not in prompt_ssh_allow"
+
+  - name: Setup for IPv6 Host
+    set_fact: {ipv6_permit: 'host {{prompt_ssh_allow}}'}
+    when: "'/' not in prompt_ssh_allow"
+
+  - name: Setup for IPv6 Prefix
+    set_fact: {ipv6_permit: '{{prompt_ssh_allow}}'}
+    when: "'/' in prompt_ssh_allow"
 
   - name: Add IPv6 Host to ACL
     icx_config:
-      lines: |
-        ipv6 access-list RemoteAccess
-         permit ipv6 host {{template_ssh_allow}}
+      lines: permit ipv6 {{ipv6_permit}} any {{log_match}}
+      parents: ipv6 access-list RemoteAccess
       save_when: changed
-    when: template_mgmt_ipv6|lower == 'true'
+    register: icxconfig_status
+    failed_when: icxconfig_status.msg is defined and "MODULE FAILURE" not in icxconfig_status.msg
 
-  - name: Gather IPv6 Results
-    icx_command:
-      commands: show ipv6 access-list RemoteAccess
+  - name: Parse Switch Error
+    set_fact:
+      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"
+    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: error_msg is not defined, fail_msg: '{{error_msg.split(newline_var)}}'}
+    when: error_msg is defined
+
+  - name: Get IPv6 ACL
+    icx_command: {commands: show ipv6 access-list RemoteAccess}
     register: output
-    when: template_mgmt_ipv6|lower == 'true'
 
-  - name: Display Results
-    debug:
-      msg: "{{output.stdout_lines}}"
+  - name: Display IPv6 ACL
+    debug: var=output.stdout_lines[0]
