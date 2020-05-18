@@ -1,5 +1,5 @@
 #! Description: Add SSH ACL permit entry for IPv4/6 host or range.
-#! Prompt: [{question_name: IPv4/6 Address or Range@colon, question_description: (e.g. 10.10.10.0/24 or fc00@colon@colon0/64 for range), required: true, type: text, variable: prompt_ssh_allow, min: 1, max: 1024, default: '', choices: ''}, {question_name: Log Matches@question, question_description: '', required: false, type: multiplechoice, variable: prompt_log_match, min: null, max: null, default: no, choices: yes\nno, new_question: true}]
+#! Prompt: [{question_name: IPv4/6 Address or Range@colon, question_description: (e.g. 10.10.10.0/24 or fc00@colon@colon0/64 for range), required: true, type: text, variable: prompt_ssh_allow, min: 1, max: 1024, default: '', choices: ''}, {question_name: Log Matches@question, question_description: '', required: false, type: multiplechoice, variable: prompt_log_match, min: null, max: null, default: 'no', choices: yes\nno, new_question: true}]
 #
 # Playbook Version: 1.2
 # =====================
