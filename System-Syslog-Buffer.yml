@@ -1,7 +1,10 @@
-# Playbook Version: 1.1
+#! Description: Modify syslog buffer length.
+#! Prompt: [{question_name: Syslog Buffer Length@colon, question_description: '', required: true, type: integer, variable: prompt_log_buffer, min: 1, max: 4000, default: '', choices: ''}, {question_name: Reboot After Config@question, question_description: (Configuration will only take effect after reboot), required: false, type: multiplechoice, variable: prompt_log_reload, min: null, max: null, default: 'yes', choices: yes\nno}]
+#
+# Playbook Version: 1.2
 # =====================
-# The following variables will need to be defined prior to running this playbook:
-# <template_log_buffer> Number of max lines to store
+# Note: Change of syslog length will not take affect until after a reboot.
+#       Survey prompt will give this option.
 ---
 - hosts: all
   connection: network_cli
@@ -10,9 +13,38 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
+    newline_var: "\r"
+    ErrParse: '^.*ConnectionError: '
 
   tasks:
   - name: Configuring Syslog
-    icx_config:
-      lines: logging buffered {{template_log_buffer}}
-      save_when: changed
+    icx_config: {lines: 'logging buffered {{prompt_log_buffer}}', save_when: changed}
+    register: IcxCfgStatus
+    failed_when:
+      - IcxCfgStatus.msg is defined
+      - "'MODULE FAILURE' not in IcxCfgStatus.msg"
+
+  - name: Parse Switch Error
+    set_fact:
+      ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+    when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(newline_var)}}'}
+    when: ErrMsg is defined
+
+  - name: DEBUG
+    debug: msg="No change detected. Not Reloading"
+    when: not IcxCfgStatus.changed|bool
+
+  - name: Setting Reload Timer
+    icx_command: {commands: 'reload after 00:00:00'}
+    register: ReloadStatus
+    when:
+      - IcxCfgStatus.changed|bool
+      - prompt_log_reload is defined
+      - prompt_log_reload|bool
+
+  - name: Display Reload Status
+    debug: var=ReloadStatus.stdout_lines[0]
+    when: ReloadStatus.stdout_lines[0] is defined

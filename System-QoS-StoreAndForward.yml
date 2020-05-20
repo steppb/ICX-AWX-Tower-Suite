@@ -11,6 +11,8 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
+    newline_var: "\r"
+    error_parse: '^.*ConnectionError: '
 
   tasks:
   - name: Gather Hardware Info
@@ -21,10 +23,25 @@
     debug: msg="Cannot configure store-and-forward on {{ansible_net_model}}"
     when: "'ICX7750' not in ansible_net_model"
 
+  - name: End Play For Non-ICX7750 Hosts
+    meta: end_host
+    when: "'ICX7750' not in ansible_net_model"
+
   - name: Configure Store-and-Forward mode
     icx_config: {lines: store-and-forward, save_when: changed}
     register: icxconfig_status
-    when: "'ICX7750' in ansible_net_model"
+    failed_when:
+      - icxconfig_status.msg is defined
+      - "'MODULE FAILURE' not in icxconfig_status.msg"
+
+  - name: Parse Switch Error
+    set_fact:
+      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"
+    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: error_msg is not defined, fail_msg: '{{error_msg.split(newline_var)}}'}
+    when: error_msg is defined
 
   - name: Setting Reload Timer
     icx_command:

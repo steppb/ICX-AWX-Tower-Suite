@@ -1,10 +1,8 @@
-# Playbook Version: 1.1
-# =====================
-# The following variables will need to be defined prior to running this playbook:
+#! Description: Add a local user account.
+#! Prompt: [{question_name: Local Account Username@colon, question_description: '', required: true, type: text, variable: prompt_localacct_user, min: 1, max: 1024, default: '', choices: ''}, {question_name: Local Account Password@colon, question_description: '', required: true, type: password, variable: prompt_localacct_pw, min: 1, max: 60, default: '', choices: ''}]
 #
-# Required Variables:
-# <template_rem_localuser> Local account username
-# <template_rem_localpw> Local account password
+# Playbook Version: 1.2
+# =====================
 ---
 - hosts: all
   connection: network_cli
@@ -13,35 +11,42 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
+    newline_var: "\r"
 
   tasks:
   - name: Check if Password-Masking is enabled
-    icx_command:
-      commands: show config | incl password-masking
-    register: pwmask
+    icx_command: {commands: show config | incl password-masking}
+    register: PwMaskCfg
 
   - name: Disable Password-Masking
-    icx_config:
-      lines: no enable user password-masking
-    when: pwmask.stdout[0] is defined and pwmask.stdout[0] != ''
+    icx_config: {lines: no enable user password-masking}
+    when: PwMaskCfg.stdout[0] is defined and PwMaskCfg.stdout[0] != ''
 
-  - name: Configuring Local User Account
+  - name: Configure Local User Account
     icx_user:
-      name: "{{template_rem_localuser}}"
-      configured_password: "{{template_rem_localpw}}"
+      name: "{{prompt_localacct_user}}"
+      configured_password: "{{prompt_localacct_pw}}"
+    register: IcxUsrStatus
+    failed_when: false
 
-  - name: Re-enabling Password-Masking
-    icx_config:
-      lines: enable user password-masking
-    when: pwmask.stdout[0] is defined and pwmask.stdout[0] != ''  
+  - name: Parse ICX User Module Error
+    set_fact: {ErrMsg: "{{IcxUsrStatus.msg|regex_replace('\n')}}"}
+    when: IcxUsrStatus.msg is defined and IcxUsrStatus.msg != ''
+
+  - name: Display ICX User Module Error
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(newline_var)}}'}
+    when: ErrMsg is defined
+
+  - name: Re-enable Password-Masking
+    icx_config: {lines: enable user password-masking}
+    when: PwMaskCfg.stdout[0] is defined and PwMaskCfg.stdout[0] != ''
 
   - name: Saving Config
-    icx_config:
-      lines: write memory
+    icx_config: {lines: write memory}
 
-  - name: Display Results
-    icx_command:
-      commands: show user
-    register: output
-  - debug:
-      msg: "{{output.stdout_lines}}"
+  - name: Get Local Account List
+    icx_command: {commands: show user}
+    register: AcctList
+
+  - name: Display Local Accounts
+    debug: var=AcctList.stdout_lines[0]

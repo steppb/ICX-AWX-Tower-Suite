@@ -1,8 +1,8 @@
-# Playbook Version: 1.1
+#! Description: Add a DNS domain and server IPv4/6 address.
+#! Prompt: [{question_name: DNS Domain@colon, question_description: '', required: true, type: text, variable: prompt_dns_domain, min: 1, max: 1024, default: '', choices: ''}, {question_name: DNS Server IPv4/6 Address@colon, question_description: '', required: true, type: text, variable: prompt_dns_server, min: 1, max: 1024, default: '', choices: ''}]
+#
+# Playbook Version: 1.2
 # =====================
-# The following variables will need to be defined prior to running this playbook:
-# <template_dns_domain> Domain Name
-# <template_dns_server> DNS server ip
 ---
 - hosts: all
   connection: network_cli
@@ -11,19 +11,37 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
+    newline_var: "\r"
+    ErrParse: '^.*ConnectionError: '
+    V6:
 
   tasks:
-  - name: Configuring DNS
+  - name: Setup for IPv6
+    set_fact: {V6: v6}
+    when: "':' in prompt_dns_server"
+
+  - name: Configure DNS
     icx_config:
       lines: |
-        ip dns domain-list {{template_dns_domain}}
-        ip dns server-address {{template_dns_server}}
+        ip dns domain-list {{prompt_dns_domain}}
+        ip{{V6}} dns server-address {{prompt_dns_server}}
       save_when: changed
+    failed_when:
+      - IcxCfgStatus.msg is defined
+      - "'MODULE FAILURE' not in IcxCfgStatus.msg"
 
-  - name: Display Results
-    icx_command:
-      commands: |
-        show ip dns
-    register: output
-  - debug: 
-      msg: "{{output.stdout_lines}}"
+  - name: Parse Switch Error
+    set_fact:
+      ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+    when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(newline_var)}}'}
+    when: ErrMsg is defined
+
+  - name: Get DNS Config
+    icx_command: {commands: show ip dns}
+    register: DnsConfig
+
+  - name: Display DNS Config
+    debug: var=DnsConfig.stdout_lines[0]
