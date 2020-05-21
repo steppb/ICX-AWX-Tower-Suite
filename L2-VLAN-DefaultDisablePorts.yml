@@ -1,13 +1,8 @@
-# Playbook Version: 1.1
+#! Description: Disable all L2 ports in the default or user-specified VLAN.
+#! Prompt: [{question_name: VLAN ID@colon, question_description: (Leave blank to disable L2 ports in default VLAN), required: false, type: integer, variable: prompt_l2_vlanid, min: 1, max: 4086, default: '', choices: ''}, {question_name: Disabled Port Name@colon, question_description: '', required: false, type: text, variable: prompt_l2_disabled_port_desc, min: 1, max: 1024, default: 'DISABLED', choices: ''}]
+#
+# Playbook Version: 1.2
 # =====================
-# The following variables will need to be defined prior to running this playbook:
-#
-# Required Variables:
-# <template_l2_vlandefault> VLAN ID of default VLAN
-#
-# Optional Variables:
-# <template_l2_unusedint> Interface To disable
-# <template_l2_unusedname> String to set name of unused interfaces
 ---
 - hosts: all
   connection: network_cli
@@ -16,49 +11,94 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
-    unused_int_name:
+    newline_var: "\r"
+    ErrParse: '^.*ConnectionError: '
+    VlanId: ''
+    IntName:
 
   tasks:
-  - name: Get Untagged Ports in Default VLAN
-    icx_command:
-      commands: show vlan {{template_l2_vlandefault}} | incl Untagged Ports
-    register: output
-    when: template_l2_unusedint is not defined or template_l2_unusedint == ''
+  - name: Find Default VLAN
+    icx_command: {commands: show run | include DEFAULT-VLAN}
+    register: DefaultVlan
+    when:
+      - prompt_l2_vlanid is not defined or prompt_l2_vlanid == ''
 
-  - name: Parsing Interfaces
+  - name: Store Default VLAN
+    set_fact: {VlanId: '{{DefaultVlan.stdout[0].split(" ")[1]}}'}
+    when: DefaultVlan.stdout[0] is defined and DefaultVlan.stdout[0] != ''
+
+  - name: Store VLAN From Prompt
+    set_fact: {VlanId: '{{prompt_l2_vlanid}}'}
+    when:
+      - VlanId == ''
+      - prompt_l2_vlanid is defined
+      - prompt_l2_vlanid != ''
+
+  - name: Get Untagged Ports For VLAN
+    icx_command: {commands: 'show vlan {{VlanId}} | incl Untagged Ports'}
+    register: VlanInfo
+    when: VlanId != ''
+
+  - name: Parse Interfaces
     shell: |
-      echo "{{ output.stdout[0] }}" | \
+      echo "{{VlanInfo.stdout[0]}}" | \
         sed -e 's/\\n/\n/g' -e 's/\s\+\([0-9]\+\)/\n\1/g' \
             -e 's/Untagged Ports: (U\([0-9]\+\)\/M\([0-9]\+\))/Unit \1 Module \2/g' | \
-        awk '/Unit/ { mU = $2; mM = $4 } /^[0-9]+/ { printf "e%s/%s/%s\n", mU, mM, $1 }' | \
+        awk '/Unit/ { mU = $2; mM = $4 } /^[0-9]+/ { printf "%s/%s/%s\n", mU, mM, $1 }' | \
         sed ':a;$!{N;s/\n/ /;ba;}'
-    register: output
+    register: VlanPorts
     changed_when: false
-    when: template_l2_unusedint is not defined or template_l2_unusedint == ''
+    when:
+      - VlanId != ''
+      - VlanInfo.stdout[0] is defined 
+      - VlanInfo.stdout[0] != ''
 
-  - name: Setting Ports to Disable
-    set_fact:
-      template_l2_unusedint: "{{output.stdout}}"
-      cacheable: no
-    when: template_l2_unusedint is not defined or template_l2_unusedint == ''
+  - name: Set Ports to Disable
+    set_fact: {EthInts: '{{VlanPorts.stdout}}'}
+    when:
+      - VlanId != ''
+      - VlanPorts.stdout[0] is defined
+      - VlanPorts.stdout[0] != ''
 
-  - name: Setting Name for Unused Ports
-    set_fact:
-      unused_int_name: "port-name {{template_l2_unusedname}}"
-      cacheable: no
-    when: template_l2_unusedname is defined and template_l2_unusedname != ''
+  - name: Check for IP Interfaces
+    icx_command:
+      commands: |
+        show ip interface
+        show ipv6 interface
+    register: IpInt
+    when:
+      - VlanId != ''
+      - EthInts is defined
+      - EthInts != ''
 
-  - name: Disabling Interfaces
+  - name: Set Name for Disabled Ports
+    set_fact: {IntName: "port-name {{prompt_l2_disabled_port_desc}}"}
+    when: prompt_l2_disabled_port_desc is defined and prompt_l2_disabled_port_desc != ''
+
+  - name: Disable Interfaces
     icx_config:
       lines: |
-        interface {{template_l2_unusedint}}
-         {{unused_int_name}}
+         {{IntName}}
          disable
+      parents: int e {{item}}
       save_when: changed
+    loop: '{{EthInts.split(" ")}}'
+    register: IcxCfgStatus
+    failed_when: false
+    when: item not in IpInt.stdout|regex_replace(newline_var)
 
-  - name: Display Results
-    icx_command:
-      commands: show int bri {{template_l2_unusedint}}
+  - name: Parse Switch Error
+    set_fact: {ErrMsg: "{{item.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"}
+    loop: '{{IcxCfgStatus.results}}'
+    when: item.rc is defined and item.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(newline_var)}}'}
+    when: ErrMsg is defined
+
+  - name: Get Interface Brief
+    icx_command: {commands: show int bri}
     register: output
-  - debug:
-      msg: "{{output.stdout_lines}}"
+
+  - name: Show Interface Brief
+    debug: var=output.stdout_lines[0]

@@ -1,17 +1,8 @@
-# Playbook Version: 1.1
+#! Description: Add or modify VLAN.
+#! Prompt: [{question_name: VLAN ID@colon, question_description: '', required: true, type: integer, variable: prompt_l2_vid, min: 1, max: 4086, default: '', choices: ''}, {question_name: VLAN Name@colon, question_description: '', required: false, type: text, variable: prompt_l2_vname, min: 1, max: 1024, default: '', choices: ''}, {question_name: VLAN Tagging@colon, question_description: '', required: false, type: multiplechoice, variable: prompt_l2_vtag, min: null, max: null, default: '', choices: tagged\nuntagged}, {question_name: Interface(s)@colon, question_description: Enter single interface or range (e.g. e1/1/1 or e1/1/1 to 1/1/10), required: false, type: text, variable: prompt_l2_vint, min: 5, max: 1024, default: '', choices: ''}, {question_name: Remove Interface(s) From VLAN@question, question_description: '', required: false, type: multiplechoice, variable: prompt_l2_vremove, min: null, max: null, default: 'no', choices: yes\nno}, {question_name: Create Router Interface@question, question_description: '', required: false, type: multiplechoice, variable: prompt_l2_vrtr, min: null, max: null, default: 'no', choices: yes\nno}]
+#
+# Playbook Version: 1.2
 # =====================
-# The following variables will need to be defined prior to running this playbook:
-#
-# Required Variables:
-# <template_l2_vid> VLAN ID
-#
-# Optional Variables:
-# <template_l2_vname> VLAN name
-# <tamplate_l2_vuntag> Interface to add as untagged
-# <template_l2_vtag> Interface to add as tagged
-# <template_l2_vnountag> Untagged interface to remove from VLAN
-# <template_l2_vnotag> Tagged interface to remove from VLAN
-# <template_l2_vrtr> (true|false) Create router interface. Default false
 ---
 - hosts: all
   connection: network_cli
@@ -20,64 +11,77 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
-    vlan_name:
-    tagged_ports:
-    untagged_ports:
-    no_tagged_ports:
-    no_untagged_ports:
-    router_interface:
+    newline_var: "\r"
+    error_parse: '^.*ConnectionError: '
+    eth_var: '(e|et|eth|ethe|ether|ethern|etherne|ethernet)'
+    port_var: '([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2})'
+    range_var: '^.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*to.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*$'
+    VlanName:
+    RemCmd:
+    VlanIntCmd:
+    RtrIntCmd:
 
   tasks:
-  - name: Checking VLAN Name
-    set_fact:
-      vlan_name: "name {{template_l2_vname}}"
-      cacheable: no
-    when: template_l2_vname is defined and template_l2_vname != ''
+  - name: Format Interface List
+    set_fact: {VlanInt: '{{prompt_l2_vint|regex_replace(eth_var)|regex_replace(port_var, "e \1")}}'}
+    when:
+      - prompt_l2_vint is defined
+      - prompt_l2_vint != ''
+      - "'to' not in prompt_l2_vint"
 
-  - name: Checking Tagged Ports
-    set_fact:
-      tagged_ports: "tagged {{template_l2_vtag}}"
-      cacheable: no
-    when: template_l2_vtag is defined and template_l2_vtag != ''
+  - name: Format Interface Range
+    set_fact: {VlanInt: '{{prompt_l2_vint|regex_replace(range_var, "e \1 to \2")}}'}
+    when:
+      - prompt_l2_vint is defined
+      - prompt_l2_vint != ''
+      - "'to' in prompt_l2_vint"
 
-  - name: Checking Untagged Ports
-    set_fact:
-      untagged_ports: "untagged {{template_l2_vuntag}}"
-      cacheable: no
-    when: template_l2_vuntag is defined and template_l2_vuntag != ''
+  - name: Check VLAN Name
+    set_fact: {VlanName: 'name {{prompt_l2_vname}}'}
+    when: prompt_l2_vname is defined and prompt_l2_vname != ''
 
-  - name: Checking Tagged Ports to Remove
-    set_fact:
-      no_tagged_ports: "no tagged {{template_l2_vtag}}"
-      cacheable: no
-    when: template_l2_vnotag is defined and template_l2_vnotag != ''
+  - name: Setup VLAN Interface Removal
+    set_fact: {RemCmd: no}
+    when:
+      - prompt_l2_vremove is defined
+      - prompt_l2_vremove|bool
+      - prompt_l2_vtag is defined
+      - prompt_l2_vtag != ''
+      - VlanInt is defined
 
-  - name: Checking Untagged Ports to Remove
-    set_fact:
-      no_untagged_ports: "no untagged {{template_l2_vuntag}}"
-      cacheable: no
-    when: template_l2_vnountag is defined and template_l2_vnountag != ''
+  - name: Setup VLAN Interface Command
+    set_fact: {VlanIntCmd: '{{RemCmd}} {{prompt_l2_vtag}} {{VlanInt}}'}
+    when:
+      - prompt_l2_vtag is defined
+      - prompt_l2_vtag != ''
+      - VlanInt is defined
 
-  - name: Create Virtual Ethernet Interface
-    set_fact:
-      router_interface: "router-interface ve {{template_l2_vid}}"
-      cacheable: no
-    when: template_l2_vrtr is defined and template_l2_vrtr|lower == 'true'
+  - name: Setup Router Interface Command
+    set_fact: {RtrIntCmd: 'router-interface ve {{prompt_l2_vid}}'}
+    when: prompt_l2_vrtr is defined and prompt_l2_vrtr|bool
 
-  - name: Configuring VLAN
+  - name: Configure VLAN
     icx_config:
       lines: |
-        vlan {{template_l2_vid}} {{vlan_name}}
-         {{no_tagged_ports}}
-         {{no_untagged_ports}}
-         {{tagged_ports}}
-         {{untagged_ports}}
-         {{router_interface}}
+        vlan {{prompt_l2_vid}} {{VlanName}}
+         {{VlanIntCmd}}
+         {{RtrIntCmd}}
       save_when: changed
+    register: icxconfig_status
+    failed_when: icxconfig_status.msg is defined and "MODULE FAILURE" not in icxconfig_status.msg
 
-  - name: Display Results
-    icx_command:
-      commands: show vlan {{template_l2_vid}}
+  - name: Parse Switch Error
+    set_fact:
+      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"
+    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: error_msg is not defined, fail_msg: '{{error_msg.split(newline_var)}}'}
+    when: error_msg is defined
+
+  - name: Get VLAN Info
+    icx_command: {commands: 'show vlan {{prompt_l2_vid}}'}
     register: output
-  - debug:
-      msg: "{{output.stdout_lines}}"
+
+  - name: Display VLAN Info
+    debug: var=output.stdout_lines[0]

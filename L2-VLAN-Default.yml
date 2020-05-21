@@ -1,9 +1,10 @@
-# Playbook Version: 1.1
-# =====================
-# The following variables will need to be defined prior to running this playbook:
+#! Description: Configure default VLAN.
+#! Prompt: [{question_name: Default VLAN@colon, question_description: '', required: true, type: integer, variable: prompt_l2_vlandefault, min: 1, max: 4086, default: '', choices: '', new_question: true}]
 #
-# Required Variables:
-# <template_l2_vlandefault> VLAN ID of default VLAN
+# Playbook Version: 1.2
+# =====================
+# Note: If using MSTP, both the old default VLAN and the new default VLAN will need to either be in the same MSTP
+#       instance or not in any MSTP instance.
 ---
 - hosts: all
   connection: network_cli
@@ -12,9 +13,29 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
+    newline_var: "\r"
+    error_parse: '^.*ConnectionError: '
 
   tasks:
   - name: Configuring Default VLAN
-    icx_config:
-      lines: default-vlan-id {{template_l2_vlandefault}}
-      save_when: changed
+    icx_config: {lines: 'default-vlan-id {{prompt_l2_vlandefault}}', save_when: changed}
+    register: icxconfig_status
+    failed_when: icxconfig_status.msg is defined and "MODULE FAILURE" not in icxconfig_status.msg
+
+  - name: Parse Switch Error
+    set_fact:
+      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"
+    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: error_msg is not defined, fail_msg: '{{error_msg.split(newline_var)}}'}
+    when: error_msg is defined
+
+  - name: Get Post-Config VLAN Status
+    icx_command: {commands: 'show vlan {{prompt_l2_vlandefault}} | include DEFAULT-VLAN'}
+    register: VlanStatus
+
+  - name: Verify Change of Default VLAN
+    assert: 
+      that: VlanStatus.stdout[0] is defined and VlanStatus.stdout[0] != ''
+      fail_msg: "ERROR: Failed to set VLAN {{prompt_l2_vlandefault}} as default"
