@@ -26,6 +26,7 @@
         ip dns domain-list {{prompt_dns_domain}}
         ip{{V6}} dns server-address {{prompt_dns_server}}
       save_when: changed
+    register: IcxCfgStatus
     failed_when:
       - IcxCfgStatus.msg is defined
       - "'MODULE FAILURE' not in IcxCfgStatus.msg"
