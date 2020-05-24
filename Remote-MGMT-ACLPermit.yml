@@ -1,13 +1,8 @@
-# Playbook Version: 1.1
+#! Description: Add or modify IPv4/6 ACL.
+#! Prompt: [{question_name: ACL Name@colon, question_description: '', required: true, type: text, variable: prompt_mgmt_aclname, min: 1, max: 1024, default: '', choices: ''}, {question_name: IPv4/6 Address or Range to Permit@colon, question_description: (For range use /xx@comma e.g. 192.168.1.0/24), required: true, type: text, variable: prompt_mgmt_allowip, min: 1, max: 1024, default: '', choices: ''}]
+#
+# Playbook Version: 1.2
 # =====================
-# The following variables will need to be defined prior to running this playbook:
-#
-# Required Variables: 
-# <template_mgmt_acl> ACL number to create/modify
-# <template_mgmt_allow> host or subnet to allow ssh access.
-#
-# Optional Variables:
-# <template_mgmt_ipv6> (true|false) Is IPv6. Default false
 ---
 - hosts: all
   connection: network_cli
@@ -16,39 +11,50 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
-    template_mgmt_ipv6: false
+    newline_var: "\r"
+    ErrParse: '^.*ConnectionError: '
+    standard:
+    host:
+    ipv6:
+    any:
+    v6:
 
   tasks:
-  - name: Add IPv4 Host or Subnet to ACL
+  - name: Setup for IPv6
+    set_fact: {v6: v6, ipv6: ipv6, any: any}
+    when: "':' in prompt_mgmt_allowip"
+
+  - name: Setup for IPv4
+    set_fact: {standard: standard}
+    when: "':' not in prompt_mgmt_allowip and '.' in prompt_mgmt_allowip"
+
+  - name: Setup for Single-Host IPv6 Address
+    set_fact: {host: host}
+    when: "':' in prompt_mgmt_allowip and '/' not in prompt_mgmt_allowip"
+
+  - name: Add Host or Subnet to ACL
     icx_config:
       lines: |
-        ip access-list standard {{template_mgmt_acl}}
-         no deny any
-         permit {{template_mgmt_allow}}
-         deny any
+         no deny {{ipv6}} any {{any}}
+         permit {{ipv6}} {{host}} {{prompt_mgmt_allowip}} {{any}}
+         deny {{ipv6}} any {{any}}
+      parents: ip{{v6}} access-list {{standard}} {{prompt_mgmt_aclname}}
       save_when: changed
-    when: template_mgmt_ipv6|lower != 'true'
+    register: IcxCfgStatus
+    failed_when: false
 
-  - name: Gather IPv4 Results
-    icx_command:
-      commands: show ip access-list {{template_mgmt_acl}}
-    register: output
-    when: template_mgmt_ipv6|lower != 'true'
+  - name: Parse Switch Error
+    set_fact:
+      ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+    when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
 
-  - name: Add IPv6 Host to ACL
-    icx_config:
-      lines: |
-        ipv6 access-list {{template_mgmt_acl}}
-         permit ipv6 host {{template_mgmt_allow}}
-      save_when: changed
-    when: template_mgmt_ipv6|lower == 'true'
+  - name: Display Switch Error
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(newline_var)}}'}
+    when: ErrMsg is defined
 
-  - name: Gather IPv6 Results
-    icx_command:
-      commands: show ipv6 access-list {{template_mgmt_acl}}
-    register: output
-    when: template_mgmt_ipv6|lower == 'true'
+  - name: Get ACL
+    icx_command: {commands: 'show ip{{v6}} access-list {{prompt_mgmt_aclname}}'}
+    register: AclCfg
 
-  - name: Display Results
-    debug:
-      msg: "{{output.stdout_lines}}"
+  - name: Display ACL
+    debug: var=AclCfg.stdout_lines[0]

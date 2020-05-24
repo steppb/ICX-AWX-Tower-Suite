@@ -1,13 +1,13 @@
-# Playbook Version: 1.1
-# =====================
-# The following variables will need to be defined prior to running this playbook:
-# Required Variables:
-# <template_snmp_community> SNMPv2 Community string
-# <template_snmp_acl> SNMPv2 ACL number or name if ipv6
+#! Description: Add IPv4/6 SNMPv2 community string.
+#! Prompt: [{question_name: IP Version@colon, question_description: '', required: true, type: multiplechoice, variable: prompt_snmp_ipver, min: null, max: null, default: ipv4, choices: ipv4\nipv6}, {question_name: SNMPv2 Community String@colon, question_description: '', required: true, type: password, variable: prompt_snmp_community, min: 1, max: 32, default: '', choices: ''}, {question_name: SNMPv2 ACL@colon, question_description: (Leave blank to apply deny ACL), required: false, type: text, variable: prompt_snmp_acl, min: 1, max: 1024, default: '', choices: ''}, {question_name: SNMPv2 Server IPv4/6 Address@colon, question_description: '', required: false, type: text, variable: prompt_snmp_host, min: 1, max: 1024, default: '', choices: ''}]
 #
-# Optional Variables:
-# <template_snmp_host> SNMPv2 Host IP
-# <host_ipv6> (true|false) false by default
+# Playbook Version: 1.2
+# =====================
+# Note: 'Remote-MGMT-ACLDenyCreate' will need to be applied before running this template
+#       if denying SNMPv2 traffic.
+#
+#       'Remote-MGMT-ACLPermit' will need to be applied before running this template
+#       if allowing SNMPv2 traffic.
 ---
 - hosts: all
   connection: network_cli
@@ -16,44 +16,94 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
+    newline_var: "\r"
+    ErrParse: '^.*ConnectionError: '
+    RequiredTemplate: Remote-MGMT-ACLDenyCreate
     ipv6:
+    v6:
 
   tasks:
-  - name: Verify IPv4 ACL is configured
-    icx_command:
-      commands: show ip access-list {{template_snmp_acl}}
-    register: output
-    failed_when: "'is not available' in output.stdout[0] or output.stdout[0] == ''"
-    when: host_ipv6 is not defined or host_ipv6|lower != 'true'
+  - name: Setup for IPv6
+    set_fact: {v6: v6, ipv6: ipv6}
+    when: prompt_snmp_ipver == 'ipv6'
 
-  - name: Verify IPv6 ACL is configured
-    icx_command:
-      commands: show ipv6 access-list {{template_snmp_acl}}
-    register: output
-    when: host_ipv6 is defined and host_ipv6|lower == 'true'
+  - name: Set SNMPv2 IPv6 ACL
+    set_fact: {SnmpAcl: NoRemoteAccess}
+    when:
+      - prompt_snmp_ipver == 'ipv6'
+      - prompt_snmp_acl is not defined or prompt_snmp_acl == ''
 
-  - name: Setup IPv6
-    set_fact:
-      ipv6: ipv6
-      cacheable: false
-    when: host_ipv6 is defined and host_ipv6|lower == 'true'
+  - name: Set SNMPv2 IPv4 ACL
+    set_fact: {SnmpAcl: 86}
+    when:
+      - prompt_snmp_ipver == 'ipv4'
+      - prompt_snmp_acl is not defined or prompt_snmp_acl == ''
+
+  - name: Set SNMPv2 ACL
+    set_fact: {SnmpAcl: '{{prompt_snmp_acl}}'}
+    when: prompt_snmp_acl is defined and prompt_snmp_acl != ''
+
+  - name: Change Template Variable for Debug Message
+    set_fact: {RequiredTemplate: Remote-MGMT-ACLPermit}
+    when:
+      - SnmpAcl != 86
+      - SnmpAcl != 'NoRemoteAccess'
+
+  - name: Set Deny ACL Debug Message
+    set_fact: 
+      SnmpErrMsg:
+        - "ERROR: ACL '{{SnmpAcl}}' not configured."
+        - "{{RequiredTemplate}} needs to be applied before running this template"
+
+  - name: Get ACL
+    icx_command: {commands: 'show ip{{v6}} access-list {{SnmpAcl}}'}
+    register: IpAccessList
+    failed_when: false
+
+  - name: Verify ACL Configuration
+    assert:
+      that:
+        - IpAccessList.stdout[0] is defined
+        - IpAccessList.stdout[0] != ''
+        - "'is not available' not in IpAccessList.stdout[0]"
+      fail_msg: "{{SnmpErrMsg}}"
 
   - name: Configuring SNMPv2 Community
     icx_config:
-      lines: |
-        snmp-server community {{template_snmp_community}} ro {{ipv6}} {{template_snmp_acl}}
+      lines: snmp-server community {{prompt_snmp_community}} ro {{ipv6}} {{SnmpAcl}}
       save_when: changed
+    register: IcxCfgStatus
+    failed_when: false
+
+  - name: Parse Switch Error
+    set_fact:
+      ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+    when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
 
   - name: Configure SNMPv2 Host
     icx_config:
       lines: |
-        snmp-server host {{template_snmp_host}} version v2c {{template_snmp_community}}
+        snmp-server host {{ipv6}} {{prompt_snmp_host}} version v2c {{prompt_snmp_community}}
       save_when: changed
-    when: template_snmp_host is defined and template_snmp_host != ''
+    register: IcxCfgStatus
+    failed_when: false
+    when:
+      - ErrMsg is not defined
+      - prompt_snmp_host is defined
+      - prompt_snmp_host != ''
 
-  - name: Display Results
-    icx_command:
-      commands: show snmp server
-    register: output
-  - debug: 
-      msg: "{{output.stdout_lines}}"
+  - name: Parse Switch Error
+    set_fact:
+      ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+    when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(newline_var)}}'}
+    when: ErrMsg is defined
+
+  - name: Get SNMPv2 Info
+    icx_command: {commands: show snmp server}
+    register: SnmpServerInfo
+
+  - name: Display SNMPv2 Info
+    debug: var=SnmpServerInfo.stdout_lines[0]

@@ -1,18 +1,8 @@
-# Playbook Version: 1.1
+#! Description: Configure 802.1X global settings.
+#! Prompt: [{question_name: 802.1X Default Authentication VLAN@comma, question_description: '', required: false, type: integer, variable: prompt_flexauth_def_vlan, min: 1, max: 4086, default: '', choices: ''}, {question_name: Enable Reauthentication@question, question_description: '', required: false, type: multiplechoice, variable: prompt_flexauth_reauth, min: null, max: null, default: '', choices: yes\nno}, {question_name: Reauthentication-Period@colon, question_description: (in seconds), required: false, type: integer, variable: prompt_flexauth_reauth_period, min: 1, max: 4294967295, default: 3600, choices: ''}, {question_name: 802.1X Max Number of Authentication Attempts@colon, question_description: '', required: false, type: integer, variable: prompt_flexauth_max_reauth_req, min: 1, max: 10, default: 2, choices: ''}, {question_name: 802.1X Max Number of Frame Retransmissions@colon, question_description: '', required: false, type: integer, variable: prompt_flexauth_max_req, min: 1, max: 10, default: 2, choices: ''}, {question_name: 802.1X Tx Timeout, question_description: (in seconds), required: false, type: integer, variable: prompt_flexauth_timeout_tx, min: 1, max: 4294967295, default: 30, choices: ''}, {question_name: 802.1X Timeout Quiet-Period@colon, question_description: (in seconds), required: false, type: integer, variable: prompt_flexauth_timeout_quiet, min: 1, max: 4294967295, default: 60, choices: ''}, {question_name: 802.1X Supplicant Timeout, question_description: (in seconds), required: false, type: integer, variable: prompt_flexauth_timeout_supplicant, min: 1, max: 4294967295, default: 30, choices: ''}]
+#
+# Playbook Version: 1.2
 # =====================
-# The following variables will need to be defined prior to running this playbook:
-#
-# Required Variables:
-# <template_flexauth_default_vlan> FlexAuth default VLAN
-#
-# Optional Variables:
-# <template_flexauth_reauth> (true|false) enable re-authentication. Default is false
-# <template_flexauth_reauth_period> Reauth period in seconds. Default 3600
-# <template_flexauth_max_reauth_req> Max number of authentication attempts. Default 2
-# <template_flexauth_max_req> Max number of frame retransmissions. Default 2
-# <template_flexauth_timeout_tx> Tx-Period in seconds. Default 30
-# <template_flexauth_timeout_quiet> Quiet-period in seconds. Default 60
-# <template_flexauth_timeout_supplicant> Supplicant timeout in seconds. Default 30
 ---
 - hosts: all
   connection: network_cli
@@ -21,39 +11,170 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
-    reauth:
-    template_flexauth_reauth_period: 3600
-    template_flexauth_max_reauth_req: 2
-    template_flexauth_max_req: 2
-    template_flexauth_timeout_tx: 30
-    template_flexauth_timeout_quiet: 60
-    template_flexauth_timeout_supplicant: 30
+    newline_var: "\r"
+    ErrParse: '^.*ConnectionError: '
+    Dot1xEn:
+    MacAuthEn:
 
   tasks:
-  - name: Verifying Re-authentication
-    set_fact:
-      reauth: re-authentication
-      cacheable: no
-    when: template_flexauth_reauth is defined and template_flexauth_reauth|lower == 'true'
+  - name: Get 802.1X Enabled Interfaces
+    icx_command: {commands: show config | include dot1x enable ethe}
+    register: Dot1xEnabledInt
+    when: prompt_flexauth_def_vlan is defined and prompt_flexauth_def_vlan != ''
 
-  - name: Configuring FlexAuth
+  - name: Get 802.1X Port-Control Auto Interfaces
+    icx_command: {commands: show config | include dot1x port-control auto ethe}
+    register: PortCtrlAutoInt
+    when: prompt_flexauth_def_vlan is defined and prompt_flexauth_def_vlan != ''
+
+  - name: Get MAC-Authentication Enabled Interfaces
+    icx_command: {commands: show config | include mac-authentication enable ethe}
+    register: MacAuthEnabledInt
+    when: prompt_flexauth_def_vlan is defined and prompt_flexauth_def_vlan != ''
+
+  - name: Setup 802.1X Commands
+    set_fact: {Dot1xEn: dot1x enable}
+    when: Dot1xEnabledInt.stdout[0] is defined and Dot1xEnabledInt.stdout[0] != ''
+
+  - name: Setup MAC-Authentication Commands
+    set_fact: {MacAuthEn: mac-authentication enable}
+    when: MacAuthEnabledInt.stdout[0] is defined and MacAuthEnabledInt.stdout[0] != ''
+
+  - name: Configure Default Authentication VLAN
+    icx_config:
+      lines: |
+        no dot1x enable
+        no mac-authentication enable
+        auth-default-vlan {{prompt_flexauth_def_vlan}}
+        {{Dot1xEn}}
+        {{MacAuthEn}}
+      parents: authentication
+    register: IcxCfgStatus
+    failed_when: false
+    when: prompt_flexauth_def_vlan is defined and prompt_flexauth_def_vlan != ''
+
+  - name: Parse Switch Error
+    set_fact:
+      ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+    when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
+
+  - name: Restore 802.1X Interfaces
+    icx_config: {lines: '{{Dot1xEnabledInt.stdout[0]}}', parents: authentication}
+    register: IcxCfgStatus
+    failed_when: false
+    when:
+      - ErrMsg is not defined
+      - prompt_flexauth_def_vlan is defined
+      - prompt_flexauth_def_vlan != ''
+      - Dot1xEnabledInt.stdout[0] is defined
+      - Dot1xEnabledInt.stdout[0] != ''
+
+  - name: Parse Switch Error
+    set_fact:
+      ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+    when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
+
+  - name: Restore 802.1X Port-Control Interfaces (Global Config)
+    icx_config: {lines: '{{PortCtrlAutoInt.stdout[0]}}', parents: authentication}
+    register: IcxCfgStatus
+    failed_when: false
+    when:
+      - ErrMsg is not defined
+      - prompt_flexauth_def_vlan is defined
+      - prompt_flexauth_def_vlan != ''
+      - Dot1xEnabledInt.stdout[0] is defined
+      - Dot1xEnabledInt.stdout[0] != ''
+      - PortCtrlAutoInt.stdout[0] is defined
+      - PortCtrlAutoInt.stdout[0] != ''
+
+  - name: Get 802.1X Interface List for Legacy Port-Control Restore
+    icx_command: {commands: show dot1x config all | include Configuration}
+    register: PortCtrlInt
+    when:
+      - ErrMsg is not defined
+      - prompt_flexauth_def_vlan is defined
+      - prompt_flexauth_def_vlan != ''
+      - Dot1xEnabledInt.stdout[0] is defined
+      - Dot1xEnabledInt.stdout[0] != ''
+      - PortCtrlAutoInt.stdout[0] is not defined or PortCtrlAutoInt.stdout[0] == ''
+
+  - name: Restore 802.1X Port-Control Interfaces (Legacy)
+    icx_config: {lines: dot1x port-control auto, parents: 'interface e {{item.split(" ")[1]}}'}
+    register: IcxCfgStatus
+    loop: '{{PortCtrlInt.stdout_lines[0]}}'
+    failed_when: false
+    when:
+      - ErrMsg is not defined
+      - prompt_flexauth_def_vlan is defined
+      - prompt_flexauth_def_vlan != ''
+      - Dot1xEnabledInt.stdout[0] is defined
+      - Dot1xEnabledInt.stdout[0] != ''
+      - PortCtrlInt.stdout[0] is defined
+      - PortCtrlInt.stdout[0] != ''
+      - PortCtrlAutoInt.stdout[0] is not defined or PortCtrlAutoInt.stdout[0] == ''
+
+  - name: Parse Switch Error
+    set_fact:
+      ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+    when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
+
+  - name: Restore MAC-Authentication Interfaces
+    icx_config: {lines: '{{MacAuthEnabledInt.stdout[0]}}', parents: authentication}
+    register: IcxCfgStatus
+    failed_when: false
+    when:
+      - ErrMsg is not defined
+      - prompt_flexauth_def_vlan is defined
+      - prompt_flexauth_def_vlan != ''
+      - MacAuthEnabledInt.stdout[0] is defined
+      - MacAuthEnabledInt.stdout[0] != ''
+
+  - name: Parse Switch Error
+    set_fact:
+      ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+    when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
+
+  - name: Configure Reauthentication
+    icx_config: {lines: reauthentication, parents: authentication, save_when: changed}
+    register: IcxCfgStatus
+    when:
+      - ErrMsg is not defined
+      - prompt_flexauth_reauth is defined
+      - prompt_flexauth_reauth|bool
+
+  - name: Parse Switch Error
+    set_fact:
+      ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+    when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
+
+  - name: Configure FlexAuth
     icx_config:
       lines: |
         aaa authentication dot1x default radius
         authentication
-         auth-default-vlan {{template_flexauth_default_vlan}}
-         {{reauth}}
-         reauth-period {{template_flexauth_reauth_period}}
-         dot1x max-reauth-req {{template_flexauth_max_reauth_req}}
-         dot1x max-req {{template_flexauth_max_req}}
-         dot1x timeout tx-period {{template_flexauth_timeout_tx}}
-         dot1x timeout quiet-period {{template_flexauth_timeout_quiet}}
-         dot1x timeout supplicant {{template_flexauth_timeout_supplicant}}
+         reauth-period {{prompt_flexauth_reauth_period|default("3600")}}
+         dot1x max-reauth-req {{prompt_flexauth_max_reauth_req|default("2")}}
+         dot1x max-req {{prompt_flexauth_max_req|default("2")}}
+         dot1x timeout tx-period {{prompt_flexauth_timeout_tx|default("30")}}
+         dot1x timeout quiet-period {{prompt_flexauth_timeout_quiet|default("60")}}
+         dot1x timeout supplicant {{prompt_flexauth_timeout_supplicant|default("30")}}
       save_when: changed
+    register: IcxCfgStatus
+    failed_when: false
+    when: ErrMsg is not defined
 
-  - name: Display Results
-    icx_command:
-      commands: show run authentication
-    register: output
-  - debug:
-      msg: "{{output.stdout_lines}}"
+  - name: Parse Switch Error
+    set_fact:
+      ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+    when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(newline_var)}}'}
+    when: ErrMsg is defined
+
+  - name: Show FlexAuth Info
+    icx_command: {commands: show dot1x config}
+    register: FlexAuthInfo
+
+  - name: Display FlexAuth Info
+    debug: var=FlexAuthInfo.stdout_lines[0]

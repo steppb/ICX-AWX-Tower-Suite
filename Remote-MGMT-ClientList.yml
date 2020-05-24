@@ -1,13 +1,8 @@
-# Playbook Version: 1.1
+#! Description: Add Client IPv4/6 address to service access list.
+#! Prompt: [{question_name: Service(s)@colon, question_description: '', required: true, type: multiselect, variable: prompt_mgmt_service, min: null, max: null, default: '', choices: telnet client\nsnmp-client\nweb client\nip ssh client}, {question_name: IPv4/6 Client Address@colon, question_description: '', required: true, type: text, variable: prompt_mgmt_clientip, min: 1, max: 1024, default: '', choices: ''}]
+#
+# Playbook Version: 1.2
 # =====================
-# The following variables will need to be defined prior to running this playbook:
-#
-# Required:
-# <template_mgmt_client> Client IP address to allow
-#
-# Optional:
-# <template_mgmt_service> (telnet|snmp-client|web|ip ssh)
-# <template_mgmt_ipv6> (true|false) Is client address IPv6. Default false.
 ---
 - hosts: all
   connection: network_cli
@@ -16,30 +11,36 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
-    template_mgmt_ipv6: false
+    newline_var: "\r"
+    ErrParse: '^.*ConnectionError: '
+    ipv6:
 
   tasks:
+  - name: Get Service Count
+    set_fact: {SvcLstCnt: '{{prompt_mgmt_service|length}}'}
+
   - name: Setup for IPv6
+    set_fact: {ipv6: 'ipv6 '}
+    when: "':' in prompt_mgmt_clientip"
+
+  - name: Add Client IP to Service's Client List
+    icx_config: {lines: '{{item}} {{ipv6}}{{prompt_mgmt_clientip}}', save_when: changed}
+    register: IcxCfgStatus
+    failed_when:
+      - IcxCfgStatus.results[idx].msg is defined
+      - "'MODULE FAILURE' not in IcxCfgStatus.results[idx].msg"
+    loop: '{{prompt_mgmt_service}}'
+    loop_control: {index_var: idx}
+
+  - name: Parse Switch Error
     set_fact:
-      ipv6: ipv6
-      cacheable: no
-    when: template_mgmt_ipv6|lower == 'true'
+      ErrMsg: "{{IcxCfgStatus.results[idx].module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+    loop: '{{prompt_mgmt_service}}'
+    loop_control: {index_var: idx}
+    when:
+      - IcxCfgStatus.results[idx].rc is defined
+      - IcxCfgStatus.results[idx].rc == 1
 
-  - name: Adding Client to All-Client List
-    icx_config:
-      lines: all-client {{ipv6}} {{template_mgmt_client}}
-      save_when: changed
-    when: template_mgmt_service is not defined or template_mgmt_service == ''
-
-  - name: Adding Client to Client List
-    icx_config:
-      lines: {{template_mgmt_service}} client {{ipv6}} {{template_mgmt_client}}
-      save_when: changed
-    when: template_mgmt_service is defined and template_mgmt_service != ''
-
-  - name: Display Results
-    icx_command:
-      commands: show run | incl client
-    register: output
-  - debug: 
-      msg: "{{output.stdout_lines}}"
+  - name: Display Switch Error
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(newline_var)}}'}
+    when: ErrMsg is defined

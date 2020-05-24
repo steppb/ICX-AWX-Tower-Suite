@@ -1,8 +1,8 @@
-# Playbook Version: 1.1
+#! Description: Add or replace SNMPv3 group.
+#! Prompt: [{question_name: SNMPv3 Group Name@colon, question_description: '', required: true, type: text, variable: prompt_snmp_group, min: 1, max: 32, default: '', choices: ''}, {question_name: SNMPv3 ACL@colon, question_description: '', required: true, type: text, variable: prompt_snmp_acl, min: 1, max: 1024, default: '', choices: ''}]
+#
+# Playbook Version: 1.2
 # =====================
-# The following variables will need to be defined prior to running this playbook:
-# <template_snmp_group> name of SNMPv3 group
-# <template_snmp_acl> SNMPv3 ACL number
 ---
 - hosts: all
   connection: network_cli
@@ -11,18 +11,45 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
+    newline_var: "\r"
+    ErrParse: '^.*ConnectionError: '
+    ipv6:
 
   tasks:
+  - name: Setup for IPv6
+    set_fact: {ipv6: 'ipv6 '}
+    when: prompt_snmp_acl|int == 0
+
+  - name: Get SNMP Group Config
+    icx_command: {commands: 'show run | include snmp-server group {{prompt_snmp_group}}'}
+    register: SnmpGroupCfg
+
+  - name: Remove Old SNMPv3 Group
+    icx_config: {lines: 'no {{SnmpGroupCfg.stdout_lines[0][0]}}'}
+    when: SnmpGroupCfg.stdout[0] is defined and SnmpGroupCfg.stdout[0] != ''
+
   - name: Configuring SNMPv3 Group
     icx_config:
       lines: |
-        snmp-server group {{template_snmp_group}} v3 priv access {{template_snmp_acl}} read all write all notify all
+        snmp-server group {{prompt_snmp_group}} v3 priv access {{ipv6}}{{prompt_snmp_acl}} read all write all notify all
       save_when: changed
+    register: IcxCfgStatus
+    failed_when:
+      - IcxCfgStatus.msg is defined
+      - "'MODULE FAILURE' not in IcxCfgStatus.msg"
 
-  - name: Display Results
-    icx_command:
-      commands: |
-        show snmp group
-    register: output
-  - debug: 
-      msg: "{{output.stdout_lines}}"
+  - name: Parse Switch Error
+    set_fact:
+      ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+    when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(newline_var)}}'}
+    when: ErrMsg is defined
+
+  - name: Get SNMPv3 Config
+    icx_command: {commands: show snmp group}
+    register: SnmpCfg
+
+  - name: Display SNMPv3 Config
+    debug: var=SnmpCfg.stdout_lines[0]

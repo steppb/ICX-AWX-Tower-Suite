@@ -1,0 +1,61 @@
+#! Description: Apply Sticky-MAC Port security to interface.
+#! Prompt: [{question_name: Sticky-MAC Interface or Range@colon, question_description: (e.g. e 1/1/2 to 1/1/4 for range), required: true, type: text, variable: prompt_portsec_int, min: 5, max: 1024, default: '', choices: ''}, {question_name: Max MAC Addresess@comma, question_description: Enter the maximum number of restricted MAC addresses on the interface, required: false, type: integer, variable: prompt_portsec_max, min: 1, max: 64, default: 1, choices: ''}, {question_name: Auto-Save Interval (In Minutes)@colon, question_description: '', required: false, type: integer, variable: prompt_portsec_autosave, min: 15, max: 1440, default: '', choices: ''}]
+#
+# Playbook Version: 1.2
+# =====================
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+    newline_var: "\r"
+    ErrParse: '^.*ConnectionError: '
+    EthVar: '(e|et|eth|ethe|ether|ethern|etherne|ethernet)'
+    PortVar: '([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2})'
+    RangeVar: '^.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*to.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*$'
+
+  tasks:
+  - name: Format Interface List
+    set_fact: {EthInt: '{{prompt_portsec_int|regex_replace(EthVar)|regex_replace(PortVar, "e \1")}}'}
+    when: "'to' not in prompt_portsec_int"
+
+  - name: Format Interface Range
+    set_fact: {EthInt: '{{prompt_portsec_int|regex_replace(RangeVar, "e \1 to \2")}}'}
+    when: "'to' in prompt_portsec_int"
+
+  - name: Setup Auto-Save Command
+    set_fact: {AutoSave: 'autosave {{prompt_portsec_autosave}}'}
+    when: prompt_portsec_autosave is defined and prompt_portsec_autosave != ''
+
+  - name: Apply Port Security
+    icx_config:
+      lines: |
+         port security
+          {{AutoSave}}
+          maximum {{prompt_portsec_max|default("1")}}
+          enable
+      save_when: changed
+      parents: interface {{EthInt}}
+    register: IcxCfgStatus
+    failed_when:
+      - IcxCfgStatus.msg is defined
+      - "'MODULE FAILURE' not in IcxCfgStatus.msg"
+
+  - name: Parse Switch Error
+    set_fact:
+      ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+    when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(newline_var)}}'}
+    when: ErrMsg is defined
+
+  - name: Get Port Security Info
+    icx_command: {commands: show port security}
+    register: PortSecInfo
+
+  - name: Display Port Security Info
+    debug: var=PortSecInfo.stdout_lines[0]

@@ -1,8 +1,8 @@
-# Playbook Version: 1.1
+#! Description: Add IPv4/6 SNMPv3 Server Address
+#! Prompt: [{question_name: SNMPv3 Server IPv4/6 Address@colon, question_description: '', required: true, type: text, variable: prompt_snmp_host, min: 1, max: 1024, default: '', choices: ''}, {question_name: SNMPv3 Server User Name@colon, question_description: '', required: true, type: text, variable: prompt_snmp_user, min: 1, max: 32, default: '', choices: ''}]
+#
+# Playbook Version: 1.2
 # =====================
-# The following variables will need to be defined prior to running this playbook:
-# <template_snmp_user> SNMPv3 User name
-# <template_snmp_host> SNMPv3 Host IP address
 ---
 - hosts: all
   connection: network_cli
@@ -11,10 +11,30 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
+    newline_var: "\r"
+    ErrParse: '^.*ConnectionError: '
+    ipv6:
 
   tasks:
+  - name: Setup for IPv6
+    set_fact: {ipv6: 'ipv6 '}
+    when: "':' in prompt_snmp_host"
+
   - name: Configuring SNMPv3 Host
     icx_config:
       lines: |
-        snmp-server host {{template_snmp_host}} version v3 priv {{template_snmp_user}}
+        snmp-server host {{ipv6}}{{prompt_snmp_host}} version v3 priv {{prompt_snmp_user}}
       save_when: changed
+    register: IcxCfgStatus
+    failed_when:
+      - IcxCfgStatus.msg is defined
+      - "'MODULE FAILURE' not in IcxCfgStatus.msg"
+
+  - name: Parse Switch Error
+    set_fact:
+      ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+    when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(newline_var)}}'}
+    when: ErrMsg is defined

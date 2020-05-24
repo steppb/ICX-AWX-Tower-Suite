@@ -1,10 +1,8 @@
-# Playbook Version: 1.1
+#! Description: Add or replace SNMPv3 user.
+#! Prompt: [{question_name: SNMPv3 User Name@colon, question_description: '', required: true, type: text, variable: prompt_snmp_user, min: 1, max: 32, default: '', choices: ''}, {question_name: SNMPv3 Group Name@colon, question_description: '', required: true, type: text, variable: prompt_snmp_group, min: 1, max: 32, default: '', choices: ''}, {question_name: Auth@colon, question_description: (SHA), required: true, type: text, variable: prompt_snmp_auth, min: 8, max: 20, default: '', choices: ''}, {question_name: Priv@colon, question_description: (AES), required: true, type: text, variable: prompt_snmp_priv, min: 12, max: 16, default: '', choices: ''}]
+#
+# Playbook Version: 1.2
 # =====================
-# The following variables will need to be defined prior to running this playbook:
-# <template_snmp_user> SNMPv3 User name
-# <template_snmp_group> SNMPv3 Group name
-# <template_snmp_auth> SNMPv3 auth string
-# <template_snmp_priv> SNMPv3 priv string
 ---
 - hosts: all
   connection: network_cli
@@ -13,18 +11,38 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
+    newline_var: "\r"
+    ErrParse: '^.*ConnectionError: '
 
   tasks:
+  - name: Get SNMPv3 User Config
+    icx_command: {commands: 'show run | include snmp-server user {{prompt_snmp_user}}'}
+    register: SnmpUserCfg
+
+  - name: Remove Old SNMPv3 User
+    icx_config: {lines: 'no {{SnmpUserCfg.stdout_lines[0][0]}}'}
+    when: SnmpUserCfg.stdout[0] is defined and SnmpUserCfg.stdout[0] != ''
+
   - name: Configuring SNMPv3 User
     icx_config:
       lines: |
-        snmp-server user {{template_snmp_user}} {{template_snmp_group}} v3 auth sha {{template_snmp_auth}} priv aes {{template_snmp_priv}}
+        snmp-server user {{prompt_snmp_user}} {{prompt_snmp_group}} v3 auth sha {{prompt_snmp_auth}} priv aes {{prompt_snmp_priv}}
       save_when: changed
+    register: IcxCfgStatus
+    failed_when: false
 
-  - name: Display Results
-    icx_command:
-      commands: |
-        show snmp user
-    register: output
-  - debug: 
-      msg: "{{output.stdout_lines}}"
+  - name: Parse Switch Error
+    set_fact:
+      ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+    when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(newline_var)}}'}
+    when: ErrMsg is defined
+
+  - name: Get SNMPv3 User Config
+    icx_command: {commands: show snmp user}
+    register: SnmpCfg
+
+  - name: Display SNMPv3 User Config
+    debug: var=SnmpCfg.stdout_lines[0]

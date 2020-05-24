@@ -1,9 +1,9 @@
-# Playbook Version: 1.1
-# =====================
-# The following variables will need to be defined prior to running this playbook:
+#! Description: Enable 802.1X on interface.
+#! Prompt: [{question_name: Interface or Range@colon, question_description: (e.g. e 1/1/2 to 1/1/4 for range), required: true, type: text, variable: prompt_flexauth_int, min: 5, max: 1024, default: '', choices: ''}]
 #
-# Required Variables:
-# <template_flexauth_int> Interface to apply FlexAuth
+# Playbook Version: 1.2
+# =====================
+
 ---
 - hosts: all
   connection: network_cli
@@ -12,21 +12,47 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
+    newline_var: "\r"
+    ErrParse: '^.*ConnectionError: '
+    EthVar: '(e|et|eth|ethe|ether|ethern|etherne|ethernet)'
+    PortVar: '([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2})'
+    RangeVar: '^.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*to.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*$'
 
   tasks:
+  - name: Format Interface List
+    set_fact: {EthInt: '{{prompt_flexauth_int|regex_replace(EthVar)|regex_replace(PortVar, "e \1")}}'}
+    when: "'to' not in prompt_flexauth_int"
+
+  - name: Format Interface Range
+    set_fact: {EthInt: '{{prompt_flexauth_int|regex_replace(RangeVar, "e \1 to \2")}}'}
+    when: "'to' in prompt_flexauth_int"
+
   - name: Configuring FlexAuth on Interface
     icx_config:
       lines: |
          dot1x-enable
-          enable {{template_flexauth_int}}
+          enable {{EthInt}}
           exit
-         interface {{template_flexauth_int}}
+         interface {{EthInt}}
           dot1x port-control auto
       save_when: changed
+    register: IcxCfgStatus
+    failed_when:
+      - IcxCfgStatus.msg is defined
+      - "'MODULE FAILURE' not in IcxCfgStatus.msg"
 
-  - name: Display Results
-    icx_command:
-      commands: show dot1x config all
-    register: output
-  - debug:
-      msg: "{{output.stdout_lines}}"
+  - name: Parse Switch Error
+    set_fact:
+      ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+    when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(newline_var)}}'}
+    when: ErrMsg is defined
+
+  - name: Get 802.1X Config
+    icx_command: {commands: show dot1x config all}
+    register: Dot1xConfig
+
+  - name: Display 802.1X Config
+    debug: var=Dot1xConfig.stdout_lines[0]

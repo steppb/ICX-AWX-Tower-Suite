@@ -1,15 +1,8 @@
-# Playbook Version: 1.1
+#! Description: Add RADIUS server.
+#! Prompt: [{question_name: Radius Server IPv4/6 Address@colon, question_description: '', required: true, type: text, variable: prompt_rem_radiusip, min: 1, max: 1024, default: '', choices: ''}, {question_name: RADIUS Shared Secret@colon, question_description: '', required: true, type: password, variable: prompt_rem_radiuskey, min: 1, max: 64, default: '', choices: ''}, {question_name: RADIUS Authentication Port@colon, question_description: '', required: false, type: integer, variable: prompt_rem_radiusauth, min: 0, max: 65535, default: 1812, choices: ''}, {question_name: RADIUS Accounting Port@colon, question_description: '', required: false, type: integer, variable: prompt_rem_radiusacct, min: 0, max: 65535, default: 1813, choices: ''}, {question_name: Use RADIUS Server for Dot1X@question, question_description: '', required: false, type: multiplechoice, variable: prompt_rem_radiusdot1x, min: null, max: null, default: 'yes', choices: yes\nno}]
+#
+# Playbook Version: 1.2
 # =====================
-# The following variables will need to be defined prior to running this playbook:
-#
-# Required Variables:
-# <template_rem_radiusip> Radius Server IP address
-# <template_rem_radiuskey> Radius Server Shared Secret
-#
-# Optional Variables:
-# <template_rem_radiusauth> Radius Server Auth UDP port. Default: 1812
-# <template_rem_radiusacct> Radius Server Acct UDP port. Defualt: 1813
-# <template_rem_radiusdot1x> (true|false) Use radius server for dot1x
 ---
 - hosts: all
   connection: network_cli
@@ -18,27 +11,39 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
-    template_rem_radiusauth: 1812
-    template_rem_radiusacct: 1813
-    dot1x:
+    newline_var: "\r"
+    ErrParse: '^.*ConnectionError: '
+    Dot1x:
+    Ipv6:
 
   tasks:
-  - name: Setup Radius Server for Dot1X
-    set_fact:
-      dot1x: dot1x
-      cacheable: no
-    when: template_rem_radiusdot1x is defined and template_rem_radiusdot1x|lower == 'true'
+  - name: Setup for IPv6
+    set_fact: {Ipv6: ipv6}
+    when: "':' in prompt_rem_radiusip"
 
-  - name: Configuring Radius Host
+  - name: Setup Radius Server for 802.1X
+    set_fact: {Dot1x: dot1x}
+    when: prompt_rem_radiusdot1x is defined and prompt_rem_radiusdot1x|bool
+
+  - name: Configure Radius Host
     icx_config:
-      lines: |
-        radius-server host {{template_rem_radiusip}} auth-port {{template_rem_radiusauth}} acct-port {{template_rem_radiusacct}} default key {{template_rem_radiuskey}} {{dot1x}}
+      lines: radius-server host {{Ipv6}} {{prompt_rem_radiusip}} auth-port {{prompt_rem_radiusauth|default("1812")}} acct-port {{prompt_rem_radiusacct|default("1813")}} default key {{prompt_rem_radiuskey}} {{Dot1x}}
       save_when: changed
+    register: icxconfig_status
+    failed_when: icxconfig_status.msg is defined and "MODULE FAILURE" not in icxconfig_status.msg
 
-  - name: Display Results
-    icx_command:
-      commands: show radius server
-    register: output
+  - name: Parse Switch Error
+    set_fact:
+      ErrMsg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
 
-  - debug:
-      msg: "{{output.stdout_lines}}"
+  - name: Display Switch Error
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(newline_var)}}'}
+    when: ErrMsg is defined
+
+  - name: Get RADIUS Config
+    icx_command: {commands: show aaa | beg Radius Server}
+    register: RadiusCfg
+
+  - name: Display RADIUS Config
+    debug: var=RadiusCfg.stdout_lines[0]
