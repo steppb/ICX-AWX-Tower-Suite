@@ -1,5 +1,5 @@
 #! Description: Add NTP Server and/or NTP authentication key.
-#! Prompt: [{question_name: NTP Server IP, question_description: Enter the NTP server IP address., required: false, type: text, variable: template_ntp_server, min: 0, max: 1024, default: '', choices: '', new_question: true}, {question_name: NTP Key ID, question_description: Enter the NTP Key ID. (Required if adding authenticated NTP server and/or adding authentication key), required: false, type: integer, variable: template_ntp_keyid, min: 1, max: 65535, default: '', choices: ''}, {question_name: NTP Authentication Method, question_description: Choose the authentication method. (Required if adding authentication key), required: false, type: multiplechoice, variable: template_ntp_authmethod, min: null, max: null, default: '', choices: md5\nsha1, new_question: true}, {question_name: NTP Key, question_description: Enter the NTP key string. (Required if adding authentication key), required: false, type: password, variable: template_ntp_key, min: 1, max: 16, default: '', choices: ''}]
+#! Prompt: [{question_name: NTP Server IP, question_description: Enter the NTP server IP address., required: false, type: text, variable: prompt_ntp_server, min: 0, max: 1024, default: '', choices: ''}, {question_name: NTP Key ID, question_description: Enter the NTP Key ID. (Required if adding authenticated NTP server and/or adding authentication key), required: false, type: integer, variable: prompt_ntp_keyid, min: 1, max: 65535, default: '', choices: ''}, {question_name: NTP Authentication Method, question_description: Choose the authentication method. (Required if adding authentication key), required: false, type: multiplechoice, variable: prompt_ntp_authmethod, min: null, max: null, default: '', choices: md5\nsha1}, {question_name: NTP Key, question_description: Enter the NTP key string. (Required if adding authentication key), required: false, type: password, variable: prompt_ntp_key, min: 1, max: 16, default: '', choices: ''}]
 #
 # Playbook Version: 1.2
 # =====================
@@ -11,77 +11,71 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
-    ntp_key_remove_cmd:
-    ntp_server_remove_cmd:
-    ntp_keyid:
     newline_var: "\r"
-    error_parse: '^.*ConnectionError: '
+    ErrParse: '^.*ConnectionError: '
+    NtpKeyRmvCmd:
+    NtpKeyCmd:
+    NtpServerRmvCmd:
+    NtpServerCmd:
+    NtpKeyId:
 
   tasks:
   - name: Set Key ID
-    set_fact:
-      ntp_keyid: key {{template_ntp_keyid}}
-    when: template_ntp_keyid is defined
+    set_fact: {NtpKeyId: 'key {{prompt_ntp_keyid}}'}
+    when: prompt_ntp_keyid is defined
 
   - name: Check For Existing NTP KeyID
-    icx_command: {commands: "show run | incl authentication-key key-id {{template_ntp_keyid}}"}
-    register: ntp_keyid_status
-    when: ntp_keyid != '' and template_ntp_authmethod is defined and template_ntp_key is defined
+    icx_command: {commands: "show run | incl authentication-key key-id {{prompt_ntp_keyid}}"}
+    register: NtpKeyIdStatus
+    when: NtpKeyId != '' and prompt_ntp_authmethod is defined and prompt_ntp_key is defined
 
   - name: Check For Existing NTP Server
-    icx_command: {commands: "show ntp associations | incl {{template_ntp_server}}"}
-    register: ntp_server_status
-    when: template_ntp_server is defined and template_ntp_server != ''
+    icx_command: {commands: "show ntp associations | incl {{prompt_ntp_server}}"}
+    register: NtpServerStatus
+    when: prompt_ntp_server is defined and prompt_ntp_server != ''
 
-  - name: Generate Command to Remove Existing NTP Key
+  - name: Set Command to Remove Existing NTP Key
+    set_fact: {NtpKeyRmvCmd: 'no authentication-key {{NtpKeyId}}'}
+    when: NtpKeyIdStatus.stdout is defined and NtpKeyIdStatus.stdout[0] != ''
+
+  - name: Set NTP Authentication Key Command
     set_fact:
-      ntp_key_remove_cmd: no authentication-key {{ntp_keyid}}
-    when: ntp_keyid_status.stdout is defined and ntp_keyid_status.stdout[0] != ''
+      NtpKeyCmd: authentication-key {{NtpKeyId}} {{prompt_ntp_authmethod}} {{prompt_ntp_key}}
+    when: NtpKeyIdStatus.stdout is defined
 
-  - name: Generate Command to Remove Existing NTP Server
-    set_fact:
-      ntp_server_remove_cmd: no server {{template_ntp_server}}
-    when: ntp_server_status.stdout is defined and ntp_server_status.stdout[0] != ''
+  - name: Set Command to Remove Existing NTP Server
+    set_fact: {NtpServerRmvCmd: 'no server {{prompt_ntp_server}}'}
+    when: NtpServerStatus.stdout is defined and NtpServerStatus.stdout[0] != ''
 
-  - name: Add NTP Authentication Key
+  - name: Set NTP Server Command
+    set_fact: {NtpServerCmd: 'server {{prompt_ntp_server}} {{NtpKeyId}}'}
+    when: NtpServerStatus.stdout is defined
+
+  - name: Configure NTP
     icx_config:
       lines: |
-        {{ntp_key_remove_cmd}}
-        authentication-key {{ntp_keyid}} {{template_ntp_authmethod}} {{template_ntp_key}}
+        {{NtpKeyRmvCmd}}
+        {{NtpKeyCmd}}
+        {{NtpServerRmvCmd}}
+        {{NtpServerCmd}}
       parents: ntp
       save_when: changed
-    register: icxconfig_status
+      diff_ignore_lines: ^ntp$
+    register: IcxCfgStatus
     failed_when: false
-    when: ntp_keyid_status.stdout is defined
 
   - name: Parse Switch Error
     set_fact:
-      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"
-    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
-
-  - name: Add NTP Server
-    icx_config:
-      lines: |
-        {{ntp_server_remove_cmd}}
-        server {{template_ntp_server}} {{ntp_keyid}}
-      parents: ntp
-      save_when: changed
-    register: icxconfig_status
-    failed_when: false
-    when: ntp_server_status.stdout is defined and error_msg is not defined
-
-  - name: Parse Switch Error
-    set_fact:
-      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"
-    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
+      ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+    when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
 
   - name: Display Switch Error
-    assert: {that: error_msg is not defined, fail_msg: '{{error_msg.split(newline_var)}}'}
-    when: error_msg is defined
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(newline_var)}}'}
+    when: ErrMsg is defined
 
-  - name: Display Results
-    icx_command:
-      commands: show ntp associations
-    register: output
-  - debug: 
-      msg: "{{output.stdout_lines}}"
+  - name: Get NTP Associations
+    icx_command: {commands: show ntp associations}
+    register: NtpStatus
+
+  - name: Display NTP Associations
+    debug: var=NtpStatus.stdout_lines[0]

@@ -1,5 +1,5 @@
 #! Description: Configure the source interface for network time queries.
-#! Prompt: [{question_name: Source Interface Type, question_description: Select the interface type@colon, required: false, type: multiplechoice, variable: prompt_ntp_srcint, min: null, max: null, default: '', choices: ethernet\nloopback\nve}, {question_name: Source Interface Number, question_description: Enter the interface number, required: false, type: text, variable: prompt_ntp_intnum, min: 0, max: 1024, default: '', choices: '', new_question: true}]
+#! Prompt: [{question_name: Source Interface Type, question_description: Select the interface type@colon, required: false, type: multiplechoice, variable: prompt_ntp_inttype, min: null, max: null, default: '', choices: ethernet\nloopback\nve}, {question_name: Source Interface Number, question_description: Enter the interface number, required: false, type: text, variable: prompt_ntp_intnum, min: 0, max: 1024, default: '', choices: ''}]
 #
 # Playbook Version: 1.2
 # =====================
@@ -19,45 +19,45 @@
     ansible_become: true
     ansible_become_method: enable
     newline_var: "\r"
-    error_parse: '^.*ConnectionError: '
+    ErrParse: '^.*ConnectionError: '
 
   tasks:
   - name: Use 'host_ntp_srcint' Variable
-    set_fact: {ntp_srcint: "{{host_ntp_srcint}}"}
+    set_fact: {NtpSrcInt: "{{host_ntp_srcint}}"}
     when: host_ntp_srcint is defined
 
   - name: Use 'host_srcint' Variable
-    set_fact: {ntp_srcint: "{{host_srcint}}"}
-    when: host_srcint is defined and ntp_srcint is not defined
+    set_fact: {NtpSrcInt: "{{host_srcint}}"}
+    when: host_srcint is defined and NtpSrcInt is not defined
 
   - name: Use AWX Survey Prompt Variables
-    set_fact: {ntp_srcint: "{{prompt_ntp_inttype}} {{prompt_ntp_intnum}}"}
-    when: prompt_ntp_inttype is defined and prompt_ntp_intnum is defined and ntp_srcint is not defined
+    set_fact: {NtpSrcInt: "{{prompt_ntp_inttype}} {{prompt_ntp_intnum}}"}
+    when:
+      - prompt_ntp_inttype is defined
+      - prompt_ntp_intnum is defined
+      - NtpSrcInt is not defined
 
   - name: Use 'template_ntp_srcint' Variable
-    set_fact: {ntp_srcint: "{{template_ntp_srcint}}"}
-    when: template_ntp_srcint is defined and ntp_srcint is not defined
+    set_fact: {NtpSrcInt: "{{template_ntp_srcint}}"}
+    when: template_ntp_srcint is defined and NtpSrcInt is not defined
 
   - name: Check Variable
-    assert: {that: ntp_srcint is defined, fail_msg: "No variable defined"}
+    assert: {that: NtpSrcInt is defined, fail_msg: "No variable defined"}
 
   - name: Correct Variable Spacing
-    set_fact: {ntp_srcint: '{{ntp_srcint|regex_replace("^([a-z]*)","\1 ")}}'}
-    when: "' ' not in ntp_srcint"
+    set_fact: {NtpSrcInt: '{{NtpSrcInt|regex_replace("^([a-z]*)","\1 ")}}'}
+    when: "' ' not in NtpSrcInt"
 
   - name: Configure NTP Source Interface
-    icx_config:
-      lines: source-interface {{ntp_srcint}}
-      parents: ntp
-      save_when: changed
-    register: icxconfig_status
-    failed_when: icxconfig_status.msg is defined and "MODULE FAILURE" not in icxconfig_status.msg
+    icx_config: {lines: 'source-interface {{NtpSrcInt}}', parents: ntp, save_when: changed}
+    register: IcxCfgStatus
+    failed_when: IcxCfgStatus.msg is defined and "MODULE FAILURE" not in IcxCfgStatus.msg
 
   - name: Parse Switch Error
     set_fact:
-      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"
-    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
+      ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+    when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
 
   - name: Display Switch Error
-    assert: {that: error_msg is not defined, fail_msg: '{{error_msg.split(newline_var)}}'}
-    when: error_msg is defined
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(newline_var)}}'}
+    when: ErrMsg is defined
