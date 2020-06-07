@@ -18,135 +18,130 @@
       user: '{{awxlogin_user}}'
       password: '{{awxlogin_pass}}'
       force_basic_auth: yes
-    set_fact:
-      cacheable: no
   vars:
-    awx_api: https://{{ansible_host}}/api/v2
-    yaml_ext: '.yml'
-    desc_var: '#! Description: '
-    newline_var: '\\\\n'
+    AwxApi: https://{{ansible_host}}/api/v2
+    YamlExt: '.yml'
+    DescVar: '#! Description: '
+    NewlineVar: '\\\\n'
     template_validate_certs: no
 
   tasks:
-  - name: Get Project Directory
-    uri:
-      url: '{{awx_api}}/config/'
-    register: awxcfg
+  - {name: Get Project Directory, uri: {url: '{{AwxApi}}/config/'}, register: AwxCfg}
 
   - name: Get Project Info
-    uri:
-      url: '{{awx_api}}/projects/?name={{template_project_name|urlencode}}'
-    register: pjinfo
-    failed_when: pjinfo.json.results[0] is not defined
+    uri: {url: '{{AwxApi}}/projects/?name={{template_project_name|urlencode}}'}
+    register: PjInfo
+    failed_when: PjInfo.json.results[0] is not defined
 
   - name: Get Inventory Info
-    uri:
-      url: '{{awx_api}}/inventories/?name={{template_project_inventory|urlencode}}'
-    register: invinfo
+    uri: {url: '{{AwxApi}}/inventories/?name={{template_project_inventory|urlencode}}'}
+    register: InvInfo
 
   - name: Set Project Variables
     set_fact:
-      pjid: "{{pjinfo.json.results[0].id}}"
-      pjpath: "{{awxcfg.json.project_base_dir}}/{{pjinfo.json.results[0].local_path}}"
-      invid: "{{invinfo.json.results[0].id}}"
+      PjId: "{{PjInfo.json.results[0].id}}"
+      PjPath: "{{AwxCfg.json.project_base_dir}}/{{PjInfo.json.results[0].local_path}}"
+      InvId: "{{InvInfo.json.results[0].id}}"
 
   - name: Get Playbook List
-    uri:
-      url: '{{awx_api}}/projects/{{pjid}}/playbooks/'
-    register: playbooks
+    uri: {url: '{{AwxApi}}/projects/{{PjId}}/playbooks/'}
+    register: PbList
 
   - name: Get Playbook Info
-    shell: cat {{pjpath}}/{{item}} | grep '^# ' && echo '---'
-    register: extravar
-    loop: "{{playbooks.json}}"
+    shell: cat {{PjPath}}/{{item}} | grep '^# ' && echo '---'
     changed_when: false
     failed_when: false
+    loop: "{{PbList.json}}"
+    register: ExtraVar
 
   - name: Get Playbook Descriptions
-    shell: cat {{pjpath}}/{{item}} | grep '^#! Description'
+    shell: cat {{PjPath}}/{{item}} | grep '^#! Description'
     register: description
-    loop: "{{playbooks.json}}"
+    loop: "{{PbList.json}}"
     changed_when: false
     failed_when: false
 
   - name: Get Existing Template List
-    uri:
-      url: '{{awx_api}}/job_templates/?name={{item|regex_replace(yaml_ext)}}'
-    loop: '{{playbooks.json}}'
-    register: existing_templates
+    uri: {url: '{{AwxApi}}/job_templates/?name={{item|regex_replace(YamlExt)}}'}
+    loop: '{{PbList.json}}'
+    register: ExistingTemplates
 
   - name: Build Template Payload
     set_fact:
       template_struct: 
-        name: "{{item|regex_replace(yaml_ext)}}"
-        description: "{{description.results[idx].stdout|regex_replace(desc_var)}}"
-        extra_vars: "{{extravar.results[idx].stdout}}"
-        project: "{{pjid}}"
-        inventory: "{{invid}}"
+        name: "{{item|regex_replace(YamlExt)}}"
+        description: "{{description.results[idx].stdout|regex_replace(DescVar)}}"
+        extra_vars: "{{ExtraVar.results[idx].stdout}}"
+        project: "{{PjId}}"
+        inventory: "{{InvId}}"
         playbook: "{{item}}"
         ask_credential_on_launch: true
-    loop: "{{playbooks.json}}"
-    loop_control:
-      index_var: idx
-    register: job_templates
+    loop: "{{PbList.json}}"
+    loop_control: {index_var: idx}
+    register: JobTemplates
 
   - name: Create Templates
     uri:
-      url: '{{awx_api}}/job_templates/'
+      url: '{{AwxApi}}/job_templates/'
       method: POST
-      headers:
-        Content-Type: "application/json"
-      body: "{{item.ansible_facts.template_struct}}"
+      headers: {Content-Type: "application/json"}
+      body: "{{JobTemplates.results[idx].ansible_facts.template_struct}}"
       body_format: json
       status_code: 201
       timeout: 60
-    loop: "{{job_templates.results}}"
-    loop_control:
-      index_var: idx
-    register: new_job_templates
-    when: existing_templates.results[idx].json.results[0] is not defined
+    loop: "{{PbList.json}}"
+    loop_control: {index_var: idx}
+    register: NewJobTemplates
+    when: ExistingTemplates.results[idx].json.results[0] is not defined
 
   - name: Scrape Playbook Prompts
-    shell: "grep '^#! Prompt' {{pjpath}}/{{item.json.playbook}} | sed 's/^.*Prompt: //g'"
-    register: rawprompt
+    shell: "grep '^#! Prompt' {{PjPath}}/{{NewJobTemplates.results[idx].json.playbook}} | sed 's/^.*Prompt: //g'"
     failed_when: false
     changed_when: false
-    loop: '{{new_job_templates.results}}'
-    when: item.status is defined and item.status == 201
+    loop: '{{PbList.json}}'
+    loop_control: {index_var: idx}
+    register: RawPrompts
+    when:
+      - NewJobTemplates.results[idx].status is defined
+      - NewJobTemplates.results[idx].status == 201
 
   - name: Prepare Survey Prompt Payload
     set_fact:
-      template_url: 'https://{{ansible_host}}{{item.item.json.url}}'
+      template_url: 'https://{{ansible_host}}{{NewJobTemplates.results[idx].json.url}}'
       payload:
         name: ''
         description: ''
-        spec: "{{item.stdout_lines[0]|from_yaml|regex_replace(newline_var, '\\\\n')}}"
-    loop: '{{rawprompt.results}}'
-    register: pbprompts
-    when: item.stdout_lines[0] is defined
+        spec: "{{tPrompt.stdout_lines[0]|from_yaml|regex_replace(NewlineVar, '\\\\n')}}"
+    loop: '{{PbList.json}}'
+    loop_control: {index_var: idx}
+    register: PbPrompts
+    when: RawPrompts.results[idx].stdout_lines[0] is defined
+    vars: {tPrompt: '{{RawPrompts.results[idx]}}'}
 
   - name: Add Survey Prompts
     uri:
-      url: '{{item.ansible_facts.template_url}}survey_spec/'
+      url: '{{PbPrompts.results[idx].ansible_facts.template_url}}survey_spec/'
       method: POST
-      headers:
-        Content-Type: "application/json"
-      body: "{{item.ansible_facts.payload|regex_replace('@colon',':')|regex_replace('@question','?')}}"
+      headers: {Content-Type: "application/json"}
+      body: "{{tPayload|regex_replace('@colon',':')|regex_replace('@question','?')}}"
       body_format: json
       timeout: 60
-    loop: '{{pbprompts.results}}'
-    register: prompt_status
-    when: item.ansible_facts is defined
+    loop: '{{PbList.json}}'
+    loop_control: {index_var: idx}
+    register: PromptStatus
+    when: PbPrompts.results[idx].ansible_facts is defined
+    vars: {tPayload: '{{PbPrompts.results[idx].ansible_facts.payload}}'}
 
   - name: Enable Survey Prompts
     uri:
-      url: '{{item.item.ansible_facts.template_url}}'
+      url: '{{PbPrompts.results[idx].ansible_facts.template_url}}'
       method: PATCH
-      headers:
-        Content-Type: "application/json"
-      body:
-        survey_enabled: true
+      headers: {Content-Type: "application/json"}
+      body: {survey_enabled: true}
       body_format: json
       timeout: 60
-    loop: '{{prompt_status.results}}'
-    when: item.status is defined and item.status == 200
+    loop: '{{PbList.json}}'
+    loop_control: {index_var: idx}
+    when:
+      - PromptStatus.results[idx].status is defined
+      - PromptStatus.results[idx].status == 200
