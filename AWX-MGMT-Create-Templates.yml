@@ -47,24 +47,40 @@
     uri: {url: '{{AwxApi}}/projects/{{PjId}}/playbooks/'}
     register: PbList
 
+  - name: Get List of Ignored Playbooks
+    lineinfile:
+      path: '{{PjPath}}/{{item}}'
+      regex: '^#! AwxMgmtIgnore$'
+      line: '#! AwxMgmtIgnore'
+    changed_when: false
+    check_mode: yes
+    loop: "{{PbList.json}}"
+    register: AwxMgmtIgnored
+
   - name: Get Playbook Info
     shell: cat {{PjPath}}/{{item}} | grep '^# ' && echo '---'
     changed_when: false
     failed_when: false
     loop: "{{PbList.json}}"
+    loop_control: {index_var: idx}
     register: ExtraVar
+    when: AwxMgmtIgnored.results[idx].msg != ''
 
   - name: Get Playbook Descriptions
     shell: cat {{PjPath}}/{{item}} | grep '^#! Description'
     register: description
     loop: "{{PbList.json}}"
+    loop_control: {index_var: idx}
     changed_when: false
     failed_when: false
+    when: AwxMgmtIgnored.results[idx].msg != ''
 
   - name: Get Existing Template List
     uri: {url: '{{AwxApi}}/job_templates/?name={{item|regex_replace(YamlExt)}}'}
     loop: '{{PbList.json}}'
+    loop_control: {index_var: idx}
     register: ExistingTemplates
+    when: AwxMgmtIgnored.results[idx].msg != ''
 
   - name: Build Template Payload
     set_fact:
@@ -79,6 +95,9 @@
     loop: "{{PbList.json}}"
     loop_control: {index_var: idx}
     register: JobTemplates
+    when:
+      - AwxMgmtIgnored.results[idx].msg != ''
+      - ExistingTemplates.results[idx].json.results[0] is not defined
 
   - name: Create Templates
     uri:
@@ -92,7 +111,7 @@
     loop: "{{PbList.json}}"
     loop_control: {index_var: idx}
     register: NewJobTemplates
-    when: ExistingTemplates.results[idx].json.results[0] is not defined
+    when: JobTemplates.results[idx].ansible_facts is defined
 
   - name: Scrape Playbook Prompts
     shell: "grep '^#! Prompt' {{PjPath}}/{{NewJobTemplates.results[idx].json.playbook}} | sed 's/^.*Prompt: //g'"
