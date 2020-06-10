@@ -92,6 +92,7 @@
         inventory: "{{InvId}}"
         playbook: "{{item}}"
         ask_credential_on_launch: true
+        ask_inventory_on_launch: '{{template_inventory_prompt|default(true)}}'
     loop: "{{PbList.json}}"
     loop_control: {index_var: idx}
     register: JobTemplates
