@@ -1,0 +1,55 @@
+option agent.subscriber-id code 6 = text;
+option hostname code 12 = text;
+
+default-lease-time 600;
+max-lease-time 7200;
+
+ddns-update-style none;
+
+on commit {
+  set ClientIP = binary-to-ascii(10,8,".",leased-address);
+  set ClientMac = concat (
+    suffix (concat ("0", binary-to-ascii (16, 8, "", substring(hardware,1,1))),2), ":",
+    suffix (concat ("0", binary-to-ascii (16, 8, "", substring(hardware,2,1))),2), ":",
+    suffix (concat ("0", binary-to-ascii (16, 8, "", substring(hardware,3,1))),2), ":",
+    suffix (concat ("0", binary-to-ascii (16, 8, "", substring(hardware,4,1))),2), ":",
+    suffix (concat ("0", binary-to-ascii (16, 8, "", substring(hardware,5,1))),2), ":",
+    suffix (concat ("0", binary-to-ascii (16, 8, "", substring(hardware,6,1))),2)
+  );
+
+  set Name = option hostname;
+  set RemoteId = "";
+  set CircuitId = "";
+  set SubscriberId = "";
+  if exists agent.circuit-id {
+    set RemoteId = concat (
+      suffix (concat ("0", binary-to-ascii (16, 8, "", substring(option agent.remote-id,0,1))),2), ":",
+      suffix (concat ("0", binary-to-ascii (16, 8, "", substring(option agent.remote-id,1,1))),2), ":",
+      suffix (concat ("0", binary-to-ascii (16, 8, "", substring(option agent.remote-id,2,1))),2), ":",
+      suffix (concat ("0", binary-to-ascii (16, 8, "", substring(option agent.remote-id,3,1))),2), ":",
+      suffix (concat ("0", binary-to-ascii (16, 8, "", substring(option agent.remote-id,4,1))),2), ":",
+      suffix (concat ("0", binary-to-ascii (16, 8, "", substring(option agent.remote-id,5,1))),2)
+    );
+    #For ICX:
+    set CircuitId = binary-to-ascii(10,8,"/",substring(option agent.circuit-id,4,4));
+  }
+
+  if exists agent.subscriber-id {
+    set SubscriberId = option agent.subscriber-id;
+  }
+
+  set Json = concat(
+      "\"variables\":\"ansible_host: ",ClientIP,"\",",
+      "\"name\":\"",ClientIP,"\",",
+      "\"description\":\"",Name,"\""
+      );
+
+  log(Json);
+
+  execute ("/etc/dhcp/awx_dhcp_webhook", ClientIP, Name);
+}
+
+subnet {{DhcpSubnetIp}} netmask {{DhcpSubnetMask}} {
+  range {{DhcpRangeLow}} {{DhcpRangeHigh}};
+  {{DhcpSubnetRouter}}
+}

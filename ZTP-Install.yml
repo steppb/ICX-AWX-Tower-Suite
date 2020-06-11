@@ -1,0 +1,326 @@
+#! Description: Generates Auth Token for DHCP ZTP Webhook.
+#! Prompt: [{question_name: Provisioning Inventory Name@colon, question_description: Name of inventory used for ZTP hosts, required: true, type: text, variable: prompt_ztp_inventory, min: 1, max: 1024, default: Provisioning, choices: ''}]
+#
+# Playbook Version: 1.2
+# =====================
+# This template performs the following tasks on first run:
+# - Installs 'netaddr' ansible module
+# - Creates AWX inventory for ZTP hosts named from the prompt variable
+# - Creates AWX application entry for 'isc-dhcp-server'
+# - Generates Auth Token used by DHCP webhook.
+# - Installs 'isc-dhcp-server'
+# - Creates and installs 'awx-dhcp-webhook' from template
+# - Creates 'ZTP-Configure' template
+---
+- hosts: all
+  connection: ssh
+  gather_facts: yes
+  module_defaults:
+    uri:
+      validate_certs: '{{template_validate_certs}}'
+      method: GET
+      user: '{{awxlogin_user}}'
+      password: '{{awxlogin_pass}}'
+      force_basic_auth: yes
+      timeout: 60
+  vars:
+    AwxApi: https://{{ansible_host}}/api/v2
+    template_validate_certs: no
+    PhysInts:
+    IpVer: ipv4
+    ZtpDefPassword: 'PasswordPassword'
+
+  tasks:
+  - {name: Get List of Installed Packages, pip_package_info: , register: PipInfo}
+
+  - name: Install 'netaddr' Package
+    pip: {name: netaddr}
+    when: PipInfo.packages.pip.netaddr is not defined
+
+  - name: Check AWX Applications
+    uri: {url: '{{AwxApi}}/applications/?name=isc-dhcp-server'}
+    register: AwxGetAppStatus
+
+  - name: Get User ID
+    uri: {url: '{{AwxApi}}/users/?username={{awxlogin_user}}'}
+    register: AwxUserId
+
+  - name: Check for Existing Webhook
+    stat: {path: /etc/dhcp/awx_dhcp_webhook}
+    register: WebhookFile
+
+  - name: Set Template Run Parameters
+    set_fact:
+      AwxDhcpAppCreated: '{{AwxGetAppStatus.json.count > 0}}'
+      WebhookCreated: '{{WebhookFile.stat.exists}}'
+      UserId: '{{AwxUserId.json.results[0].id}}'
+
+  - name: Store Existing Application Id
+    set_fact: {AppId: '{{AwxGetAppStatus.json.results[0].id}}'}
+    when: AwxDhcpAppCreated|bool
+
+  - name: Check for Existing ZTP Inventory
+    uri: {url: '{{AwxApi}}/inventories/?name={{prompt_ztp_inventory|urlencode}}'}
+    register: ZtpInventoryInfo
+
+  - name: Create ZTP Inventory and App Entry
+    block:
+      - name: Get Organization ID
+        uri: {url: '{{AwxApi}}/inventories/{{awx_inventory_id}}/'}
+        register: PjInfo
+
+      - name: Create ZTP Inventory
+        uri:
+          url: '{{AwxApi}}/inventories/'
+          method: POST
+          headers: {Content-Type: "application/json"}
+          body:
+            name: '{{prompt_ztp_inventory}}'
+            description: ''
+            organization: '{{PjInfo.json.organization}}'
+            variables: "inventory_provisioning_pass: {{ZtpDefPassword}}"
+          body_format: json
+          status_code: 201
+        when: ZtpInventoryInfo.json.count == 0
+
+      - name: Create AWX Application Entry for ISC-DHCP-Server
+        uri:
+          url: '{{AwxApi}}/applications/'
+          method: POST
+          headers: {Content-Type: "application/json"}
+          body:
+            name: isc-dhcp-server
+            description: DHCP Server
+            client_type: confidential
+            redirect_uris: 'https://localhost/api/v2/*'
+            authorization_grant_type: authorization-code
+            skip_authorization: false
+            organization: '{{PjInfo.json.organization}}'
+          body_format: json
+          status_code: 201
+        register: AwxPostAppStatus
+        when: not AwxDhcpAppCreated|bool
+
+      - name: Store New Application Id
+        set_fact: {AppId: '{{AwxPostAppStatus.json.id}}'}
+        when: not AwxDhcpAppCreated|bool
+    when: ZtpInventoryInfo.json.count == 0 or not AwxDhcpAppCreated|bool
+
+  - name: Check for Existing Webhook Token
+    uri: {url: '{{AwxApi}}/users/{{UserId}}/tokens/?application={{AppId}}'}
+    register: GetWebhookToken
+
+  - name: Delete Existing Webhook Token
+    uri:
+      url: '{{AwxApi}}/tokens/{{GetWebhookToken.json.results[0].id}}/'
+      method: DELETE
+      status_code: 204
+    register: TokenDelete
+    when:
+      - GetWebhookToken.json.count > 0
+      - not WebhookCreated|bool
+
+  - name: Generate Auth Token For DHCP Webhook
+    uri:
+      url: '{{AwxApi}}/users/{{AwxUserId.json.results[0].id}}/tokens/'
+      method: POST
+      headers: {Content-Type: "application/json"}
+      body: {application: '{{AppId}}', scope: write}
+      body_format: json
+      status_code: 201
+    register: WebhookToken
+    when: TokenDelete.status is defined or GetWebhookToken.json.count == 0
+
+  - name: Attempt to Install ISC-DHCP-Server
+    apt: {name: isc-dhcp-server}
+    register: DhcpInstallStatus
+    vars: {ansible_become: true, ansible_become_method: sudo}
+
+  - name: Create 'awx_dhcp_webhook'
+    template:
+      src: awx_dhcp_webhook.j2
+      dest: /etc/dhcp/awx_dhcp_webhook
+      mode: 0755
+    vars:
+      AuthToken: '{{WebhookToken.json.token}}'
+      InventoryName: '{{prompt_ztp_inventory}}'
+      ansible_become: true
+      ansible_become_method: sudo
+    when: WebhookToken.json.token is defined
+
+  - name: Add AppArmor entry for 'awx_dhcp_webhook'
+    lineinfile:
+      path: /etc/apparmor.d/usr.sbin.dhcpd
+      regexp: 'awx_dhcp_webhook'
+      insertbefore: '^}'
+      line: "  /etc/dhcp/awx_dhcp_webhook cux,"
+    vars: {ansible_become: true, ansible_become_method: sudo}
+
+  - name: Restart AppArmor Service
+    service: {name: apparmor, state: restarted}
+    vars: {ansible_become: true, ansible_become_method: sudo}
+
+  - name: Check for Existing 'ZTP-Configure' Template
+    uri: {url: '{{AwxApi}}/job_templates/?name=ZTP-Configure'}
+    register: GetZtpCfgTemplate
+
+  - name: Store Job Template ID
+    set_fact: {ZtpCfgTemplateId: '{{GetZtpCfgTemplate.json.results[0].id}}'}
+    when: GetZtpCfgTemplate.json.count > 0
+
+  - name: Create 'ZTP-Configure' Template
+    block:
+      - name: Get Info for This Template
+        uri: {url: '{{AwxApi}}/job_templates/{{awx_job_template_id}}'}
+        register: ThisTemplate
+
+      - name: Create 'ZTP-Configure' Template
+        uri:
+          url: '{{AwxApi}}/job_templates/'
+          method: POST
+          headers: {Content-Type: "application/json"}
+          body:
+            name: ZTP-Configure
+            description: 'Configure ISC-DHCP-Server.'
+            project: '{{ThisTemplate.json.project}}'
+            inventory: '{{awx_inventory_id}}'
+            playbook: 'ZTP-Configure.yml'
+          body_format: json
+          status_code: 201
+        register: ConfigZtpTemplate
+
+      - name: Store Template ID of 'ZTP-Configure'
+        set_fact: {ZtpCfgTemplateId: '{{ConfigZtpTemplate.json.id}}'}
+
+      - name: Get Credentials for This Job
+        uri: {url: '{{AwxApi}}/jobs/{{awx_job_id}}/credentials/'}
+        register: ThisJob
+
+      - name: Workaround Ansible String To Integer Casting Issue
+        set_fact: {Credential: "id: {{ThisJob.json.results[idx].id}}"}
+        loop: "{{range(0, ThisJob.json.results|length)|list}}"
+        loop_control: {index_var: idx}
+        register: CredentialList
+
+      - name: Add SSH Credentials to 'ZTP-Configure' Template
+        uri:
+          url: '{{AwxApi}}/job_templates/{{ZtpCfgTemplateId}}/credentials/'
+          method: POST
+          headers: {Content-Type: "application/json"}
+          body: '{{CredentialList.results[idx].ansible_facts.Credential|from_yaml}}'
+          body_format: json
+          status_code: 204
+        loop: '{{range(0, ThisJob.json.results|length)|list}}'
+        loop_control: {index_var: idx}
+    when: GetZtpCfgTemplate.json.count == 0
+
+  - name: Setup for IPv6
+    set_fact: {IpVer: ipv6}
+    when:
+      - ansible_default_ipv4.gateway is not defined
+      - ansible_default_ipv6.gateway is defined
+
+  - name: Get Physical Interface Names and IP Addresses
+    set_fact:
+      PhysInts: "{{PhysInts}} {{item}}:{{vars['ansible_'~item][IpVer].address|default('')}}"
+    loop: '{{ansible_interfaces}}'
+    when: item is match("^e.*$")
+
+  - name: Set Default Interface for Prompt
+    set_fact: {DefInt: '{{item}}'}
+    loop: '{{PhysInts.split(" ")}}'
+    when: item is match("^e.*:$")
+
+  - name: Format Interface String
+    set_fact: {PhysIntStr: '{{PhysInts|regex_replace("^ ")|regex_replace(" ","\n")}}'}
+
+  - name: Add Survey Prompt to 'ZTP-Configure' Template
+    uri:
+      url: '{{AwxApi}}/job_templates/{{ZtpCfgTemplateId}}/survey_spec/'
+      method: POST
+      headers: {Content-Type: 'application/json'}
+      body:
+        name: ''
+        description: ''
+        spec:
+        - question_name: 'Select ZTP Interface:'
+          question_description: ''
+          required: '{{DefInt is defined}}'
+          type: multiplechoice
+          variable: prompt_ztp_interface
+          min: null
+          max: null
+          default: '{{DefInt|default("")}}'
+          choices: '{{PhysIntStr}}'
+        - question_name: 'Interface IP Address and Mask: (e.g. x.x.x.x/x)'
+          question_description: '(Note: Required if no IP address exists on interface)'
+          required: false
+          type: text
+          variable: prompt_ztp_int_ipaddr
+          min: 9
+          max: 18
+          default: ''
+          choices: ''
+        - question_name: Force IP Address Change?
+          question_description: '(Note: Ignored if primary interface is selected)'
+          required: true
+          type: multiplechoice
+          variable: prompt_ztp_addr_change
+          min: null
+          max: null
+          default: 'no'
+          choices: |-
+            yes
+            no
+        - question_name: 'DHCP Subnet IP and Mask:'
+          question_description: '(e.g. 192.168.0.0/24)'
+          required: true
+          type: text
+          variable: prompt_ztp_dhcp_subnet
+          min: 9
+          max: 18
+          default: ''
+          choices: ''
+        - question_name: 'DHCP Subnet Range:'
+          question_description: '(e.g. 192.168.0.10-192.168.0.200)'
+          required: true
+          type: text
+          variable: prompt_ztp_dhcp_range
+          min: 15
+          max: 31
+          default: ''
+          choices: ''
+        - question_name: 'DHCP Subnet Default Router'
+          question_description: '(e.g. 192.168.0.1)'
+          required: false
+          type: text
+          variable: prompt_ztp_dhcp_rtr
+          min: 7
+          max: 15
+          default: ''
+          choices: ''
+      body_format: json
+
+  - name: Add Extra Variables to 'ZTP-Configure'
+    uri:
+      url: '{{AwxApi}}/job_templates/{{ZtpCfgTemplateId}}/'
+      method: PATCH
+      headers: {Content-Type: "application/json"}
+      body:
+        extra_vars: >-
+          template_ztp_inventory: {{prompt_ztp_inventory}}
+      body_format: json
+
+  - name: Enable Survey Prompt
+    uri:
+      url: '{{AwxApi}}/job_templates/{{ZtpCfgTemplateId}}/'
+      method: PATCH
+      headers: {Content-Type: 'application/json'}
+      body: {survey_enabled: true}
+      body_format: json
+
+  - name: Display Completion Message
+    debug:
+      msg:
+        - "ZTP install complete."
+        - "Run 'ZTP-Configure' next to finish setup"

@@ -1,0 +1,59 @@
+#! AwxMgmtIgnore
+---
+- hosts: all
+  connection: local
+  gather_facts: no
+
+  tasks:
+  - {name: Get List of Installed Packages, pip_package_info: , register: PipInfo}
+
+  - name: Install 'pexpect' Package
+    pip: {name: pexpect}
+    when: PipInfo.packages.pip.pexpect is not defined
+
+  - name: Set Password from Template Variable
+    set_fact: {ProvisioningPass: '{{template_provisioning_pass}}'}
+    when:
+      - ProvisioningPass is not defined
+      - template_provisioning_pass is defined
+      - template_provisioning_pass != ''
+
+  - name: Set Password from Inventory Variable
+    set_fact: {ProvisioningPass: '{{inventory_provisioning_pass}}'}
+    when:
+      - ProvisioningPass is not defined
+      - inventory_provisioning_pass is defined
+      - inventory_provisioning_pass != ''
+
+  - name: Attempt SSH Login
+    expect:
+      command: ssh -o UserKnownHostsFile=/dev/null super@{{ansible_host}}
+      echo: yes
+      timeout: 10
+      responses:
+        'want to continue connecting': 'yes'
+        'Password:': 'sp-admin'
+        'Enter the new password for user super :': "{{ProvisioningPass}}"
+        'Enter the reconfirm password for user super:': "{{ProvisioningPass}}"
+        'SSH@': "exit"
+    changed_when: false
+    failed_when: false
+    register: SshSession
+
+  - debug: var=SshSession
+
+  - name: Attempt Telnet Login
+    telnet:
+      host: '{{ansible_host}}'
+      login_prompt: "telnet@"
+      user: enable
+      password_prompt: "#"
+      password: "config t"
+      prompts:
+        - "config"
+      command:
+        - aaa authentication login default local
+        - username super password {{ProvisioningPass}}
+        - crypto key generate rsa modulus 2048
+        - write mem
+    when: "'Connection refused' in SshSession.stdout"

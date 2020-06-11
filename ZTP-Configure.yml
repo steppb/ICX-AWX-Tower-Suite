@@ -1,0 +1,409 @@
+#! AwxMgmtIgnore
+#
+# Playbook Version: 1.2
+# =====================
+---
+- hosts: all
+  connection: ssh
+  gather_facts: yes
+  module_defaults:
+    uri:
+      validate_certs: '{{template_validate_certs}}'
+      method: GET
+      user: '{{awxlogin_user}}'
+      password: '{{awxlogin_pass}}'
+      force_basic_auth: yes
+      timeout: 60
+  vars:
+    AwxApi: https://{{ansible_host}}/api/v2
+    template_validate_certs: no
+    PhysInts:
+    CfgIpAddr: no
+    DhcpSubnetRouter:
+    ZtpDefPassword: 'PasswordPassword'
+
+  tasks:
+  - name: Configure DHCP Interface
+    block:
+      - name: Set Initial Variables
+        set_fact:
+          NetIp: '{{prompt_ztp_int_ipaddr|default("")|regex_replace("/.*$")}}'
+          OldIp: "{{vars['ansible_'~NetIntName].ipv4.address|default('')}}"
+          ForceIp: '{{prompt_ztp_addr_change|default(no)}}'
+
+      - name: Validate Setup
+        assert:
+          that: OldIp != '' or prompt_ztp_int_ipaddr is defined
+          fail_msg: "Error: No IP Address specified"
+
+      - name: Setup for Interface Address Change
+        set_fact: {CfgIpAddr: yes}
+        when:
+          - NetIp != ''
+          - NetIp != ansible_host
+          - OldIp == '' or ForceIp|bool
+
+      - name: Configure Interface IP Address
+        block:
+          - name: Validate IP Variable
+            assert:
+              that: "'/' in prompt_ztp_int_ipaddr"
+              fail_msg:
+                - "ERROR: IP Address improperly formatted"
+                - "Address and mask needs to be formatted as such: x.x.x.x/x"
+
+          - name: Create Network Interface Config
+            template:
+              src: 02-ztp-netcfg.yaml.j2
+              dest: /etc/netplan/02-ztp-netcfg.yaml
+              mode: 0644
+
+          - name: Apply Network Interface Config
+            shell: netplan apply
+            register: template_apply
+
+          - name: Store New IP Address
+            set_fact: {OldIp: "{{vars['ansible_'~NetIntName].ipv4.address|default('')}}"}
+
+          - name: Map New IP to Interface
+            set_fact: {PhysInts: "{{NetIntName}}:{{OldIp}}"}
+        when: CfgIpAddr|bool
+        vars:
+          NetIntIp: '{{prompt_ztp_int_ipaddr}}'
+          ansible_become: true
+          ansible_become_method: sudo
+    when: prompt_ztp_interface is defined
+    vars:
+      NetIntName: '{{prompt_ztp_interface|regex_replace(":.*$")}}'
+
+  - name: Apply DHCP Configuration
+    block:
+      - name: Reformat DHCP Subnet if Needed
+        set_fact: {DhcpSubnet: "{{prompt_ztp_dhcp_subnet|ipaddr('network/prefix')}}"}
+
+      - name: Ensure Proper Subnet Provided
+        assert:
+          that: DhcpSubnet|ipaddr('bool')
+          fail_msg: "Error: Subnet {{prompt_ztp_dhcp_subnet}} is improperly formatted"
+
+      - name: Ensure Range IP Addresses are in Subnet
+        assert:
+          that:
+            - PromptDhcpRangeLow|ipaddr(DhcpSubnet)|ipaddr('bool')
+            - PromptDhcpRangeHigh|ipaddr(DhcpSubnet)|ipaddr('bool')
+          fail_msg: "Error: Range IP is outside of subnet {{DhcpSubnet}}"
+
+      - name: Set Range Variables
+        set_fact:
+          DhcpRangeLow: '{{PromptDhcpRangeLow}}'
+          DhcpRangeHigh: '{{PromptDhcpRangeHigh}}'
+        when: PromptDhcpRangeHigh is version(PromptDhcpRangeLow, '>')
+
+      - name: Set Range Variables (Reordered)
+        set_fact:
+          DhcpRangeLow: '{{PromptDhcpRangeHigh}}'
+          DhcpRangeHigh: '{{PromptDhcpRangeLow}}'
+        when:
+          - DhcpRangeLow is not defined
+          - DhcpRangeHigh is not defined
+
+      - name: Set Default Router
+        set_fact: {DhcpSubnetRouter: 'option routers {{prompt_ztp_dhcp_rtr}};'}
+        when:
+          - prompt_ztp_dhcp_rtr is defined
+          - prompt_ztp_dhcp_rtr|ipaddr(DhcpSubnet)|ipaddr('bool')
+
+      - name: Generating 'dhcpd.conf'
+        template:
+          src: dhcpd.conf.j2
+          dest: /etc/dhcp/dhcpd.conf
+          mode: 0644
+        vars:
+          DhcpSubnetIp: "{{DhcpSubnet|ipaddr('network')}}"
+          DhcpSubnetMask: "{{DhcpSubnet|ipaddr('netmask')}}"
+
+      - name: Restart DHCP Service
+        service: {name: isc-dhcp-server, state: restarted}
+
+      - name: Get Physical Interface Names and IP Addresses
+        set_fact:
+          PhysInts: "{{PhysInts}} {{item}}:{{vars['ansible_'~item].ipv4.address|default('')}}"
+        loop: '{{ansible_interfaces}}'
+        when:
+          - item is match("^e.*$")
+          - NetIntName is not defined or item != NetIntName
+
+      - name: Format Interface String
+        set_fact: {PhysIntStr: '{{PhysInts|regex_replace("^ ")|regex_replace(" ","\n")}}'}
+
+      - name: Disable DHCP Config Requirements in Survey Prompt
+        uri:
+          url: '{{AwxApi}}/job_templates/{{awx_job_template_id}}/survey_spec/'
+          method: POST
+          headers: {Content-Type: 'application/json'}
+          body:
+            name: ''
+            description: ''
+            spec:
+            - question_name: 'Select ZTP Interface:'
+              question_description: ''
+              required: false
+              type: multiplechoice
+              variable: prompt_ztp_interface
+              min: null
+              max: null
+              default: ''
+              choices: '{{PhysIntStr}}'
+            - question_name: 'Interface IP Address and Mask: (e.g. x.x.x.x/x)'
+              question_description: '(Note: Required if no IP address exists on interface)'
+              required: false
+              type: text
+              variable: prompt_ztp_int_ipaddr
+              min: 9
+              max: 18
+              default: ''
+              choices: ''
+            - question_name: Force IP Address Change?
+              question_description: '(Note: Ignored if primary interface is selected)'
+              required: true
+              type: multiplechoice
+              variable: prompt_ztp_addr_change
+              min: null
+              max: null
+              default: 'no'
+              choices: |-
+                yes
+                no
+            - question_name: 'DHCP Subnet IP and Mask:'
+              question_description: '(e.g. 192.168.0.0/24)'
+              required: false
+              type: text
+              variable: prompt_ztp_dhcp_subnet
+              min: 9
+              max: 18
+              default: ''
+              choices: ''
+            - question_name: 'DHCP Subnet Range:'
+              question_description: '(e.g. 192.168.0.10-192.168.0.200)'
+              required: false
+              type: text
+              variable: prompt_ztp_dhcp_range
+              min: 15
+              max: 31
+              default: ''
+              choices: ''
+            - question_name: 'DHCP Subnet Default Router'
+              question_description: '(e.g. 192.168.0.1)'
+              required: false
+              type: text
+              variable: prompt_ztp_dhcp_rtr
+              min: 7
+              max: 15
+              default: ''
+              choices: ''
+            - question_name: 'Regenerate Auth Token?'
+              question_description: ''
+              required: true
+              type: multiplechoice
+              variable: prompt_ztp_regen_token
+              min: null
+              max: null
+              default: 'no'
+              choices: |-
+                yes
+                no
+          body_format: json
+
+      - name: Display DHCP Config in 'Extra Variables'
+        uri:
+          url: '{{AwxApi}}/job_templates/{{awx_job_template_id}}/'
+          method: PATCH
+          headers: {Content-Type: "application/json"}
+          body:
+            extra_vars: >-
+              template_ztp_inventory: {{template_ztp_inventory}}
+
+              # Current DHCP Config
+
+              # ===================
+
+              # Subnet {{DhcpSubnet}}
+
+              # Start IP: {{DhcpRangeLow}}
+
+              # End IP: {{DhcpRangeHigh}}
+
+              # Router: {{prompt_ztp_dhcp_rtr|default("none")}}
+          body_format: json
+    when:
+      - prompt_ztp_dhcp_subnet is defined
+      - prompt_ztp_dhcp_range is defined
+    vars:
+      PromptDhcpRangeLow: '{{prompt_ztp_dhcp_range.split("-")[0]}}'
+      PromptDhcpRangeHigh: '{{prompt_ztp_dhcp_range.split("-")[1]}}'
+      ansible_become: true
+      ansible_become_method: sudo
+
+  - name: Get Existing Webhook Info
+    block:
+      - name: Get Existing Webhook AuthToken
+        shell: grep '^AuthToken' /etc/dhcp/awx_dhcp_webhook
+        register: OldAuthToken
+        changed_when: false
+
+      - name: Get Existing Webhook Inventory Name
+        shell: grep '^InventoryName' /etc/dhcp/awx_dhcp_webhook
+        register: OldInventory
+        changed_when: false
+
+      - name: Store Variables from Webhook
+        set_fact:
+          AuthToken: '{{OldAuthToken.stdout_lines[0]|regex_replace("^AuthToken=")}}'
+          InventoryName: '{{OldInventory.stdout_lines[0]|regex_replace("^InventoryName=")}}'
+
+      - name: Regenerate Auth Token
+        block:
+          - name: Get User ID
+            uri: {url: '{{AwxApi}}/users/?username={{awxlogin_user}}'}
+            register: AwxUserId
+
+          - name: Get AWX Application Info
+            uri: {url: '{{AwxApi}}/applications/?name=isc-dhcp-server'}
+            register: AwxGetAppStatus
+
+          - name: Store App and User IDs
+            set_fact:
+              UserId: '{{AwxUserId.json.results[0].id}}'
+              AppId: '{{AwxGetAppStatus.json.results[0].id}}'
+
+          - name: Check for Existing Webhook Token
+            uri: {url: '{{AwxApi}}/users/{{UserId}}/tokens/?application={{AppId}}'}
+            register: GetWebhookToken
+
+          - name: Delete Existing Webhook Token
+            uri:
+              url: '{{AwxApi}}/tokens/{{GetWebhookToken.json.results[0].id}}/'
+              method: DELETE
+              status_code: 204
+            register: TokenDelete
+            when: GetWebhookToken.json.count > 0
+
+          - name: Generate Auth Token For DHCP Webhook
+            uri:
+              url: '{{AwxApi}}/users/{{AwxUserId.json.results[0].id}}/tokens/'
+              method: POST
+              headers: {Content-Type: "application/json"}
+              body: {application: '{{AppId}}', scope: write}
+              body_format: json
+              status_code: 201
+            register: WebhookToken
+            when: TokenDelete.status is defined or GetWebhookToken.json.count == 0
+
+          - name: Store New Auth Token
+            set_fact: {AuthToken: '{{WebhookToken.json.token}}', RecreateWebhook: true}
+            when: WebhookToken.json.token is defined
+        when: prompt_ztp_regen_token|bool
+
+      - name: Create New Inventory
+        block:
+          - name: Check for Existing ZTP Inventory
+            uri: {url: '{{AwxApi}}/inventories/?name={{template_ztp_inventory|urlencode}}'}
+            register: ZtpInventoryInfo
+
+          - name: Get Organization ID
+            uri: {url: '{{AwxApi}}/inventories/{{awx_inventory_id}}/'}
+            register: OrgInfo
+
+          - name: Create ZTP Inventory
+            uri:
+              url: '{{AwxApi}}/inventories/'
+              method: POST
+              headers: {Content-Type: "application/json"}
+              body:
+                name: '{{template_ztp_inventory}}'
+                description: ''
+                organization: '{{OrgInfo.json.organization}}'
+                variables: "inventory_provisioning_pass: {{ZtpDefPassword}}"
+              body_format: json
+              status_code: 201
+            register: ZtpInventory
+            when: ZtpInventoryInfo.json.count == 0
+
+          - name: Store New Inventory Name
+            set_fact: {InventoryName: '{{template_ztp_inventory}}', RecreateWebhook: true}
+        when:
+          - InventoryName != template_ztp_inventory|urlencode
+
+      - name: Recreate 'awx_dhcp_webhook'
+        template:
+          src: awx_dhcp_webhook.j2
+          dest: /etc/dhcp/awx_dhcp_webhook
+          mode: 0755
+        when: RecreateWebhook|bool
+        vars: {ansible_become: true, ansible_become_method: sudo}
+    when: prompt_ztp_regen_token is defined
+    vars: {RecreateWebhook: false}
+
+  - name: Check For Existing 'Provisioning-Init-Login' Template
+    uri: {url: '{{AwxApi}}/job_templates/?name=Provisioning-Init-Login'}
+    register: InitTemplate
+
+  - name: Create Provisioning Template
+    block:
+      - name: Get Info for This Template
+        uri: {url: '{{AwxApi}}/job_templates/{{awx_job_template_id}}'}
+        register: ThisTemplate
+
+      - name: Get Inventory ID
+        uri: {url: '{{AwxApi}}/inventories/?name={{template_ztp_inventory|urlencode}}'}
+        register: InventoryStatus
+
+      - name: Create 'Provisioning-Init-Login' Template
+        uri:
+          url: '{{AwxApi}}/job_templates/'
+          method: POST
+          headers: {Content-Type: "application/json"}
+          body:
+            name: Provisioning-Init-Login
+            description: 'Configure initial password.'
+            project: '{{ThisTemplate.json.project}}'
+            inventory: '{{InventoryStatus.json.results[0].id}}'
+            playbook: 'Provisioning-Init-Login.yml'
+          body_format: json
+          status_code: 201
+
+      - name: Set Name for ZTP Credentials
+        set_fact: {ZtpDefLogin: '{{prompt_ztp_default_login|default("ZTP_Default_Login")}}'}
+
+      - name: Check for Existence of ZTP Host Default Credentials
+        uri: {url: '{{AwxApi}}/credentials/?name={{ZtpDefLogin|urlencode}}'}
+        register: ZtpCredStatus
+
+      - name: Create Initial Login Credentials
+        block:
+          - name: Get Info for This Job
+            uri: {url: '{{AwxApi}}/jobs/{{awx_job_id}}/'}
+            register: ThisJob
+
+          - name: Get ID for 'Machine' Credential Type
+            uri: {url: '{{AwxApi}}/credential_types/?name=Machine'}
+            register: MachineCredType
+
+          - name: Create Initial Login Credentials for ZTP Hosts
+            uri:
+              url: '{{AwxApi}}/credentials/'
+              method: POST
+              headers: {Content-Type: "application/json"}
+              body:
+                name: '{{ZtpDefLogin}}'
+                credential_type: '{{MachineCredType.json.results[0].id}}'
+                organization: '{{ThisJob.json.summary_fields.inventory.organization_id}}'
+                inputs:
+                  password: '{{ZtpDefPassword}}'
+                  username: super
+              body_format: json
+              status_code: 201
+        when: ZtpCredStatus.json.count == 0
+    when: InitTemplate.json.count == 0
+
+
