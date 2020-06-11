@@ -18,13 +18,15 @@
     AwxApi: https://{{ansible_host}}/api/v2
     template_validate_certs: no
     PhysInts:
-    CfgIpAddr: no
     DhcpSubnetRouter:
     ZtpDefPassword: 'PasswordPassword'
 
   tasks:
   - name: Configure DHCP Interface
     block:
+      - name: Set Interface Name
+        set_fact: {NetIntName: '{{prompt_ztp_interface|regex_replace(":.*$")}}'}
+
       - name: Set Initial Variables
         set_fact:
           NetIp: '{{prompt_ztp_int_ipaddr|default("")|regex_replace("/.*$")}}'
@@ -35,13 +37,6 @@
         assert:
           that: OldIp != '' or prompt_ztp_int_ipaddr is defined
           fail_msg: "Error: No IP Address specified"
-
-      - name: Setup for Interface Address Change
-        set_fact: {CfgIpAddr: yes}
-        when:
-          - NetIp != ''
-          - NetIp != ansible_host
-          - OldIp == '' or ForceIp|bool
 
       - name: Configure Interface IP Address
         block:
@@ -58,23 +53,22 @@
               dest: /etc/netplan/02-ztp-netcfg.yaml
               mode: 0644
 
-          - name: Apply Network Interface Config
-            shell: netplan apply
-            register: template_apply
+          - {name: Apply Network Interface Config, shell: netplan apply}
 
           - name: Store New IP Address
             set_fact: {OldIp: "{{vars['ansible_'~NetIntName].ipv4.address|default('')}}"}
 
           - name: Map New IP to Interface
             set_fact: {PhysInts: "{{NetIntName}}:{{OldIp}}"}
-        when: CfgIpAddr|bool
+        when:
+          - NetIp != ''
+          - NetIp != ansible_host
+          - OldIp == '' or ForceIp|bool
         vars:
           NetIntIp: '{{prompt_ztp_int_ipaddr}}'
           ansible_become: true
           ansible_become_method: sudo
     when: prompt_ztp_interface is defined
-    vars:
-      NetIntName: '{{prompt_ztp_interface|regex_replace(":.*$")}}'
 
   - name: Apply DHCP Configuration
     block:
@@ -125,6 +119,38 @@
       - name: Restart DHCP Service
         service: {name: isc-dhcp-server, state: restarted}
 
+      - name: Display DHCP Config in 'Extra Variables'
+        uri:
+          url: '{{AwxApi}}/job_templates/{{awx_job_template_id}}/'
+          method: PATCH
+          headers: {Content-Type: "application/json"}
+          body:
+            extra_vars: >-
+              template_ztp_inventory: {{template_ztp_inventory}}
+
+              # Current DHCP Config
+
+              # ===================
+
+              # Subnet {{DhcpSubnet}}
+
+              # Start IP: {{DhcpRangeLow}}
+
+              # End IP: {{DhcpRangeHigh}}
+
+              # Router: {{prompt_ztp_dhcp_rtr|default("none")}}
+          body_format: json
+    when:
+      - prompt_ztp_dhcp_subnet is defined
+      - prompt_ztp_dhcp_range is defined
+    vars:
+      PromptDhcpRangeLow: '{{prompt_ztp_dhcp_range.split("-")[0]}}'
+      PromptDhcpRangeHigh: '{{prompt_ztp_dhcp_range.split("-")[1]}}'
+      ansible_become: true
+      ansible_become_method: sudo
+
+  - name: Refresh 'ZTP-Configure' Survey Prompt
+    block:
       - name: Get Physical Interface Names and IP Addresses
         set_fact:
           PhysInts: "{{PhysInts}} {{item}}:{{vars['ansible_'~item].ipv4.address|default('')}}"
@@ -213,36 +239,6 @@
                 yes
                 no
           body_format: json
-
-      - name: Display DHCP Config in 'Extra Variables'
-        uri:
-          url: '{{AwxApi}}/job_templates/{{awx_job_template_id}}/'
-          method: PATCH
-          headers: {Content-Type: "application/json"}
-          body:
-            extra_vars: >-
-              template_ztp_inventory: {{template_ztp_inventory}}
-
-              # Current DHCP Config
-
-              # ===================
-
-              # Subnet {{DhcpSubnet}}
-
-              # Start IP: {{DhcpRangeLow}}
-
-              # End IP: {{DhcpRangeHigh}}
-
-              # Router: {{prompt_ztp_dhcp_rtr|default("none")}}
-          body_format: json
-    when:
-      - prompt_ztp_dhcp_subnet is defined
-      - prompt_ztp_dhcp_range is defined
-    vars:
-      PromptDhcpRangeLow: '{{prompt_ztp_dhcp_range.split("-")[0]}}'
-      PromptDhcpRangeHigh: '{{prompt_ztp_dhcp_range.split("-")[1]}}'
-      ansible_become: true
-      ansible_become_method: sudo
 
   - name: Get Existing Webhook Info
     block:
