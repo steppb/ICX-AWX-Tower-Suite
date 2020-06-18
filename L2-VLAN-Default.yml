@@ -1,7 +1,6 @@
 #! Description: Configure default VLAN.
 #! Prompt: [{question_name: Default VLAN@colon, question_description: '', required: true, type: integer, variable: prompt_l2_vlandefault, min: 1, max: 4086, default: '', choices: '', new_question: true}]
-#
-# Playbook Version: 1.2
+#! PlaybookVersion: 1.3
 # =====================
 # Note: If using MSTP, both the old default VLAN and the new default VLAN will need to either be in the same MSTP
 #       instance or not in any MSTP instance.

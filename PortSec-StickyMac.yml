@@ -1,7 +1,6 @@
 #! Description: Apply Sticky-MAC Port security to interface.
 #! Prompt: [{question_name: Sticky-MAC Interface or Range@colon, question_description: (e.g. e 1/1/2 to 1/1/4 for range), required: true, type: text, variable: prompt_portsec_int, min: 5, max: 1024, default: '', choices: ''}, {question_name: Max MAC Addresess@comma, question_description: Enter the maximum number of restricted MAC addresses on the interface, required: false, type: integer, variable: prompt_portsec_max, min: 1, max: 64, default: 1, choices: ''}, {question_name: Auto-Save Interval (In Minutes)@colon, question_description: '', required: false, type: integer, variable: prompt_portsec_autosave, min: 15, max: 1440, default: '', choices: ''}]
-#
-# Playbook Version: 1.2
+#! PlaybookVersion: 1.3
 # =====================
 ---
 - hosts: all

@@ -1,6 +1,5 @@
 #! Description: (ICX7750 only) Configure store-and-forward mode and reload switch.
-#
-# Playbook Version: 1.2
+#! PlaybookVersion: 1.3
 # =====================
 # Note: Device will reload after successfully configuring store-and-forward mode.
 ---

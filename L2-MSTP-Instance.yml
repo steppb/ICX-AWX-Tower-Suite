@@ -1,7 +1,6 @@
 #! Description: Configure MSTP instance priority.
 #! Prompt: [{question_name: MSTI ID, question_description: Enter the MSTP Instance ID, required: true, type: integer, variable: template_l2_mstpinst, min: 0, max: 4094, default: '', choices: ''}, {question_name: MSTI Priority, question_description: Enter the MSTP Instance Priority (0 to 61440 in increments of 4096), required: true, type: integer, variable: template_l2_mstppri, min: 0, max: 61440, default: '', choices: '', new_question: true}]
-#
-# Playbook Version: 1.2
+#! PlaybookVersion: 1.3
 # =====================
 # Note: L2-MSTP-Config template needs to be applied before running this template.
 ---

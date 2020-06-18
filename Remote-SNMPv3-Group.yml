@@ -1,7 +1,6 @@
 #! Description: Add or replace SNMPv3 group.
 #! Prompt: [{question_name: SNMPv3 Group Name@colon, question_description: '', required: true, type: text, variable: prompt_snmp_group, min: 1, max: 32, default: '', choices: ''}, {question_name: SNMPv3 ACL@colon, question_description: '', required: true, type: text, variable: prompt_snmp_acl, min: 1, max: 1024, default: '', choices: ''}]
-#
-# Playbook Version: 1.2
+#! PlaybookVersion: 1.3
 # =====================
 ---
 - hosts: all

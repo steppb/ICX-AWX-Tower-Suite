@@ -1,6 +1,5 @@
 #! Description: Enable IPv6 PIM routing.
-#
-# Playbook Version: 1.2
+#! PlaybookVersion: 1.3
 # =====================
 # Note: This template needs to be applied before running other IPv6 PIM templates
 ---

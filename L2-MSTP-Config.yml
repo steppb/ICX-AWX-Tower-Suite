@@ -1,7 +1,6 @@
 #! Description: Setup and start initial MSTP configuration.
 #! Prompt: [{question_name: MSTP Name, question_description: Enter the MSTP configuration name, required: true, type: text, variable: template_l2_mstpname, min: 0, max: 1024, default: '', choices: '', new_question: true}, {question_name: MSTP Revision, question_description: Enter the MSTP revision level, required: true, type: integer, variable: template_l2_mstprev, min: 0, max: 65535, default: 0, choices: '', new_question: true}, {question_name: MSTP Instance ID, question_description: Enter the MSTP Instance ID, required: true, type: integer, variable: prompt_inst, min: 0, max: 4094, default: 0, choices: '', new_question: true}, {question_name: MSTP VLAN Range, question_description: Enter a single VLAN or a range of VLANs to add to the MSTP instance., required: true, type: text, variable: prompt_vlans, min: 0, max: 1024, default: 1-4000, choices: '', new_question: true}]
-#
-# Playbook Version: 1.2
+#! PlaybookVersion: 1.3
 # =====================
 # Note: This template needs to be run before running other L2-MSTP templates.
 ---

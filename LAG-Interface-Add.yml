@@ -1,7 +1,6 @@
 #! Description: Create and deploy a new LAG.
 #! Prompt: [{question_name: New LAG Name, question_description: Enter a name for the new LAG@colon, required: true, type: text, variable: template_lag_name, min: 1, max: 64, default: '', choices: ''}, {question_name: LAG Mode, question_description: Select the LAG Mode@colon, required: true, type: multiplechoice, variable: template_lag_mode, min: null, max: null, default: '', choices: dynamic\nstatic\nkeep-alive}, {question_name: LAG ID, question_description: Enter the LAG ID@colon (Optional), required: false, type: integer, variable: template_lag_id, min: 0, max: 2047, default: '', choices: ''}, {question_name: LAG Ports, question_description: Enter the LAG ports@colon (e.g. e 1/1/1 e 1/1/2), required: true, type: text, variable: template_lag_port, min: 5, max: 1024, default: '', choices: '', new_question: true}]
-#
-# Playbook Version: 1.2
+#! PlaybookVersion: 1.3
 # =====================
 ---
 - hosts: all

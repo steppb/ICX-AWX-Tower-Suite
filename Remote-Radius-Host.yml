@@ -1,7 +1,6 @@
 #! Description: Add RADIUS server.
 #! Prompt: [{question_name: Radius Server IPv4/6 Address@colon, question_description: '', required: true, type: text, variable: prompt_rem_radiusip, min: 1, max: 1024, default: '', choices: ''}, {question_name: RADIUS Shared Secret@colon, question_description: '', required: true, type: password, variable: prompt_rem_radiuskey, min: 1, max: 64, default: '', choices: ''}, {question_name: RADIUS Authentication Port@colon, question_description: '', required: false, type: integer, variable: prompt_rem_radiusauth, min: 0, max: 65535, default: 1812, choices: ''}, {question_name: RADIUS Accounting Port@colon, question_description: '', required: false, type: integer, variable: prompt_rem_radiusacct, min: 0, max: 65535, default: 1813, choices: ''}, {question_name: Use RADIUS Server for Dot1X@question, question_description: '', required: false, type: multiplechoice, variable: prompt_rem_radiusdot1x, min: null, max: null, default: 'yes', choices: yes\nno}]
-#
-# Playbook Version: 1.2
+#! PlaybookVersion: 1.3
 # =====================
 ---
 - hosts: all

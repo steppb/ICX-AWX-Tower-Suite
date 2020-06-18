@@ -1,6 +1,5 @@
 #! Description: Disable NTP MD5 Authentication.
-#
-# Playbook Version: 1.2
+#! PlaybookVersion: 1.3
 # =====================
 ---
 - hosts: all

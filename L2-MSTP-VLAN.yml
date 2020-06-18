@@ -1,7 +1,6 @@
 #! Description: Add VLAN(s) to MSTP Instance.
 #! Prompt: [{question_name: MSTI ID, question_description: Enter the MSTP Instance ID, required: true, type: integer, variable: template_l2_mstpinst, min: 0, max: 4094, default: '', choices: '', new_question: true}, {question_name: MSTP VLAN ID, question_description: Enter a single VLAN or a VLAN range to add to MSTI. (e.g. 1 to 100), required: true, type: text, variable: template_l2_mstpvlan, min: 0, max: 1024, default: '', choices: '', new_question: true}]
-#
-# Playbook Version: 1.2
+#! PlaybookVersion: 1.3
 # =====================
 # Note: L2-MSTP-Config template needs to be applied before running this template.
 ---

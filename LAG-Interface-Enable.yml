@@ -1,7 +1,6 @@
 #! Description: Enable a disabled LAG interface.
 #! Prompt: [{question_name: LAG Name, question_description: Enter LAG name@colon, required: true, type: text, variable: template_lag_name, min: 1, max: 64, default: '', choices: '', new_question: true}, {question_name: LAG Ports, question_description: Enter the LAG ports (e.g. e 1/1/1 e 1/1/2), required: true, type: text, variable: template_lag_port, min: 5, max: 1024, default: '', choices: '', new_question: true}]
-#
-# Playbook Version: 1.2
+#! PlaybookVersion: 1.3
 # =====================
 # Note: LAG-Interface-Add needs to be applied before running this template.
 ---

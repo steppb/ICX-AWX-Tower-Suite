@@ -1,7 +1,6 @@
 #! Description: Configure OSPF area.
 #! Prompt: [{question_name: OSPF Area ID@colon, question_description: '', required: true, type: text, variable: template_rtr_ospf_area, min: 1, max: 1024, default: '', choices: ''}]
-#
-# Playbook Version: 1.2
+#! PlaybookVersion: 1.3
 # =====================
 # Note: In addition to creating a new OSPF area, the following global options are also applied:
 #       auto-cost reference-bandwidth 10000

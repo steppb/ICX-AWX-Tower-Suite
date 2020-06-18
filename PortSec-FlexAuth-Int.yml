@@ -1,7 +1,6 @@
 #! Description: Enable 802.1X on interface.
 #! Prompt: [{question_name: Interface or Range@colon, question_description: (e.g. e 1/1/2 to 1/1/4 for range), required: true, type: text, variable: prompt_flexauth_int, min: 5, max: 1024, default: '', choices: ''}]
-#
-# Playbook Version: 1.2
+#! PlaybookVersion: 1.3
 # =====================
 
 ---

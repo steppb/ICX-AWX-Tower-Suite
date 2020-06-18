@@ -1,7 +1,6 @@
 #! Description: Add or modify VRRP VRID on interface.
 #! Prompt: [{question_name: Target Interface, question_description: Enter the interface to configure VRRP on@colon (e.g. e1/1/1 or ve20), required: false, type: text, variable: prompt_rtr_vrrp_int, min: 1, max: 1024, default: '', choices: ''}, {question_name: VRRP VRID@colon, question_description: '', required: false, type: integer, variable: prompt_rtr_vrrp_vrid, min: 1, max: 255, default: '', choices: ''}, {question_name: VRRP Router Mode@colon, question_description: '', required: false, type: multiplechoice, variable: prompt_rtr_vrrp_mode, min: null, max: null, default: '', choices: backup\nowner}, {question_name: VRRP IPv4 Address@colon, question_description: '', required: false, type: text, variable: prompt_rtr_vrrp_ip, min: 7, max: 15, default: '', choices: ''}, {question_name: VRRP Priority@colon, question_description: '', required: false, type: integer, variable: prompt_rtr_vrrp_ownerpri, min: 1, max: 254, default: '', choices: '', new_question: true}, {question_name: VRRP Version@colon, question_description: '', required: false, type: multiplechoice, variable: prompt_rtr_vrrp_version, min: null, max: null, default: '', choices: v2\nv3}, {question_name: Use VRRPv2 Checksum@question, question_description: (only valid with VRRPv3), required: false, type: multiplechoice, variable: prompt_rtr_vrrp_v2checksum, min: null, max: null, default: '', choices: yes\nno}]
-#
-# Playbook Version: 1.2
+#! PlaybookVersion: 1.3
 # =====================
 # Note: If template is run on more than one switch, the 'host_icx_int' variable needs to be
 #       defined for each host in the 'VARIABLES' section of the AWX Inventory Host page.

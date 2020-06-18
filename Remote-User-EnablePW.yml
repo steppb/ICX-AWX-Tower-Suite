@@ -1,7 +1,6 @@
 #! Description: Configure Enable Password
 #! Prompt: [{question_name: Target Enable Password, question_description: Enter the Enable Password, required: true, type: password, variable: template_remote_enablepw, min: 1, max: 32, default: '', choices: '', new_question: true}]
-#
-# Playbook Version: 1.2
+#! PlaybookVersion: 1.3
 # =====================
 # Note: If passsword-masking is enabled, it will be removed before setting password,
 #       then reenabled.

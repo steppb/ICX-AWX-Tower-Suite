@@ -1,6 +1,5 @@
 #! Description: Apply SSH hardening config.
-#
-# Playbook Version: 1.2
+#! PlaybookVersion: 1.3
 # =====================
 # Note: Remote-SSH-ACLPermit needs to be applied before running this template.
 ---

@@ -1,11 +1,10 @@
 #! Description: Configure the source interface for syslog traffic.
 #! Prompt: [{question_name: Source Interface Type, question_description: Choose the interface type@colon, required: false, type: multiplechoice, variable: prompt_log_inttype, default: '', choices: ethernet\nloopback\nve\nmanagement},{question_name: Source Interface Number, question_description: Enter the interface number. (i.e. 1/2/2), required: false, type: text, variable: prompt_log_intnum, min: 0, max: 1024, default: '', choices: '', new_question: true}]
-#
-# Playbook Version: 1.2
+#! PlaybookVersion: 1.3
 # =====================
 # The following variables can be used to set the Syslog source interface.
 # They are listed in order of precedence (higher overrides lower).
-#
+# 
 # <host_log_srcint>: Defined at the Inventory Host. Only defines the Syslog source interface for the host.
 # <host_srcint>: Defined at the Inventory Host.  Define source interface for all services. Valid interface types: (ethernet|loopback|ve)
 # <prompt_log_inttype> & <prompt_log_intnum>: Defined with AWX Survey Prompt.

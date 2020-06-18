@@ -1,7 +1,6 @@
 #! Description: Disable all L2 ports in the default or user-specified VLAN.
 #! Prompt: [{question_name: VLAN ID@colon, question_description: (Leave blank to disable L2 ports in default VLAN), required: false, type: integer, variable: prompt_l2_vlanid, min: 1, max: 4086, default: '', choices: ''}, {question_name: Disabled Port Name@colon, question_description: '', required: false, type: text, variable: prompt_l2_disabled_port_desc, min: 1, max: 1024, default: 'DISABLED', choices: ''}]
-#
-# Playbook Version: 1.2
+#! PlaybookVersion: 1.3
 # =====================
 ---
 - hosts: all

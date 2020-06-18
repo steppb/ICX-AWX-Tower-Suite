@@ -1,6 +1,5 @@
 #! Description: Enable RADIUS accounting.
-#
-# Playbook Version: 1.2
+#! PlaybookVersion: 1.3
 # =====================
 ---
 - hosts: all

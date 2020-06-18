@@ -1,7 +1,6 @@
 #! Description: Configure default route.
 #! Prompt: [{question_name: Default Router, question_description: Enter IP address of default router@colon, required: true, type: text, variable: template_rtr_defrtr, min: 7, max: 15, default: '', choices: '', new_question: true}, {question_name: OSPF Default Information Originate, question_description: Include default route in OSPF updates@question, required: true, type: multiplechoice, variable: template_rtr_ospf_definfo, min: null, max: null, default: 'no', choices: yes\nno}]
-#
-# Playbook Version: 1.2
+#! PlaybookVersion: 1.3
 # =====================
 ---
 - hosts: all
