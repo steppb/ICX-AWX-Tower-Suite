@@ -1,0 +1,71 @@
+---
+- name: Debug
+  debug: msg="Updating template '{{PbFileName|regex_replace(YamlExt)}}'"
+
+- name: Get Playbook Descriptions
+  shell: grep '{{DescRegex}}' {{PjPath}}/{{PbFileName}} | sed 's/{{DescRegex}}//g'
+  register: description
+  changed_when: false
+  failed_when: false
+  vars: {DescRegex: '#! Description: '}
+
+- name: Get Playbook Version
+  shell: cat {{PjPath}}/{{PbFileName}} | grep '^#! PlaybookVersion'
+  register: PbVer
+  changed_when: false
+  failed_when: false
+
+- name: Get Playbook Comments
+  shell: cat {{PjPath}}/{{PbFileName}} | grep '^# '
+  changed_when: false
+  failed_when: false
+  register: ExtraVar
+
+- name: Add Playbook Description and Comments
+  uri:
+    url: '{{AwxApi}}/job_templates/{{TemplateId}}/'
+    method: PATCH
+    headers: {Content-Type: "application/json"}
+    body:
+      description: '{{description.stdout_lines[0]}}'
+      extra_vars: >-
+        playbook_version: {{PbVer.stdout|regex_replace(PbVerRegex)}}
+
+        {{ExtraVar.stdout}}
+    body_format: json
+  vars: {PbVerRegex: '^#! PlaybookVersion: '}
+
+- name: Scrape Playbook Prompts
+  shell: "grep '^#! Prompt' {{PjPath}}/{{PbFileName}} | sed 's/^.*Prompt: //g'"
+  failed_when: false
+  changed_when: false
+  register: RawPrompts
+
+- name: Prepare Survey Prompt Payload
+  set_fact:
+    PromptPayload:
+      name: ''
+      description: ''
+      spec: "{{RawPrompts.stdout_lines[0]|from_yaml|regex_replace(NewlineVar, '\\\\n')}}"
+  when: RawPrompts.stdout_lines[0] is defined
+
+- name: Add Survey Prompts
+  uri:
+    url: '{{AwxApi}}/job_templates/{{TemplateId}}/survey_spec/'
+    method: POST
+    headers: {Content-Type: "application/json"}
+    body: "{{PromptPayload|regex_replace('@colon',':')|regex_replace('@question','?')}}"
+    body_format: json
+  register: PromptStatus
+  when: PromptPayload is defined
+
+- name: Enable Survey Prompts
+  uri:
+    url: '{{AwxApi}}/job_templates/{{TemplateId}}/'
+    method: PATCH
+    headers: {Content-Type: "application/json"}
+    body: {survey_enabled: true}
+    body_format: json
+  when:
+    - PromptStatus.status is defined
+    - PromptStatus.status == 200

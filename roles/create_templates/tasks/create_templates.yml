@@ -1,0 +1,27 @@
+---
+- name: Debug
+  debug: msg="Creating template '{{PbFileName|regex_replace(YamlExt)}}'"
+
+- name: Build Template Payload
+  set_fact:
+    TemplateStruct: 
+      name: "{{PbFileName|regex_replace(YamlExt)}}"
+      project: "{{PjId}}"
+      playbook: "{{PbFileName}}"
+      ask_credential_on_launch: true
+      ask_inventory_on_launch: '{{prompt_ask_inventory_on_launch|default(true)}}'
+  register: JobTemplate
+
+- name: Create Template
+  uri:
+    url: '{{AwxApi}}/job_templates/'
+    method: POST
+    headers: {Content-Type: "application/json"}
+    body: "{{TemplateStruct}}"
+    body_format: json
+    status_code: 201
+  register: NewJobTemplate
+
+- name: Update Templates
+  include_tasks: update_template.yml
+  vars: {TemplateId: '{{NewJobTemplate.json.id}}'}

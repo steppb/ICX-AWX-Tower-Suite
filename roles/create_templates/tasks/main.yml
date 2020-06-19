@@ -1,0 +1,49 @@
+---
+- {name: Get Project Directory, uri: {url: '{{AwxApi}}/config/'}, register: AwxCfg}
+
+- name: Get Project Info
+  uri: {url: '{{AwxApi}}/projects/?name={{prompt_project_name|urlencode}}'}
+  register: PjInfo
+  failed_when: PjInfo.json.results[0] is not defined
+
+- name: Set Project Variables
+  set_fact:
+    PjId: "{{PjInfo.json.results[0].id}}"
+    PjPath: "{{AwxCfg.json.project_base_dir}}/{{PjInfo.json.results[0].local_path}}"
+
+- name: Get Playbook List
+  uri: {url: '{{AwxApi}}/projects/{{PjId}}/playbooks/'}
+  register: PbList
+
+- name: Get List of Ignored Playbooks
+  lineinfile:
+    path: '{{PjPath}}/{{item}}'
+    regex: '^#! AwxMgmtIgnore$'
+    line: '#! AwxMgmtIgnore'
+  changed_when: false
+  check_mode: yes
+  loop: "{{PbList.json}}"
+  register: AwxMgmtIgnored
+
+- name: Get List of Existing Templates
+  uri: {url: '{{AwxApi}}/job_templates/?name={{item|regex_replace(YamlExt)}}'}
+  loop: '{{PbList.json}}'
+  loop_control: {index_var: idx}
+  register: ExistingTemplates
+
+- name: Create Templates
+  include_tasks: create_templates.yml
+  loop: '{{PbList.json}}'
+  loop_control: {loop_var: PbFileName, index_var: idx}
+  when:
+    - AwxMgmtIgnored.results[idx].msg != ''
+    - ExistingTemplates.results[idx].json.results[0] is not defined
+
+- name: Update Existing Templates
+  include_tasks: update_template.yml
+  loop: '{{PbList.json}}'
+  loop_control: {loop_var: PbFileName, index_var: idx}
+  when:
+    - AwxMgmtIgnored.results[idx].msg != ''
+    - ExistingTemplates.results[idx].json.results[0] is defined
+  vars: {TemplateId: '{{ExistingTemplates.results[idx].json.results[0].id}}'}

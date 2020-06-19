@@ -1,0 +1,81 @@
+---
+- name: Get This Template Info
+  uri: {url: '{{AwxApi}}/job_templates/{{awx_job_template_id}}/'}
+  register: ThisTemplate
+
+- name: Get List of Projects
+  uri: {url: '{{AwxApi}}/projects/'}
+  register: PjInfo
+
+- name: Add First Project to List
+  set_fact: {ProjectList: '{{PjInfo.json.results[idx].name}}', FirstPjIdx: '{{idx}}'}
+  loop: '{{range(0, PjInfo.json.count)|list}}'
+  loop_control: {index_var: idx}
+  when:
+    - PjInfo.json.count > 1
+    - PjInfo.json.results[idx].id != ThisTemplate.json.project
+    - ProjectList is not defined
+
+- name: Add Remaining Projects to List
+  set_fact: {ProjectList: '{{ProjectList}}@NL@{{PjInfo.json.results[idx].name}}'}
+  loop: '{{range(0, PjInfo.json.count)|list}}'
+  loop_control: {index_var: idx}
+  when:
+    - ProjectList is defined
+    - PjInfo.json.results[idx].id != ThisTemplate.json.project
+    - idx != FirstPjIdx
+
+- name: Create New Survey Prompt Payload
+  set_fact:
+    PromptPayload:
+      name: ''
+      description: ''
+      spec:
+      - question_name: 'Template management function:'
+        required: true
+        type: multiplechoice
+        variable: prompt_mgmt_role
+        choices: |-
+          Create/Update Templates
+          Remove Templates
+      - question_name: 'Project:'
+        required: true
+        type: multiplechoice
+        variable: prompt_project_name
+        choices: '{{ProjectList|regex_replace("@NL@","\n")|default("")}}'
+
+- name: Create Survey Prompt
+  uri:
+    url: '{{AwxApi}}/job_templates/{{awx_job_template_id}}/survey_spec/'
+    method: POST
+    headers: {Content-Type: 'application/json'}
+    body: '{{PromptPayload}}'
+    body_format: json
+
+- name: Update Template
+  uri:
+    url: '{{AwxApi}}/job_templates/{{awx_job_template_id}}/'
+    method: PATCH
+    headers: {Content-Type: "application/json"}
+    body: {extra_vars: 'template_version: {{AwxMgmtVer}}', survey_enabled: true}
+    body_format: json
+
+- name: Update Template Version
+  block:
+    - name: Update Template Version
+      uri:
+        url: '{{AwxApi}}/job_templates/{{awx_job_template_id}}/'
+        method: PATCH
+        headers: {Content-Type: "application/json"}
+        body: {extra_vars: 'template_version: {{AwxMgmtVer}}'}
+        body_format: json
+
+    - name: Debug
+      debug:
+        msg:
+          - "Template updated to version {{AwxMgmtVer}}."
+          - "Relaunch template to continue."
+
+    - name: Ending Play
+      meta: end_play
+  when: TemplateVersion is version(AwxMgmtVer, '<')

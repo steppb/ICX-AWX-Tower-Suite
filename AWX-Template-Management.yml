@@ -1,0 +1,27 @@
+#! Description: Create/update or remove templates in a project.
+---
+- name: Create or Update Job Templates
+  hosts: all
+  connection: local
+  gather_facts: no
+  module_defaults:
+    uri:
+      validate_certs: '{{template_validate_certs}}'
+      method: GET
+      user: '{{awxlogin_user}}'
+      password: '{{awxlogin_pass}}'
+      force_basic_auth: yes
+      timeout: 60
+  vars:
+    AwxMgmtVer: 1.3
+    TemplateVersion: '{{template_version|default(0)}}'
+    AwxApi: https://{{ansible_host}}/api/v2
+    YamlExt: '.yml'
+    NewlineVar: '\\\\n'
+    template_validate_certs: no
+
+  roles:
+  - {role: self_update}
+  - {role: create_templates, when: "'create' in prompt_mgmt_role|lower"}
+  - {role: remove_templates, when: "'remove' in prompt_mgmt_role|lower"}
+

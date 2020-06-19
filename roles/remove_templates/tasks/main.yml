@@ -1,0 +1,25 @@
+---
+- name: Get Project Info
+  uri: {url: '{{AwxApi}}/projects/?name={{prompt_project_name|urlencode}}'}
+  register: PjInfo
+
+- name: Get Playbook List
+  uri: {url: '{{AwxApi}}/projects/{{PjInfo.json.results[0].id}}/playbooks/'}
+  register: PbList
+
+- name: Get Template List
+  uri: {url: '{{AwxApi}}/job_templates/?name={{item|regex_replace(YamlExt)}}'}
+  loop: '{{PbList.json}}'
+  register: JobTemplates
+
+- name: Remove Templates
+  uri:
+    url: '{{AwxApi}}/job_templates/{{JobTemplates.results[idx].json.results[0].id}}/'
+    method: DELETE
+    return_content: no
+    status_code: 204
+  loop: '{{PbList.json}}'
+  loop_control: {index_var: idx}
+  when:
+    - JobTemplates.results[idx].json.results[0] is defined
+    - JobTemplates.results[idx].json.results[0].project == PjInfo.json.results[0].id
