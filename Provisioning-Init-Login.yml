@@ -3,6 +3,17 @@
 - hosts: all
   connection: local
   gather_facts: no
+  module_defaults:
+    uri:
+      validate_certs: '{{template_validate_certs}}'
+      method: GET
+      user: '{{awxlogin_user}}'
+      password: '{{awxlogin_pass}}'
+      force_basic_auth: yes
+      timeout: 60
+  vars:
+    AwxApi: '{{inventory_awx_api_cb}}'
+    template_validate_certs: no
 
   tasks:
   - {name: Get List of Installed Packages, pip_package_info: , register: PipInfo}
@@ -40,8 +51,6 @@
     failed_when: false
     register: SshSession
 
-  - debug: var=SshSession
-
   - name: Attempt Telnet Login
     telnet:
       host: '{{ansible_host}}'
@@ -57,3 +66,19 @@
         - crypto key generate rsa modulus 2048
         - write mem
     when: "'Connection refused' in SshSession.stdout"
+
+  - name: Get Workflow ID
+    uri: {url: '{{AwxApi}}/workflow_job_templates/?name={{template_provisioning_workflow|urlencode}}'}
+    register: ProvisioningWorkflow
+    when:
+      - template_provisioning_workflow is defined
+      - template_provisioning_workflow != ''
+      - template_provisioning_workflow is not none
+
+  - name: Launch Workflow
+    uri:
+      url: '{{AwxApi}}/workflow_job_templates/{{ProvisioningWorkflow.json.results[0].id}}/launch/'
+      method: POST
+      headers: {Content-Type: "application/json"}
+      status_code: 201
+    when: ProvisioningWorkflow.json.results[0].id is defined

@@ -1,6 +1,5 @@
 #! AwxMgmtIgnore
-#
-# Playbook Version: 1.2
+#! PlaybookVersion: 1.3
 # =====================
 ---
 - hosts: all
@@ -22,7 +21,7 @@
     ZtpDefPassword: 'PasswordPassword'
 
   tasks:
-  - name: Configure DHCP Interface
+  - name: Configure Static IP Address on Interface
     block:
       - name: Set Interface Name
         set_fact: {NetIntName: '{{prompt_ztp_interface|regex_replace(":.*$")}}'}
@@ -56,7 +55,7 @@
           - {name: Apply Network Interface Config, shell: netplan apply}
 
           - name: Store New IP Address
-            set_fact: {OldIp: "{{vars['ansible_'~NetIntName].ipv4.address|default('')}}"}
+            set_fact: {OldIp: "{{NetIp}}"}
 
           - name: Map New IP to Interface
             set_fact: {PhysInts: "{{NetIntName}}:{{OldIp}}"}
@@ -319,7 +318,10 @@
                 name: '{{template_ztp_inventory}}'
                 description: ''
                 organization: '{{OrgInfo.json.organization}}'
-                variables: "inventory_provisioning_pass: {{ZtpDefPassword}}"
+                variables: >-
+                  inventory_provisioning_pass: {{ZtpDefPassword}}
+
+                  inventory_awx_api_cb: {{AwxApi}}
               body_format: json
               status_code: 201
             register: ZtpInventory
@@ -342,7 +344,11 @@
 
   - name: Check For Existing 'Provisioning-Init-Login' Template
     uri: {url: '{{AwxApi}}/job_templates/?name=Provisioning-Init-Login'}
-    register: InitTemplate
+    register: GetInitTemplate
+
+  - name: Store Job Template
+    set_fact: {InitTemplate: '{{GetInitTemplate.json.results[0]}}'}
+    when: GetInitTemplate.json.count > 0
 
   - name: Create Provisioning Template
     block:
@@ -367,6 +373,10 @@
             playbook: 'Provisioning-Init-Login.yml'
           body_format: json
           status_code: 201
+        register: NewInitTemplate
+
+      - name: Store Template ID of 'Provisioning-Init-Template'
+        set_fact: {InitTemplate: '{{NewInitTemplate.json}}'}
 
       - name: Set Name for ZTP Credentials
         set_fact: {ZtpDefLogin: '{{prompt_ztp_default_login|default("ZTP_Default_Login")}}'}
@@ -400,6 +410,40 @@
               body_format: json
               status_code: 201
         when: ZtpCredStatus.json.count == 0
-    when: InitTemplate.json.count == 0
+    when: GetInitTemplate.json.count == 0
 
+  - name: Check for Existence of 'Provisioning-Init-Login' Credentials
+    uri: {url: '{{AwxApi}}/job_templates/{{InitTemplate.id}}/credentials/'}
+    register: InitTemplateCreds
 
+  - name: Add AWX REST API Credentials to 'Provisioning-Init-Login'
+    block:
+      - name: Get Credentials for This Job
+        uri: {url: '{{AwxApi}}/jobs/{{awx_job_id}}/credentials/'}
+        register: JobCredentials
+
+      - name: Workaround Ansible String To Integer Casting Issue
+        set_fact: {RestCredential: "id: {{JobCredentials.json.results[idx].id}}"}
+        loop: "{{range(0, JobCredentials.json.results|length)|list}}"
+        loop_control: {index_var: idx}
+        when: JobCredentials.json.results[idx].kind != 'ssh'
+
+      - name: Add Credentials to 'Provisioning-Init-Login' Template
+        uri:
+          url: '{{AwxApi}}/job_templates/{{InitTemplate.id}}/credentials/'
+          method: POST
+          headers: {Content-Type: "application/json"}
+          body: '{{RestCredential|from_yaml}}'
+          body_format: json
+          status_code: 204
+    when: InitTemplateCreds.json.count == 0
+
+  - name: Add Extra Variable to 'Provisioning-Init-Login' Template
+    uri:
+      url: '{{AwxApi}}/job_templates/{{InitTemplate.id}}/'
+      method: PATCH
+      headers: {Content-Type: "application/json"}
+      body:
+        extra_vars: "template_provisioning_workflow:"
+      body_format: json
+    when: InitTemplate.extra_vars == ''

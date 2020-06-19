@@ -1,7 +1,6 @@
 #! Description: Generates Auth Token for DHCP ZTP Webhook.
 #! Prompt: [{question_name: Provisioning Inventory Name@colon, question_description: Name of inventory used for ZTP hosts, required: true, type: text, variable: prompt_ztp_inventory, min: 1, max: 1024, default: Provisioning, choices: ''}]
-#
-# Playbook Version: 1.2
+#! PlaybookVersion: 1.3
 # =====================
 # This template performs the following tasks on first run:
 # - Installs 'netaddr' ansible module
@@ -78,7 +77,10 @@
             name: '{{prompt_ztp_inventory}}'
             description: ''
             organization: '{{PjInfo.json.organization}}'
-            variables: "inventory_provisioning_pass: {{ZtpDefPassword}}"
+            variables: >-
+              inventory_provisioning_pass: {{ZtpDefPassword}}
+
+              inventory_awx_api_cb: {{AwxApi}}
           body_format: json
           status_code: 201
         when: ZtpInventoryInfo.json.count == 0
@@ -202,7 +204,7 @@
         loop_control: {index_var: idx}
         register: CredentialList
 
-      - name: Add SSH Credentials to 'ZTP-Configure' Template
+      - name: Add Credentials to 'ZTP-Configure' Template
         uri:
           url: '{{AwxApi}}/job_templates/{{ZtpCfgTemplateId}}/credentials/'
           method: POST
