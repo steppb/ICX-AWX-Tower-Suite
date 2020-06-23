@@ -321,6 +321,8 @@
                 variables: >-
                   inventory_provisioning_pass: {{ZtpDefPassword}}
 
+                  inventory_provisioning_workflow:
+
                   inventory_awx_api_cb: {{AwxApi}}
               body_format: json
               status_code: 201
@@ -437,13 +439,3 @@
           body_format: json
           status_code: 204
     when: InitTemplateCreds.json.count == 0
-
-  - name: Add Extra Variable to 'Provisioning-Init-Login' Template
-    uri:
-      url: '{{AwxApi}}/job_templates/{{InitTemplate.id}}/'
-      method: PATCH
-      headers: {Content-Type: "application/json"}
-      body:
-        extra_vars: "template_provisioning_workflow:"
-      body_format: json
-    when: InitTemplate.extra_vars == ''

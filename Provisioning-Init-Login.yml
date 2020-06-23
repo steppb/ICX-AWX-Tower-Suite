@@ -68,12 +68,12 @@
     when: "'Connection refused' in SshSession.stdout"
 
   - name: Get Workflow ID
-    uri: {url: '{{AwxApi}}/workflow_job_templates/?name={{template_provisioning_workflow|urlencode}}'}
+    uri: {url: '{{AwxApi}}/workflow_job_templates/?name={{inventory_provisioning_workflow|urlencode}}'}
     register: ProvisioningWorkflow
     when:
-      - template_provisioning_workflow is defined
-      - template_provisioning_workflow != ''
-      - template_provisioning_workflow is not none
+      - inventory_provisioning_workflow is defined
+      - inventory_provisioning_workflow != ''
+      - inventory_provisioning_workflow is not none
 
   - name: Launch Workflow
     uri:

@@ -80,6 +80,8 @@
             variables: >-
               inventory_provisioning_pass: {{ZtpDefPassword}}
 
+              inventory_provisioning_workflow:
+
               inventory_awx_api_cb: {{AwxApi}}
           body_format: json
           status_code: 201
