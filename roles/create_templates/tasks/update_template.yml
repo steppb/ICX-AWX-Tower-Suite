@@ -27,7 +27,7 @@
     method: PATCH
     headers: {Content-Type: "application/json"}
     body:
-      description: '{{description.stdout_lines[0]}}'
+      description: '{{description.stdout_lines[0]|default("")}}'
       extra_vars: >-
         playbook_version: {{PbVer.stdout|regex_replace(PbVerRegex)}}
 
