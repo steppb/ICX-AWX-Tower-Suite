@@ -12,51 +12,75 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
-    newline_var: "\r"
-    error_parse: '^.*ConnectionError: '
-    pt2pt_int:
-    edge_int:
+    EthVar: '(e|et|eth|ethe|ether|ethern|etherne|ethernet)'
+    PortVar: '([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2})'
+    RngVar: '^.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*to.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*$'
+    P2pIntCmd:
+    EdgeIntCmd:
 
   tasks:
-  - name: Get MSTP Config
-    icx_command: {commands: show mstp config}
-    register: mstp_status
+  - {name: Get MSTP Config, icx_command: {commands: show mstp config}, register: MstpCfg}
 
   - name: Verify MSTP Mode
     assert:
-      that: mstp_status.stdout is defined and mstp_status.stdout[0] != ''
+      that: MstpCfg.stdout is defined and MstpCfg.stdout[0] != ''
       fail_msg: "ERROR: L2-MSTP-Config needs to be applied before running this template"
 
-  - name: Set MSTP Point-to-Point Interface Command
-    set_fact: {pt2pt_int: "mstp admin-pt2pt-mac {{template_l2_mstp_pt2pt}}"}
+  - name: Setup Point-to-Point Interface Command
+    block:
+      - name: Format Interface List
+        set_fact: {P2pInts: '{{EthInts|regex_replace(PortVar, "e \1")}}'}
+        vars: {EthInts: '{{template_l2_mstp_pt2pt|regex_replace(EthVar)}}'}
+        when: "'to' not in template_l2_mstp_pt2pt"
+
+      - name: Format Interface Range
+        set_fact: {P2pInts: '{{EthInts|regex_replace(RngVar, "e \1 to \2")}}'}
+        vars: {EthInts: '{{template_l2_mstp_pt2pt}}'}
+        when: "'to' in template_l2_mstp_pt2pt"
+
+      - name: Set MSTP Point-to-Point Interface Command
+        set_fact: {P2pIntCmd: "mstp admin-pt2pt-mac {{P2pInts}}"}
     when: template_l2_mstp_pt2pt is defined and template_l2_mstp_pt2pt != ''
 
-  - name: Set MSTP Edge Interface Command
-    set_fact: {edge_int: "mstp admin-edge-port {{template_l2_mstp_edgeint}}"}
+  - name: Setup Edge Interface Command
+    block:
+      - name: Format Interface List
+        set_fact: {EdgeInts: '{{EthInts|regex_replace(PortVar, "e \1")}}'}
+        vars: {EthInts: '{{template_l2_mstp_edgeint|regex_replace(EthVar)}}'}
+        when: "'to' not in template_l2_mstp_edgeint"
+
+      - name: Format Interface Range
+        set_fact: {EdgeInts: '{{EthInts|regex_replace(RngVar, "e \1 to \2")}}'}
+        vars: {EthInts: '{{template_l2_mstp_edgeint}}'}
+        when: "'to' in template_l2_mstp_edgeint"
+
+      - name: Set MSTP Edge Interface Command
+        set_fact: {EdgeIntCmd: "mstp admin-edge-port {{EdgeInts}}"}
     when: template_l2_mstp_edgeint is defined and template_l2_mstp_edgeint != ''
 
-  - name: Configuring MSTP Point-to-Point Interface(s)
+  - name: Configuring MSTP Interface(s)
     icx_config:
       lines: |
-        {{pt2pt_int}}
-        {{edge_int}}
+        {{P2pIntCmd}}
+        {{EdgeIntCmd}}
       save_when: changed
-    register: icxconfig_status
+    register: IcxCfgStatus
     failed_when: false
 
   - name: Parse Switch Error
-    set_fact:
-      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"
-    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
+    set_fact: {ErrMsg: "{{IcxErr|regex_replace('\n')|regex_replace(ErrParse)}}"}
+    vars: {ErrParse: '^.*ConnectionError: ', IcxErr: '{{IcxCfgStatus.module_stderr}}'}
+    when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
 
   - name: Display Switch Error
-    assert: {that: error_msg is not defined, fail_msg: '{{error_msg.split(newline_var)}}'}
-    when: error_msg is defined
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(NewlineVar)}}'}
+    vars: {NewlineVar: "\r"}
+    when: ErrMsg is defined
 
   - name: Get MSTP Config
     icx_command: {commands: show run | incl mstp}
-    register: mstp_config
+    register: MstpCfg
 
   - name: Display MSTP Config
-    debug: var=mstp_config.stdout_lines[0]
-    when: mstp_config.stdout_lines[0] is defined
+    debug: var=MstpCfg.stdout_lines[0]
+    when: MstpCfg.stdout_lines[0] is defined
