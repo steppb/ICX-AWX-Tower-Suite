@@ -12,38 +12,39 @@
     ansible_become: true
     ansible_become_method: enable
     ansible_command_timeout: 90
-    newline_var: "\r"
-    error_parse: '^.*ConnectionError: '
-    mcfg: false
-    lrange_cmd:
-    urange_cmd:
-    mvlan_cmd:
-    vlan_cmd:
+    MstpInstCmd: 'mstp instance {{prompt_inst}} vlan'
+    CfgMgmtVlan: false
+    RngCmd:
+    LRngCmd:
+    URngCmd:
+    MgmtVlanCmd:
+    VlanCmd:
 
   tasks:
-  - name: Find MGMT IP Interface
-    icx_command: {commands: 'show ip interface | incl {{ansible_host}}'}
-    register: ipint_status
-
-  - name: Save IP Interface
-    set_fact: {ip_int: '{{ipint_status.stdout[0].split(" ")}}'}
-    when: ipint_status.stdout is defined and ipint_status.stdout[0] != ''
-
-  - name: Format Interface String
-    set_fact: {ve_int: 'router-interface ve {{ip_int[1]}}'}
-    when: ip_int[0]|lower == 've'
-
-  - name: Get VLAN List
-    icx_command: {commands: 'show run vlan | include by port|router-interface'}
-    register: vlan_list
-    when: ip_int[0]|lower == 've'
-
   - name: Get Management VLAN
-    set_fact: {mvlan: '{{vlan_list.stdout_lines[0][idx - 1].split(" ")}}'}
-    when: ip_int[0]|lower == 've' and ve_int in item
-    loop: '{{vlan_list.stdout_lines[0]}}'
-    loop_control:
-      index_var: idx
+    block:
+      - name: Find MGMT IP Interface
+        icx_command: {commands: 'show ip interface | incl {{ansible_host}}'}
+        register: IpIntInfo
+
+      - name: Save IP Interface
+        set_fact: {ip_int: '{{IpIntInfo.stdout[0].split(" ")}}'}
+        when: IpIntInfo.stdout is defined and IpIntInfo.stdout[0] != ''
+
+      - name: Format Interface String
+        set_fact: {ve_int: 'router-interface ve {{ip_int[1]}}'}
+        when: ip_int[0]|lower == 've'
+
+      - name: Get VLAN List
+        icx_command: {commands: 'show run vlan | include by port|router-interface'}
+        register: VlanList
+        when: ip_int[0]|lower == 've'
+
+      - name: Get Management VLAN
+        set_fact: {mvlan: '{{VlanList.stdout_lines[0][idx - 1].split(" ")}}'}
+        when: ip_int[0]|lower == 've' and ve_int in item
+        loop: '{{VlanList.stdout_lines[0]}}'
+        loop_control: {index_var: idx}
 
   - name: Format VLAN Range
     set_fact: {prompt_vlans: '{{prompt_vlans|regex_replace(" to ", "-")}}'}
@@ -60,25 +61,35 @@
     when: "'-' in prompt_vlans"
 
   - name: Set Management VLAN Command
-    set_fact: {mcfg: true, mvlan_cmd: 'mstp instance {{prompt_inst}} vlan {{mvlan[1]}}'}
-    when: "'-' in prompt_vlans and mvlan[1] is defined and mvlan[1]|int >= vrange[0]|int and mvlan[1]|int <= vrange[1]|int"
+    set_fact: {CfgMgmtVlan: true, MgmtVlanCmd: '{{MstpInstCmd}} {{mvlan[1]}}'}
+    when:
+      - "'-' in prompt_vlans"
+      - mvlan[1] is defined
+      - mvlan[1]|int >= vrange[0]|int
+      - mvlan[1]|int <= vrange[1]|int
 
   - name: Set VLAN Range Command
-    set_fact: {range_cmd: 'mstp instance {{prompt_inst}} vlan {{vrange[0]}} to {{vrange[1]}}'}
-    when: mvlan_cmd != ''
+    set_fact: {RngCmd: '{{MstpInstCmd}} {{vrange[0]}} to {{vrange[1]}}'}
+    when: not CfgMgmtVlan|bool
 
   - name: Set Lower VLAN Range Command
-    set_fact:
-      lrange_cmd: 'mstp instance {{prompt_inst}} vlan {{vrange[0]}} to {{mvlan[1]|int - 1}}'
-    when: "'-' in prompt_vlans and mvlan[1] is defined and vrange[0]|int < mvlan[1]|int and mcfg|bool"
+    set_fact: {LRngCmd: '{{MstpInstCmd}} {{vrange[0]}} to {{mvlan[1]|int - 1}}'}
+    when:
+      - "'-' in prompt_vlans"
+      - mvlan[1] is defined
+      - vrange[0]|int < mvlan[1]|int
+      - CfgMgmtVlan|bool
 
   - name: Set Upper VLAN Range Command
-    set_fact:
-      urange_cmd: 'mstp instance {{prompt_inst}} vlan {{mvlan[1]|int + 1}} to {{vrange[1]}}'
-    when: "'-' in prompt_vlans and mvlan[1] is defined and vrange[1]|int > mvlan[1]|int and mcfg|bool"
+    set_fact: {URngCmd: '{{MstpInstCmd}} {{mvlan[1]|int + 1}} to {{vrange[1]}}'}
+    when:
+      - "'-' in prompt_vlans"
+      - mvlan[1] is defined
+      - vrange[1]|int > mvlan[1]|int
+      - CfgMgmtVlan|bool
 
   - name: Set Single VLAN Command
-    set_fact: {vlan_cmd: 'mstp instance {{prompt_inst}} vlan {{prompt_vlans}}'}
+    set_fact: {VlanCmd: '{{MstpInstCmd}} {{prompt_vlans}}'}
     when: "'-' not in prompt_vlans"
 
   - name: Configuring MSTP
@@ -87,29 +98,31 @@
         mstp scope pvst
         mstp name {{template_l2_mstpname}}
         mstp revision {{template_l2_mstprev}}
-        {{range_cmd}}
-        {{lrange_cmd}}
-        {{urange_cmd}}
-        {{vlan_cmd}}
+        {{RngCmd}}
+        {{LRngCmd}}
+        {{URngCmd}}
+        {{VlanCmd}}
         mstp start
-        {{mvlan_cmd}}
+        {{MgmtVlanCmd}}
       save_when: changed
-    register: icxconfig_status
+    register: IcxCfgStatus
     failed_when: false
 
   - name: Parse Switch Error
     set_fact:
-      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"
-    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
+      ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+    vars: {ErrParse: '^.*ConnectionError: '}
+    when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
 
   - name: Display Switch Error
-    assert: {that: error_msg is not defined, fail_msg: '{{error_msg.split(newline_var)}}'}
-    when: error_msg is defined
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(NewlineVar)}}'}
+    vars: {NewlineVar: "\r"}
+    when: ErrMsg is defined
 
   - name: Get MSTP Config
     icx_command: {commands: show mstp configuration}
-    register: mstp_config
+    register: MstpCfg
 
   - name: Display MSTP Config
-    debug: var=mstp_config.stdout_lines[0]
-    when: mstp_config.stdout_lines[0] is defined
+    debug: var=MstpCfg.stdout_lines[0]
+    when: MstpCfg.stdout_lines[0] is defined
