@@ -41,31 +41,34 @@
   changed_when: false
   register: RawPrompts
 
-- name: Prepare Survey Prompt Payload
-  set_fact:
-    PromptPayload:
-      name: ''
-      description: ''
-      spec: "{{RawPrompts.stdout_lines[0]|from_yaml|regex_replace(NewlineVar, '\\\\n')}}"
-  when: RawPrompts.stdout_lines[0] is defined
-
 - name: Add Survey Prompts
-  uri:
-    url: '{{AwxApi}}/job_templates/{{TemplateId}}/survey_spec/'
-    method: POST
-    headers: {Content-Type: "application/json"}
-    body: "{{PromptPayload|regex_replace('@colon',':')|regex_replace('@question','?')}}"
-    body_format: json
-  register: PromptStatus
-  when: PromptPayload is defined
+  block:
+    - name: Prepare Survey Prompt Payload
+      set_fact:
+        PromptPayload:
+          name: ''
+          description: ''
+          spec: "{{tPrompt|regex_replace(NewlineVar, '\\\\n')}}"
+      vars: {tPrompt: '{{RawPrompts.stdout_lines[0]|from_yaml}}'}
 
-- name: Enable Survey Prompts
-  uri:
-    url: '{{AwxApi}}/job_templates/{{TemplateId}}/'
-    method: PATCH
-    headers: {Content-Type: "application/json"}
-    body: {survey_enabled: true}
-    body_format: json
-  when:
-    - PromptStatus.status is defined
-    - PromptStatus.status == 200
+    - name: Add Survey Prompts
+      uri:
+        url: '{{AwxApi}}/job_templates/{{TemplateId}}/survey_spec/'
+        method: POST
+        headers: {Content-Type: "application/json"}
+        body: "{{tPromptPayload|regex_replace('@question','?')}}"
+        body_format: json
+      register: PromptStatus
+      vars: {tPromptPayload: "{{PromptPayload|regex_replace('@colon', ':')}}"}
+
+    - name: Enable Survey Prompts
+      uri:
+        url: '{{AwxApi}}/job_templates/{{TemplateId}}/'
+        method: PATCH
+        headers: {Content-Type: "application/json"}
+        body: {survey_enabled: true}
+        body_format: json
+      when:
+        - PromptStatus.status is defined
+        - PromptStatus.status == 200
+  when: RawPrompts.stdout_lines[0] is defined
