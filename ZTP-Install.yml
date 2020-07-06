@@ -30,11 +30,16 @@
     ZtpDefPassword: 'PasswordPassword'
 
   tasks:
-  - {name: Get List of Installed Packages, pip_package_info: , register: PipInfo}
+  - name: Get Installed Packages
+    pip_package_info:
+      clients: ['pip', 'pip3']
+    register: PipInfo
 
   - name: Install 'netaddr' Package
     pip: {name: netaddr}
-    when: PipInfo.packages.pip.netaddr is not defined
+    when:
+      - PipInfo.packages.pip.netaddr is not defined
+      - PipInfo.packages.pip3.netaddr is not defined
 
   - name: Check AWX Applications
     uri: {url: '{{AwxApi}}/applications/?name=isc-dhcp-server'}
@@ -162,6 +167,7 @@
 
   - name: Restart AppArmor Service
     service: {name: apparmor, state: restarted}
+    changed_when: false
     vars: {ansible_become: true, ansible_become_method: sudo}
 
   - name: Check for Existing 'ZTP-Configure' Template
