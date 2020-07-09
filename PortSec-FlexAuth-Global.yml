@@ -10,132 +10,137 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
-    newline_var: "\r"
     ErrParse: '^.*ConnectionError: '
     Dot1xEn:
     MacAuthEn:
 
   tasks:
-  - name: Get 802.1X Enabled Interfaces
-    icx_command: {commands: show config | include dot1x enable ethe}
-    register: Dot1xEnabledInt
+
+
+  - name: Configure Auth-Default-VLAN
+    block:
+      - name: Get 802.1X Enabled Status
+        icx_command: {commands: show run | include dot1x enable}
+        register: Dot1xEnabled
+
+      - name: Get 802.1X Enabled Interfaces
+        icx_command: {commands: show config | include dot1x enable ethe}
+        register: Dot1xEnabledInt
+
+      - name: Get 802.1X Port-Control Auto Interfaces
+        icx_command: {commands: show config | include dot1x port-control auto ethe}
+        register: PortCtrlAutoInt
+
+      - name: Get MAC-Authentication Enabled Interfaces
+        icx_command: {commands: show config | include mac-authentication enable ethe}
+        register: MacAuthEnabledInt
+
+      - name: Setup 802.1X Enable Command
+        set_fact: {Dot1xEn: dot1x enable}
+        when: Dot1xEnabledInt.stdout[0] is defined and Dot1xEnabledInt.stdout[0] != ''
+
+      - name: Setup MAC-Authentication Enable Command
+        set_fact: {MacAuthEn: mac-authentication enable}
+        when: MacAuthEnabledInt.stdout[0] is defined and MacAuthEnabledInt.stdout[0] != ''
+    
+      - name: Disable 802.1X
+        icx_config: {lines: no dot1x enable, parents: authentication}
+        failed_when: false
+        when: Dot1xEnabled.stdout[0] is defined and Dot1xEnabled.stdout[0] != ''
+
+      - name: Configure Default Authentication VLAN
+        icx_config:
+          lines: |
+            no mac-authentication enable
+            auth-default-vlan {{prompt_flexauth_def_vlan}}
+            {{Dot1xEn}}
+            {{MacAuthEn}}
+          parents: authentication
+        register: IcxCfgStatus
+        failed_when: false
+
+      - name: Parse Switch Error
+        set_fact: {ErrMsg: "{{tStatus|regex_replace('\n')|regex_replace(ErrParse)}}"}
+        vars: {tStatus: "{{IcxCfgStatus.module_stderr}}"}
+        when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
+
+      - name: Restore 802.1X Interfaces
+        icx_config: {lines: '{{Dot1xEnabledInt.stdout[0]}}', parents: authentication}
+        register: IcxCfgStatus
+        failed_when: false
+        when:
+          - ErrMsg is not defined
+          - Dot1xEnabledInt.stdout[0] is defined
+          - Dot1xEnabledInt.stdout[0] != ''
+
+      - name: Parse Switch Error
+        set_fact: {ErrMsg: "{{tStatus|regex_replace('\n')|regex_replace(ErrParse)}}"}
+        vars: {tStatus: "{{IcxCfgStatus.module_stderr}}"}
+        when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
+
+      - name: Restore 802.1X Port-Control Interfaces (Global Config)
+        icx_config: {lines: '{{PortCtrlAutoInt.stdout[0]}}', parents: authentication}
+        register: IcxCfgStatus
+        failed_when: false
+        when:
+          - ErrMsg is not defined
+          - Dot1xEnabledInt.stdout[0] is defined
+          - Dot1xEnabledInt.stdout[0] != ''
+          - PortCtrlAutoInt.stdout[0] is defined
+          - PortCtrlAutoInt.stdout[0] != ''
+
+      - name: Parse Switch Error
+        set_fact: {ErrMsg: "{{tStatus|regex_replace('\n')|regex_replace(ErrParse)}}"}
+        vars: {tStatus: "{{IcxCfgStatus.module_stderr}}"}
+        when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
+
+      - name: Get 802.1X Interface List for Legacy Port-Control Restore
+        icx_command: {commands: show dot1x config all | include Configuration}
+        register: PortCtrlInt
+        when:
+          - ErrMsg is not defined
+          - Dot1xEnabledInt.stdout[0] is defined
+          - Dot1xEnabledInt.stdout[0] != ''
+          - PortCtrlAutoInt.stdout[0] is not defined or PortCtrlAutoInt.stdout[0] == ''
+
+      - name: Restore 802.1X Port-Control Interfaces (Legacy)
+        icx_config: {lines: '{{tCmd}}', parents: 'interface e {{item.split(" ")[1]}}'}
+        register: IcxCfgStatus
+        loop: '{{PortCtrlInt.stdout_lines[0]}}'
+        failed_when: false
+        vars: {tCmd: dot1x port-control auto}
+        when:
+          - ErrMsg is not defined
+          - Dot1xEnabledInt.stdout[0] is defined
+          - Dot1xEnabledInt.stdout[0] != ''
+          - PortCtrlInt.stdout[0] is defined
+          - PortCtrlInt.stdout[0] != ''
+          - PortCtrlAutoInt.stdout[0] is not defined or PortCtrlAutoInt.stdout[0] == ''
+
+      - name: Parse Switch Error
+        set_fact: {ErrMsg: "{{tStatus|regex_replace('\n')|regex_replace(ErrParse)}}"}
+        vars: {tStatus: "{{IcxCfgStatus.module_stderr}}"}
+        when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
+
+      - name: Restore MAC-Authentication Interfaces
+        icx_config: {lines: '{{MacAuthEnabledInt.stdout[0]}}', parents: authentication}
+        register: IcxCfgStatus
+        failed_when: false
+        when:
+          - ErrMsg is not defined
+          - MacAuthEnabledInt.stdout[0] is defined
+          - MacAuthEnabledInt.stdout[0] != ''
+
+      - name: Parse Switch Error
+        set_fact: {ErrMsg: "{{tStatus|regex_replace('\n')|regex_replace(ErrParse)}}"}
+        vars: {tStatus: "{{IcxCfgStatus.module_stderr}}"}
+        when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
     when: prompt_flexauth_def_vlan is defined and prompt_flexauth_def_vlan != ''
-
-  - name: Get 802.1X Port-Control Auto Interfaces
-    icx_command: {commands: show config | include dot1x port-control auto ethe}
-    register: PortCtrlAutoInt
-    when: prompt_flexauth_def_vlan is defined and prompt_flexauth_def_vlan != ''
-
-  - name: Get MAC-Authentication Enabled Interfaces
-    icx_command: {commands: show config | include mac-authentication enable ethe}
-    register: MacAuthEnabledInt
-    when: prompt_flexauth_def_vlan is defined and prompt_flexauth_def_vlan != ''
-
-  - name: Setup 802.1X Commands
-    set_fact: {Dot1xEn: dot1x enable}
-    when: Dot1xEnabledInt.stdout[0] is defined and Dot1xEnabledInt.stdout[0] != ''
-
-  - name: Setup MAC-Authentication Commands
-    set_fact: {MacAuthEn: mac-authentication enable}
-    when: MacAuthEnabledInt.stdout[0] is defined and MacAuthEnabledInt.stdout[0] != ''
-
-  - name: Configure Default Authentication VLAN
-    icx_config:
-      lines: |
-        no dot1x enable
-        no mac-authentication enable
-        auth-default-vlan {{prompt_flexauth_def_vlan}}
-        {{Dot1xEn}}
-        {{MacAuthEn}}
-      parents: authentication
-    register: IcxCfgStatus
-    failed_when: false
-    when: prompt_flexauth_def_vlan is defined and prompt_flexauth_def_vlan != ''
-
-  - name: Parse Switch Error
-    set_fact:
-      ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
-    when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
-
-  - name: Restore 802.1X Interfaces
-    icx_config: {lines: '{{Dot1xEnabledInt.stdout[0]}}', parents: authentication}
-    register: IcxCfgStatus
-    failed_when: false
-    when:
-      - ErrMsg is not defined
-      - prompt_flexauth_def_vlan is defined
-      - prompt_flexauth_def_vlan != ''
-      - Dot1xEnabledInt.stdout[0] is defined
-      - Dot1xEnabledInt.stdout[0] != ''
-
-  - name: Parse Switch Error
-    set_fact:
-      ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
-    when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
-
-  - name: Restore 802.1X Port-Control Interfaces (Global Config)
-    icx_config: {lines: '{{PortCtrlAutoInt.stdout[0]}}', parents: authentication}
-    register: IcxCfgStatus
-    failed_when: false
-    when:
-      - ErrMsg is not defined
-      - prompt_flexauth_def_vlan is defined
-      - prompt_flexauth_def_vlan != ''
-      - Dot1xEnabledInt.stdout[0] is defined
-      - Dot1xEnabledInt.stdout[0] != ''
-      - PortCtrlAutoInt.stdout[0] is defined
-      - PortCtrlAutoInt.stdout[0] != ''
-
-  - name: Get 802.1X Interface List for Legacy Port-Control Restore
-    icx_command: {commands: show dot1x config all | include Configuration}
-    register: PortCtrlInt
-    when:
-      - ErrMsg is not defined
-      - prompt_flexauth_def_vlan is defined
-      - prompt_flexauth_def_vlan != ''
-      - Dot1xEnabledInt.stdout[0] is defined
-      - Dot1xEnabledInt.stdout[0] != ''
-      - PortCtrlAutoInt.stdout[0] is not defined or PortCtrlAutoInt.stdout[0] == ''
-
-  - name: Restore 802.1X Port-Control Interfaces (Legacy)
-    icx_config: {lines: dot1x port-control auto, parents: 'interface e {{item.split(" ")[1]}}'}
-    register: IcxCfgStatus
-    loop: '{{PortCtrlInt.stdout_lines[0]}}'
-    failed_when: false
-    when:
-      - ErrMsg is not defined
-      - prompt_flexauth_def_vlan is defined
-      - prompt_flexauth_def_vlan != ''
-      - Dot1xEnabledInt.stdout[0] is defined
-      - Dot1xEnabledInt.stdout[0] != ''
-      - PortCtrlInt.stdout[0] is defined
-      - PortCtrlInt.stdout[0] != ''
-      - PortCtrlAutoInt.stdout[0] is not defined or PortCtrlAutoInt.stdout[0] == ''
-
-  - name: Parse Switch Error
-    set_fact:
-      ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
-    when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
-
-  - name: Restore MAC-Authentication Interfaces
-    icx_config: {lines: '{{MacAuthEnabledInt.stdout[0]}}', parents: authentication}
-    register: IcxCfgStatus
-    failed_when: false
-    when:
-      - ErrMsg is not defined
-      - prompt_flexauth_def_vlan is defined
-      - prompt_flexauth_def_vlan != ''
-      - MacAuthEnabledInt.stdout[0] is defined
-      - MacAuthEnabledInt.stdout[0] != ''
-
-  - name: Parse Switch Error
-    set_fact:
-      ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
-    when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
 
   - name: Configure Reauthentication
-    icx_config: {lines: reauthentication, parents: authentication, save_when: changed}
+    icx_config: {lines: re-authentication, parents: authentication, save_when: changed}
     register: IcxCfgStatus
+    failed_when: false
     when:
       - ErrMsg is not defined
       - prompt_flexauth_reauth is defined
@@ -168,7 +173,8 @@
     when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
 
   - name: Display Switch Error
-    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(newline_var)}}'}
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(NewlineVar)}}'}
+    vars: {NewlineVar: "\r"}
     when: ErrMsg is defined
 
   - name: Show FlexAuth Info
