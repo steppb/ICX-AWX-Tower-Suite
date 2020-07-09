@@ -47,7 +47,7 @@
         when: Dot1xEnabled.stdout[0] is defined and Dot1xEnabled.stdout[0] != ''
 
       - name: Setup 802.1X Enable Command
-        set_fact: {Dot1xEnCmd: dot1x enable}
+        set_fact: {Dot1xCmd: dot1x enable}
         when: Dot1xEnabledInt.stdout[0] is defined and Dot1xEnabledInt.stdout[0] != ''
 
       - name: Setup MAC-Authentication Disable Command
