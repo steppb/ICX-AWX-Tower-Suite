@@ -6,22 +6,29 @@
 - hosts: all
   connection: network_cli
   gather_facts: no
+  module_defaults:
+    icx_config:
+      parents: authenticatio
   vars:
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
     ErrParse: '^.*ConnectionError: '
-    Dot1xEn:
-    MacAuthEn:
+    NoDot1xCmd:
+    NoMacAuthCmd:
+    Dot1xCmd:
+    MacAuthCmd:
 
   tasks:
-
-
   - name: Configure Auth-Default-VLAN
     block:
       - name: Get 802.1X Enabled Status
         icx_command: {commands: show run | include dot1x enable}
         register: Dot1xEnabled
+
+      - name: Get MAC-Authentication Enabled Status
+        icx_command: {commands: show run | include mac-authentication enable}
+        register: MacAuthEnabled
 
       - name: Get 802.1X Enabled Interfaces
         icx_command: {commands: show config | include dot1x enable ethe}
@@ -35,27 +42,30 @@
         icx_command: {commands: show config | include mac-authentication enable ethe}
         register: MacAuthEnabledInt
 
-      - name: Setup 802.1X Enable Command
-        set_fact: {Dot1xEn: dot1x enable}
-        when: Dot1xEnabledInt.stdout[0] is defined and Dot1xEnabledInt.stdout[0] != ''
-
-      - name: Setup MAC-Authentication Enable Command
-        set_fact: {MacAuthEn: mac-authentication enable}
-        when: MacAuthEnabledInt.stdout[0] is defined and MacAuthEnabledInt.stdout[0] != ''
-    
-      - name: Disable 802.1X
-        icx_config: {lines: no dot1x enable, parents: authentication}
-        failed_when: false
+      - name: Setup 802.1X Disable Command
+        set_fact: {NoDot1xCmd: no dot1x enable}
         when: Dot1xEnabled.stdout[0] is defined and Dot1xEnabled.stdout[0] != ''
 
+      - name: Setup 802.1X Enable Command
+        set_fact: {Dot1xEnCmd: dot1x enable}
+        when: Dot1xEnabledInt.stdout[0] is defined and Dot1xEnabledInt.stdout[0] != ''
+
+      - name: Setup MAC-Authentication Disable Command
+        set_fact: {NoMacAuthCmd: no mac-authentication enable}
+        when: MacAuthEnabled.stdout[0] is defined and MacAuthEnabled.stdout[0] != ''
+
+      - name: Setup MAC-Authentication Enable Command
+        set_fact: {MacAuthCmd: mac-authentication enable}
+        when: MacAuthEnabledInt.stdout[0] is defined and MacAuthEnabledInt.stdout[0] != ''
+    
       - name: Configure Default Authentication VLAN
         icx_config:
           lines: |
-            no mac-authentication enable
+            {{NoDot1xCmd}}
+            {{NoMacAuthCmd}}
             auth-default-vlan {{prompt_flexauth_def_vlan}}
-            {{Dot1xEn}}
-            {{MacAuthEn}}
-          parents: authentication
+            {{Dot1xCmd}}
+            {{MacAuthCmd}}
         register: IcxCfgStatus
         failed_when: false
 
@@ -65,7 +75,7 @@
         when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
 
       - name: Restore 802.1X Interfaces
-        icx_config: {lines: '{{Dot1xEnabledInt.stdout[0]}}', parents: authentication}
+        icx_config: {lines: '{{Dot1xEnabledInt.stdout[0]}}'}
         register: IcxCfgStatus
         failed_when: false
         when:
@@ -79,7 +89,7 @@
         when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
 
       - name: Restore 802.1X Port-Control Interfaces (Global Config)
-        icx_config: {lines: '{{PortCtrlAutoInt.stdout[0]}}', parents: authentication}
+        icx_config: {lines: '{{PortCtrlAutoInt.stdout[0]}}'}
         register: IcxCfgStatus
         failed_when: false
         when:
@@ -123,7 +133,7 @@
         when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
 
       - name: Restore MAC-Authentication Interfaces
-        icx_config: {lines: '{{MacAuthEnabledInt.stdout[0]}}', parents: authentication}
+        icx_config: {lines: '{{MacAuthEnabledInt.stdout[0]}}'}
         register: IcxCfgStatus
         failed_when: false
         when:
@@ -138,7 +148,7 @@
     when: prompt_flexauth_def_vlan is defined and prompt_flexauth_def_vlan != ''
 
   - name: Configure Reauthentication
-    icx_config: {lines: re-authentication, parents: authentication, save_when: changed}
+    icx_config: {lines: re-authentication}
     register: IcxCfgStatus
     failed_when: false
     when:
@@ -162,6 +172,7 @@
          dot1x timeout tx-period {{prompt_flexauth_timeout_tx|default("30")}}
          dot1x timeout quiet-period {{prompt_flexauth_timeout_quiet|default("60")}}
          dot1x timeout supplicant {{prompt_flexauth_timeout_supplicant|default("30")}}
+      parents:
       save_when: changed
     register: IcxCfgStatus
     failed_when: false
@@ -176,10 +187,3 @@
     assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(NewlineVar)}}'}
     vars: {NewlineVar: "\r"}
     when: ErrMsg is defined
-
-  - name: Show FlexAuth Info
-    icx_command: {commands: show dot1x config}
-    register: FlexAuthInfo
-
-  - name: Display FlexAuth Info
-    debug: var=FlexAuthInfo.stdout_lines[0]
