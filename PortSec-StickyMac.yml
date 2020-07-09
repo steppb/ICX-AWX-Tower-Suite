@@ -10,7 +10,6 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
-    newline_var: "\r"
     ErrParse: '^.*ConnectionError: '
     EthVar: '(e|et|eth|ethe|ether|ethern|etherne|ethernet)'
     PortVar: '([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2})'
@@ -33,7 +32,7 @@
     icx_config:
       lines: |
          port security
-          {{AutoSave}}
+          {{AutoSave|default()}}
           maximum {{prompt_portsec_max|default("1")}}
           enable
       save_when: changed
@@ -49,7 +48,8 @@
     when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
 
   - name: Display Switch Error
-    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(newline_var)}}'}
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(NewlineVar)}}'}
+    vars: {NewlineVar: "\r"}
     when: ErrMsg is defined
 
   - name: Get Port Security Info
