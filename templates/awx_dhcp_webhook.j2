@@ -13,11 +13,12 @@ InventoryID=$(curl -s -k -H "Authorization: Bearer $AuthToken" \
 # Verify if device exists in Provisioning Inventory
 number_re='^[0-9]+$'
 rc=$(curl -s -k -H "Authorization: Bearer $AuthToken" \
-        -X GET https://localhost/api/v2/inventories/2/hosts/?name=$1 |\
+        -X GET https://localhost/api/v2/hosts/?name=$ClientIP |\
         sed 's/^.*results\":\[{\"id\":\([0-9]*\).*/\1/g')
 
 # Add Device to Provisioning Inventory in AWX
 if ! [[ $rc =~ $number_re ]] ; then
+  echo "Adding $ClientIP to $InventoryName Inventory"
   curl -s -k -H "Authorization: Bearer $AuthToken" \
              -H "Content-Type: application/json" -X POST -d '{
                 "variables":"---\nansible_host: '$ClientIP'",
@@ -25,6 +26,8 @@ if ! [[ $rc =~ $number_re ]] ; then
                 "description":"'$ClientName'",
                 "inventory":"'$InventoryID'"
            }' https://localhost/api/v2/hosts/
+else
+  exit
 fi
 
 # Get Job Template ID for 'Provisioning-Init-Login'
@@ -34,7 +37,7 @@ InitLoginTemplateId=$(curl -s -k -H "Authorization: Bearer $AuthToken" \
 
 # Launch 'Provisioning-Init-Login'
 if [[ $InitLoginTemplateId =~ $number_re ]] ; then
-  echo 'Launching Provisioning-Init-Login on $ClientName'
+  echo "Launching Provisioning-Init-Login on $ClientName"
   rc=$(curl -s -k -H "Authorization: Bearer $AuthToken" \
              -H "Content-Type: application/json" -X POST -d '{
            }' https://localhost/api/v2/job_templates/$InitLoginTemplateId/launch/)
