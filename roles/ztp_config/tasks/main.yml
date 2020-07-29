@@ -1,0 +1,22 @@
+---
+- name: Configure Static IP Address on Interface
+  include_tasks: config_interface.yml
+  when: ZtpParams.CfgInterface|bool
+
+- name: Create ZTP Inventory
+  include_tasks: create_ztp_inventory.yml
+  when: ZtpParams.InstallInv|bool
+
+- name: Add Templates to Template List
+  set_fact: {TemplateCreateParams: "{{TemplateCreateParams|default([])}} + {{tVar}}"}
+  vars:
+    tVar:
+      - name: Provisioning-Init-Login
+        description: 'Setup ICX initial login'
+        inventory:
+        ask_inventory: true
+        playbook: 'Provisioning-Init-Login.yml'
+        credentials: '{{RestCredentialList.results}}'
+      - name: ZTP-Configure
+        survey_spec: '{{ZtpCfgSurveyPrompt}}'
+  when: ZtpParams.CreateTemplates|bool

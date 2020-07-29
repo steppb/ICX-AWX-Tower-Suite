@@ -1,0 +1,73 @@
+---
+- name: Get AWX Server Network Interfaces
+  setup: gather_subset=!all,!min,network
+
+- name: Configure Interface
+  block:
+    - name: Set Interface Name
+      set_fact: {NetIntName: '{{prompt_ztp_interface|regex_replace(":.*$")}}'}
+
+    - name: Set Initial Variables
+      set_fact:
+        NetIp: '{{prompt_ztp_int_ipaddr|default("")|regex_replace("/.*$")}}'
+        OldIp: "{{vars['ansible_'~NetIntName].ipv4.address|default('')}}"
+
+    - name: Configure Interface IP Address
+      block:
+        - name: Validate IP Variable
+          assert:
+            that: "'/' in prompt_ztp_int_ipaddr"
+            fail_msg:
+              - "ERROR: IP Address improperly formatted"
+              - "Address and mask needs to be formatted as such: x.x.x.x/x"
+
+        - name: Create Network Interface Config
+          template:
+            src: 02-ztp-netcfg.yaml.j2
+            dest: /etc/netplan/02-ztp-netcfg.yaml
+            mode: 0644
+
+        - {name: Apply Network Interface Config, shell: netplan apply}
+
+        - name: Store New IP Address
+          set_fact: {OldIp: "{{NetIp}}"}
+
+        - name: Refresh AWX Network Fact Cache
+          setup: gather_subset=!all,!min,network
+      when:
+        - NetIp != ''
+        - NetIp != ansible_host
+        - NetIp != OldIp
+      vars:
+        NetIntIp: '{{prompt_ztp_int_ipaddr}}'
+        ansible_become: true
+        ansible_become_method: sudo
+
+    - name: Map New IP to Interface
+      set_fact: {PhysInts: "{{NetIntName}}:{{OldIp}}"}
+  when:
+    - prompt_ztp_interface is defined
+    - prompt_ztp_int_ipaddr is defined
+
+- name: Get Physical Interface Names and IP Addresses
+  set_fact:
+    PhysInts: "{{PhysInts}} {{item}}:{{vars['ansible_'~item].ipv4.address|default('')}}"
+  loop: '{{ansible_interfaces}}'
+  when:
+    - item is match("^e.*$")
+    - NetIntName is not defined or item != NetIntName
+
+- name: Format Interface String
+  set_fact: {PhysIntStr: '{{PhysInts|regex_replace("^ ")|regex_replace(" ","\n")}}'}
+
+- {name: Load Survey Prompt Variable, include_vars: ztp_cfg_survey_prompt.yml}
+
+- name: Add 'ZTP-Configure-Server-Interface' to Template List
+  set_fact: {TemplateCreateParams: "{{TemplateCreateParams|default([])}} + {{tVar}}"}
+  vars:
+    tVar:
+      - name: ZTP-Configure-Server-Address
+        description: 'Configure IP address on secondary interface'
+        playbook: 'ZTP-Install.yml'
+        credentials: '{{CredentialList.results}}'
+        survey_spec: '{{ZtpCfgSvrAdd}}'

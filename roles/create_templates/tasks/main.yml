@@ -1,0 +1,4 @@
+- name: Create Templates
+  include_tasks: create_template.yml
+  loop: '{{TemplateCreateParams}}'
+  loop_control: {loop_var: tTemplateParams}

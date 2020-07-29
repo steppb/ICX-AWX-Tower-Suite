@@ -46,10 +46,11 @@ on commit {
 
   log(Json);
 
-  execute ("/etc/dhcp/awx_dhcp_webhook", ClientIP, Name);
+  execute ("/etc/dhcp/awx_dhcp_webhook", ClientIP, Name, AwxInventoryName);
 }
 
 subnet {{DhcpSubnetIp}} netmask {{DhcpSubnetMask}} {
   range {{DhcpRangeLow}} {{DhcpRangeHigh}};
+  set AwxInventoryName = "{{InventoryName}}";
   {{DhcpSubnetRouter}}
 }

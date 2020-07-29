@@ -1,0 +1,58 @@
+---
+ZtpCfgSurveyPrompt:
+- question_name: 'Provisioning Inventory:'
+  question_description: Name of inventory used for ZTP hosts
+  required: true
+  type: text
+  variable: prompt_ztp_inventory
+  min: 1
+  max: 1024
+  default: Provisioning
+  choices: ''
+- question_name: 'DHCP Subnet IP and Mask:'
+  question_description: '(e.g. 192.168.0.0/24)'
+  required: '{{ZtpParams.InstallComponents|bool}}'
+  type: text
+  variable: prompt_ztp_dhcp_subnet
+  min: 9
+  max: 18
+  default: ''
+  choices: ''
+- question_name: 'DHCP Subnet Range:'
+  question_description: '(e.g. 192.168.0.10-192.168.0.200)'
+  required: '{{ZtpParams.InstallComponents|bool}}'
+  type: text
+  variable: prompt_ztp_dhcp_range
+  min: 15
+  max: 31
+  default: ''
+  choices: ''
+- question_name: 'DHCP Subnet Default Router'
+  question_description: '(e.g. 192.168.0.1)'
+  required: false
+  type: text
+  variable: prompt_ztp_dhcp_rtr
+  min: 7
+  max: 15
+  default: ''
+  choices: ''
+
+ZtpCfgSvrAdd:
+- question_name: 'Select ZTP Interface:'
+  question_description: ''
+  required: true
+  type: multiplechoice
+  variable: prompt_ztp_interface
+  min: null
+  max: null
+  default: '{{DefInt|default("")}}'
+  choices: '{{PhysInts|regex_replace("^ ")|regex_replace(" ","\n")}}'
+- question_name: 'Interface IP Address and Mask: (e.g. x.x.x.x/x)'
+  question_description: '(Note: Required if no IP address exists on interface)'
+  required: true
+  type: text
+  variable: prompt_ztp_int_ipaddr
+  min: 9
+  max: 18
+  default: ''
+  choices: ''

@@ -1,9 +1,9 @@
 #!/bin/bash
 
 AuthToken={{AuthToken}}
-InventoryName={{InventoryName}}
 ClientIP=$1
 ClientName=$2
+InventoryName=$3
 
 # Get the 'Provisioning' Inventory ID
 InventoryID=$(curl -s -k -H "Authorization: Bearer $AuthToken" \
@@ -25,7 +25,7 @@ if ! [[ $rc =~ $number_re ]] ; then
                 "name":"'$ClientIP'",
                 "description":"'$ClientName'",
                 "inventory":"'$InventoryID'"
-           }' https://localhost/api/v2/hosts/
+            }' https://localhost/api/v2/hosts/
 else
   exit
 fi
@@ -35,10 +35,16 @@ InitLoginTemplateId=$(curl -s -k -H "Authorization: Bearer $AuthToken" \
   -X GET https://localhost/api/v2/job_templates/?name=Provisioning-Init-Login |\
   sed 's/^.*results\":\[{\"id\":\([0-9]*\).*/\1/g')
 
+# Get Inventory ID
+InventoryID=$(curl -s -k -H "Authorization: Bearer $AuthToken" \
+  -X GET https://localhost/api/v2/inventories/?name=$InventoryName |\
+  sed 's/^.*results\":\[{\"id\":\([0-9]*\).*/\1/g')
+
 # Launch 'Provisioning-Init-Login'
 if [[ $InitLoginTemplateId =~ $number_re ]] ; then
   echo "Launching Provisioning-Init-Login on $ClientName"
-  rc=$(curl -s -k -H "Authorization: Bearer $AuthToken" \
+  curl -s -k -H "Authorization: Bearer $AuthToken" \
              -H "Content-Type: application/json" -X POST -d '{
-           }' https://localhost/api/v2/job_templates/$InitLoginTemplateId/launch/)
+                "inventory":"'$InventoryID'"
+            }' https://localhost/api/v2/job_templates/$InitLoginTemplateId/launch/
 fi

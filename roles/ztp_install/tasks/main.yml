@@ -1,0 +1,14 @@
+---
+- name: Install ZTP Components
+  block:
+    - {name: Install Required ZTP Components, include_tasks: install_components.yml}
+
+    - {name: Create Default Login Creds, include_tasks: create_default_credentials.yml}
+  when: ZtpParams.InstallComponents|bool
+
+- name: Build Template Param List
+  include_tasks: create_template_list.yml
+  when: ZtpParams.CreateTemplates|bool
+
+- name: Setup App Authentication Token
+  include_tasks: create_auth_token.yml

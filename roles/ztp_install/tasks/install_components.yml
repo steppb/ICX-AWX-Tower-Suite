@@ -1,0 +1,26 @@
+- {name: Get Pip Packages, pip_package_info: {clients: ['pip', 'pip3']}, register: PInfo}
+
+- name: Install 'netaddr' Package
+  pip: {name: netaddr}
+  vars: {ansible_become: true, ansible_become_method: sudo}
+  when:
+    - PInfo.packages.pip.netaddr is not defined
+    - PInfo.packages.pip3.netaddr is not defined
+
+- name: Attempt to Install ISC-DHCP-Server
+  apt: {name: isc-dhcp-server}
+  register: DhcpInstallStatus
+  vars: {ansible_become: true, ansible_become_method: sudo}
+
+- name: Add AppArmor entry for 'awx_dhcp_webhook'
+  lineinfile:
+    path: /etc/apparmor.d/usr.sbin.dhcpd
+    regexp: 'awx_dhcp_webhook'
+    insertbefore: '^}'
+    line: "  /etc/dhcp/awx_dhcp_webhook cux,"
+  vars: {ansible_become: true, ansible_become_method: sudo}
+
+- name: Restart AppArmor Service
+  service: {name: apparmor, state: restarted}
+  changed_when: false
+  vars: {ansible_become: true, ansible_become_method: sudo}

@@ -1,0 +1,46 @@
+---
+- name: Get Info for This Template
+  uri: {url: '{{AwxApi}}/job_templates/{{awx_job_template_id}}'}
+  register: ThisTemplate
+
+- name: Get Inventory Info
+  uri: {url: '{{AwxApi}}/inventories/{{awx_inventory_id}}/'}
+  register: InvInfo
+
+- name: Get User ID
+  uri: {url: '{{AwxApi}}/users/?username={{awxlogin_user}}'}
+  register: AwxUserId
+
+- name: Get Credentials for This Job
+  uri: {url: '{{AwxApi}}/jobs/{{awx_job_id}}/credentials/'}
+  register: ThisJobCreds
+
+- name: Store AWX REST API Credential ID
+  set_fact: {Credential: "id: {{ThisJobCreds.json.results[idx].id}}"}
+  loop: "{{range(0, ThisJobCreds.json.results|length)|list}}"
+  loop_control: {index_var: idx}
+  register: RestCredentialList
+  when: ThisJobCreds.json.results[idx].kind != 'ssh'
+
+- name: Store AWX REST API and SSH Credential IDs
+  set_fact: {Credential: "id: {{ThisJobCreds.json.results[idx].id}}"}
+  loop: "{{range(0, ThisJobCreds.json.results|length)|list}}"
+  loop_control: {index_var: idx}
+  register: CredentialList
+
+- name: Set Play Parameters
+  set_fact:
+    ZtpParams:
+      ZtpInstall: '{{IsInstall|bool or IsRegenToken|bool}}'
+      ZtpConfigure: '{{IsConfigure|bool or IsReIp|bool}}'
+      InstallComponents: '{{IsInstall|bool}}'
+      RegenToken: '{{IsRegenToken|bool}}'
+      InstallInv: '{{IsConfigure|bool}}'
+      CfgInterface: '{{IsReIp|bool or IsConfigure|bool}}'
+      CreateTemplates: '{{IsInstall|bool or IsConfigure|bool}}'
+      OrgId: '{{InvInfo.json.organization}}'
+  vars:
+    IsInstall: '{{ThisTemplate.json.name == "ZTP-Install"}}'
+    IsConfigure: '{{ThisTemplate.json.name == "ZTP-Configure"}}'
+    IsRegenToken: '{{ThisTemplate.json.name == "ZTP-Regen-AuthToken"}}'
+    IsReIp: '{{ThisTemplate.json.name == "ZTP-Configure-Server-Address"}}'

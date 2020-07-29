@@ -1,0 +1,51 @@
+---
+- name: Gather Facts
+  setup: gather_subset=!all,!min,network
+
+- name: Check for Existing 'ZTP-Configure' Template
+  uri: {url: '{{AwxApi}}/job_templates/?name=ZTP-Configure'}
+  register: GetZtpCfgTemplate
+
+- name: Create 'ZTP-Configure' Template
+  block:
+    - name: Gather Facts
+      setup: gather_subset=!all,!min,network
+
+    - name: Get Physical Interface Names and IP Addresses
+      set_fact:
+        PhysInts: "{{PhysInts}} {{item}}:{{vars['ansible_'~item].ipv4.address|default('')}}"
+      loop: '{{ansible_interfaces}}'
+      when: item is match("^e.*$")
+
+    - name: Set Default Interface for Prompt
+      set_fact: {DefInt: '{{item}}'}
+      loop: '{{PhysInts.split(" ")}}'
+      when:
+        - ZtpParams.InstallComponents|bool
+        - item is match("^e.*:$")
+
+    - name: Format Interface String
+      set_fact: {PhysIntStr: '{{PhysInts|regex_replace("^ ")|regex_replace(" ","\n")}}'}
+
+    - include_vars: ztp_cfg_survey_prompt.yml
+
+    - name: Add Templates to Template List
+      set_fact:
+        TemplateCreateParams: "{{TemplateCreateParams|default([])}} + {{tVar}}"
+      vars:
+        tVar:
+          - name: ZTP-Regen-AuthToken
+            description: 'Regenerate DHCP Webhook Authentication Token'
+            inventory: '{{awx_inventory_id}}'
+            ask_inventory: false
+            playbook: 'ZTP-Install.yml'
+            credentials: '{{CredentialList.results}}'
+          - name: ZTP-Configure
+            description: 'Configure ZTP'
+            inventory: '{{awx_inventory_id}}'
+            ask_inventory: false
+            use_fact_cache: true
+            playbook: 'ZTP-Install.yml'
+            credentials: '{{CredentialList.results}}'
+            survey_spec: '{{ZtpCfgSurveyPrompt}}'
+  when: GetZtpCfgTemplate.json.count == 0 or ansible_ztp_inventories is not defined

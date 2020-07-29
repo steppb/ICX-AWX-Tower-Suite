@@ -1,0 +1,171 @@
+---
+- name: Check for Existing ZTP Inventory
+  uri: {url: '{{AwxApi}}/inventories/?name={{prompt_ztp_inventory|urlencode}}'}
+  register: GetZtpInventory
+
+- name: Store Inventory Id
+  set_fact: {InventoryId: '{{GetZtpInventory.json.results[0].id}}'}
+  when: GetZtpInventory.json.count > 0
+
+- name: Get ZTP Inventories Info
+  uri: {url: '{{AwxApi}}/inventories/?name={{item|urlencode}}'}
+  loop: '{{ansible_ztp_inventories}}'
+  register: GetZtpInventories
+  when: ansible_ztp_inventories is defined
+
+- name: Build ZTP Inventories List
+  set_fact:
+    ZtpInvList: "{{ZtpInvList|default([])}} + ['{{tZtpInv}}']"
+  loop: '{{range(0, GetZtpInventories.results|length)|list}}'
+  loop_control: {index_var: idx}
+  vars: {tZtpInv: '{{GetZtpInventories.results[idx].json.results[0].name}}'}
+  when: GetZtpInventories.results[idx].json.results[0].name is defined
+
+- name: Check for Inventory
+  set_fact: {AwxZtpInvFound: true}
+  loop: '{{ansible_ztp_inventories|default([])}}'
+  when:
+    - ansible_ztp_inventories is defined
+    - item == prompt_ztp_inventory
+
+- name: Set AWX Server DHCP Config Key Name
+  set_fact: {AwxDhcpCfgKey: "ansible_ztp_inv_{{prompt_ztp_inventory}}"}
+
+- name: Store Variables from Inventory
+  block:
+    - name: Store Provisioning Variables from Inventory
+      set_fact: {ProvisioningVars: '{{tInvVars.icx_inv_ztp_vars.provisioning_vars}}'}
+      vars: {tInvVars: '{{GetZtpInventory.json.results[0].variables|from_yaml}}'}
+      when:
+        - GetZtpInventory.json.count > 0
+        - tInvVars.icx_inv_ztp_vars.provisioning_vars is defined
+
+    - name: Store DHCP Config from Inventory
+      set_fact: {AwxDhcpConfig: '{{vars[AwxDhcpCfgKey]}}'}
+      when: vars[AwxDhcpCfgKey] is defined
+  when: GetZtpInventory.json.count > 0
+
+- name: Create ZTP Inventory
+  block:
+    - name: Create Inventory
+      uri:
+        url: '{{AwxApi}}/inventories/'
+        method: POST
+        headers: {Content-Type: "application/json"}
+        body:
+          name: '{{prompt_ztp_inventory}}'
+          description: ''
+          organization: '{{ZtpParams.OrgId}}'
+        body_format: json
+        status_code: 201
+      register: NewInventory
+
+    - name: Store Inventory Id
+      set_fact: {InventoryId: '{{NewInventory.json.id}}'}
+  when: GetZtpInventory.json.count == 0
+
+- name: Update Inventory Config
+  uri:
+    url: '{{AwxApi}}/inventories/{{InventoryId}}/'
+    method: PATCH
+    headers: {Content-Type: 'application/json'}
+    body:
+      variables: >-
+        icx_inv_ztp_vars:
+          provisioning_vars:
+            default_pass: '{{ProvisioningVars.provisioning_pass|default(ZtpDefPassword)}}'
+            workflow: '{{ProvisioningVars.provisioning_workflow|default()}}'
+            awx_api_cb: '{{ProvisioningVars.awx_api_cb|default(AwxApi)}}'
+    body_format: json
+
+- name: Configure DHCP
+  block:
+    - name: Reformat DHCP Subnet if Needed
+      set_fact: {DhcpSubnet: "{{prompt_ztp_dhcp_subnet|ipaddr('network/prefix')}}"}
+
+    - name: Ensure Proper Subnet Provided
+      assert:
+        that: DhcpSubnet|ipaddr('bool')
+        fail_msg: "Error: Subnet {{prompt_ztp_dhcp_subnet}} is improperly formatted"
+
+    - name: Ensure Range IP Addresses are in Subnet
+      assert:
+        that:
+          - PromptDhcpRangeLow|ipaddr(DhcpSubnet)|ipaddr('bool')
+          - PromptDhcpRangeHigh|ipaddr(DhcpSubnet)|ipaddr('bool')
+        fail_msg: "Error: Range IP is outside of subnet {{DhcpSubnet}}"
+
+    - name: Set Range Variables
+      set_fact:
+        DhcpRangeLow: '{{PromptDhcpRangeLow}}'
+        DhcpRangeHigh: '{{PromptDhcpRangeHigh}}'
+      when: PromptDhcpRangeHigh is version(PromptDhcpRangeLow, '>')
+
+    - name: Set Range Variables (Reordered)
+      set_fact:
+        DhcpRangeLow: '{{PromptDhcpRangeHigh}}'
+        DhcpRangeHigh: '{{PromptDhcpRangeLow}}'
+      when:
+        - DhcpRangeLow is not defined
+        - DhcpRangeHigh is not defined
+
+    - name: Set Default Router
+      set_fact: {DhcpSubnetRouter: 'option routers {{prompt_ztp_dhcp_rtr}};'}
+      when:
+        - prompt_ztp_dhcp_rtr is defined
+        - prompt_ztp_dhcp_rtr|ipaddr(DhcpSubnet)|ipaddr('bool')
+
+    - name: Store DHCP Config Variables
+      set_fact:
+        ZtpDhcpInfo:
+          subnet: '{{DhcpSubnet}}'
+          ip_pool:
+            start_ip: '{{DhcpRangeLow}}'
+            end_ip: '{{DhcpRangeHigh}}'
+          router_ip: '{{prompt_ztp_dhcp_rtr|default()}}'
+
+    - name: Verify DHCP Config Change
+      set_fact: {SkipDhcpCfg: true}
+      when:
+        - AwxDhcpConfig is defined
+        - AwxDhcpConfig.subnet == ZtpDhcpInfo.subnet
+        - AwxDhcpConfig.ip_pool.start_ip == ZtpDhcpInfo.ip_pool.start_ip
+        - AwxDhcpConfig.ip_pool.end_ip == ZtpDhcpInfo.ip_pool.end_ip
+        - AwxDhcpConfig.router_ip == AwxDhcpConfig.router_ip
+
+    - name: Update DHCP Config
+      block:
+        - name: Generating 'dhcpd.conf'
+          template:
+            src: dhcpd.conf.j2
+            dest: /etc/dhcp/dhcpd.conf
+            mode: 0644
+          vars:
+            DhcpSubnetIp: "{{DhcpSubnet|ipaddr('network')}}"
+            DhcpSubnetMask: "{{DhcpSubnet|ipaddr('netmask')}}"
+            InventoryName: "{{prompt_ztp_inventory}}"
+
+        - name: Restart DHCP Service
+          service: {name: isc-dhcp-server, state: restarted}
+
+        - name: Update AWX Server DHCP Config
+          set_fact: {'{{AwxDhcpCfgKey}}':'{{ZtpDhcpInfo}}', cacheable: true}
+
+        - name: Add Inventory to List
+          set_fact:
+            ZtpInvList: "{{ZtpInvList|default([])}} + ['{{prompt_ztp_inventory}}']"
+          when: AwxZtpInvFound is not defined
+
+        - name: Add Inventory to 'ansible_ztp_inventories'
+          set_fact:
+            ansible_ztp_inventories: "{{ZtpInvList}}"
+            cacheable: true
+      when: SkipDhcpCfg is not defined
+  vars:
+    PromptDhcpRangeLow: '{{prompt_ztp_dhcp_range.split("-")[0]}}'
+    PromptDhcpRangeHigh: '{{prompt_ztp_dhcp_range.split("-")[1]}}'
+    ansible_become: true
+    ansible_become_method: sudo
+  when:
+    - prompt_ztp_dhcp_subnet is defined
+    - prompt_ztp_dhcp_range is defined

@@ -1,0 +1,65 @@
+---
+- name: Check For Existing Template
+  uri: {url: '{{AwxApi}}/job_templates/?name={{tTemplateParams.name}}'}
+  register: GetTemplateInfo
+
+- name: Store Job Template
+  set_fact: {TemplateInfo: '{{GetTemplateInfo.json.results[0]}}'}
+  when: GetTemplateInfo.json.count > 0
+
+- name: Create Template
+  block:
+    - name: Create Template
+      uri:
+        url: '{{AwxApi}}/job_templates/'
+        method: POST
+        headers: {Content-Type: "application/json"}
+        body:
+          name: '{{tTemplateParams.name}}'
+          description: '{{tTemplateParams.description}}'
+          project: '{{ThisTemplate.json.project}}'
+          inventory: '{{tTemplateParams.inventory|default(awx_inventory_id)}}'
+          playbook: '{{tTemplateParams.playbook|default("ZTP-Install.yml")}}'
+          ask_inventory_on_launch: '{{tTemplateParams.ask_inventory|default(false)}}'
+          use_fact_cache: '{{tTemplateParams.use_fact_cache|default(false)}}'
+        body_format: json
+        status_code: 201
+      register: NewTemplate
+
+    - name: Store Job Template
+      set_fact: {TemplateInfo: '{{NewTemplate.json}}'}
+
+    - name: Add Credentials to Template
+      uri:
+        url: '{{AwxApi}}/job_templates/{{TemplateInfo.id}}/credentials/'
+        method: POST
+        headers: {Content-Type: "application/json"}
+        body: '{{tTemplateParams.credentials[idx].ansible_facts.Credential|from_yaml}}'
+        body_format: json
+        status_code: 204
+      loop: '{{range(0, tTemplateParams.credentials|length)|list}}'
+      loop_control: {index_var: idx}
+      when: tTemplateParams.credentials[idx].ansible_facts.Credential is defined
+  when: GetTemplateInfo.json.count == 0
+
+- name: Add and Enable Survey Prompt
+  block:
+    - name: Add Survey Prompt
+      uri:
+        url: '{{AwxApi}}/job_templates/{{TemplateInfo.id}}/survey_spec/'
+        method: POST
+        headers: {Content-Type: 'application/json'}
+        body:
+          name: ''
+          description: ''
+          spec: '{{tTemplateParams.survey_spec}}'
+        body_format: json
+
+    - name: Enable Survey Prompt
+      uri:
+        url: '{{AwxApi}}/job_templates/{{TemplateInfo.id}}/'
+        method: PATCH
+        headers: {Content-Type: 'application/json'}
+        body: {survey_enabled: true}
+        body_format: json
+  when: tTemplateParams.survey_spec is defined

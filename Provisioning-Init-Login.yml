@@ -12,7 +12,8 @@
       force_basic_auth: yes
       timeout: 60
   vars:
-    AwxApi: '{{inventory_awx_api_cb}}'
+    WorkflowUrl: '{{icx_inv_ztp_vars.provisioning_vars.awx_api_cb}}/workflow_job_templates'
+    InvProvisioning: '{{icx_inv_ztp_vars.provisioning_vars}}'
     template_validate_certs: no
 
   tasks:
@@ -30,11 +31,11 @@
       - template_provisioning_pass != ''
 
   - name: Set Password from Inventory Variable
-    set_fact: {ProvisioningPass: '{{inventory_provisioning_pass}}'}
+    set_fact: {ProvisioningPass: '{{InvProvisioning.default_pass}}'}
     when:
       - ProvisioningPass is not defined
-      - inventory_provisioning_pass is defined
-      - inventory_provisioning_pass != ''
+      - InvProvisioning.default_pass is defined
+      - InvProvisioning.default_pass != ''
 
   - name: Attempt SSH Login
     expect:
@@ -68,16 +69,16 @@
     when: "'Connection refused' in SshSession.stdout"
 
   - name: Get Workflow ID
-    uri: {url: '{{AwxApi}}/workflow_job_templates/?name={{inventory_provisioning_workflow|urlencode}}'}
+    uri: {url: '{{WorkflowUrl}}/?name={{InvProvisioning.workflow|urlencode}}'}
     register: ProvisioningWorkflow
     when:
-      - inventory_provisioning_workflow is defined
-      - inventory_provisioning_workflow != ''
-      - inventory_provisioning_workflow is not none
+      - InvProvisioning.workflow is defined
+      - InvProvisioning.workflow != ''
+      - InvProvisioning.workflow is not none
 
   - name: Launch Workflow
     uri:
-      url: '{{AwxApi}}/workflow_job_templates/{{ProvisioningWorkflow.json.results[0].id}}/launch/'
+      url: '{{WorkflowUrl}}/{{ProvisioningWorkflow.json.results[0].id}}/launch/'
       method: POST
       headers: {Content-Type: "application/json"}
       status_code: 201
