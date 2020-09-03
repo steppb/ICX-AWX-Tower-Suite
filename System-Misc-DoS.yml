@@ -11,7 +11,7 @@
     ansible_become_method: enable
     newline_var: "\r"
     error_parse: '^.*ConnectionError: '
-    tcp_rate_cmd: ip tcp burst-normal 10 burst-max 100 lockup 300
+    tcp_rate_cmd: ip tcp burst-normal 30 burst-max 100 lockup 300
     attack_rate_cmd:
 
   tasks:
