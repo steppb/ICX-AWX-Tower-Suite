@@ -9,7 +9,7 @@ ZtpCfgSurveyPrompt:
   max: 1024
   default: Provisioning
   choices: ''
-- question_name: 'DHCP Subnet IP and Mask:'
+- question_name: 'DHCP Config - Subnet IP and Mask:'
   question_description: '(e.g. 192.168.0.0/24)'
   required: '{{ZtpParams.InstallComponents|bool}}'
   type: text
@@ -18,8 +18,8 @@ ZtpCfgSurveyPrompt:
   max: 18
   default: ''
   choices: ''
-- question_name: 'DHCP Subnet Range:'
-  question_description: '(e.g. 192.168.0.10-192.168.0.200)'
+- question_name: 'DHCP Config - Subnet Range:'
+  question_description: '(e.g. 192.168.0.100-192.168.0.200)'
   required: '{{ZtpParams.InstallComponents|bool}}'
   type: text
   variable: prompt_ztp_dhcp_range
@@ -27,13 +27,58 @@ ZtpCfgSurveyPrompt:
   max: 31
   default: ''
   choices: ''
-- question_name: 'DHCP Subnet Default Router'
+- question_name: 'DHCP Config - Default Router'
   question_description: '(e.g. 192.168.0.1)'
   required: false
   type: text
   variable: prompt_ztp_dhcp_rtr
   min: 7
   max: 15
+  default: ''
+  choices: ''
+- question_name: 'Static IP Pool Config - Switch Interface'
+  question_description: '(e.g. management1 or e1/1/1)'
+  required: false
+  type: text
+  variable: prompt_ztp_ippool_int
+  min: 2
+  max: 1024
+  default: ''
+  choices: ''
+- question_name: 'Static IP Pool Config - Subnet'
+  question_description: '(e.g. 192.168.0.0/24)'
+  required: false
+  type: text
+  variable: prompt_ztp_ippool_subnet
+  min: 9
+  max: 18
+  default: ''
+  choices: ''
+- question_name: 'Static IP Pool Config - IP Range'
+  question_description: '(e.g. 192.168.0.10-192.168.0.99)'
+  required: false
+  type: text
+  variable: prompt_ztp_ippool_range
+  min: 15
+  max: 31
+  default: ''
+  choices: ''
+- question_name: 'Hostname Pool Config - Base Name'
+  question_description: ''
+  required: false
+  type: text
+  variable: prompt_ztp_hostname_base
+  min: 1
+  max: 1024
+  default: ''
+  choices: ''
+- question_name: 'Post-Provisioning Inventory Name'
+  question_description: ''
+  required: false
+  type: text
+  variable: prompt_ztp_postztp_inv
+  min: 1
+  max: 1024
   default: ''
   choices: ''
 

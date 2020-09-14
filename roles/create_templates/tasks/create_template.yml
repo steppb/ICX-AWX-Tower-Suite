@@ -21,6 +21,8 @@
           inventory: '{{tTemplateParams.inventory|default(awx_inventory_id)}}'
           playbook: '{{tTemplateParams.playbook|default("ZTP-Install.yml")}}'
           ask_inventory_on_launch: '{{tTemplateParams.ask_inventory|default(false)}}'
+          ask_credential_on_launch: '{{tTemplateParams.ask_credential|default(false)}}'
+          ask_variables_on_launch: '{{tTemplateParams.ask_variables|default(false)}}'
           use_fact_cache: '{{tTemplateParams.use_fact_cache|default(false)}}'
         body_format: json
         status_code: 201

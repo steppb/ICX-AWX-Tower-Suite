@@ -45,6 +45,20 @@
       when: vars[AwxDhcpCfgKey] is defined
   when: GetZtpInventory.json.count > 0
 
+- name: Store Inventory Config
+  set_fact:
+    OldIpPoolVars:
+      interface: '{{tInvVars.icx_inv_ztp_vars.static_ip_pool.interface|default()}}'
+      subnet: '{{tInvVars.icx_inv_ztp_vars.static_ip_pool.subnet|default()}}'
+      start_ip: '{{tInvVars.icx_inv_ztp_vars.static_ip_pool.start_ip|default()}}'
+      end_ip: '{{tInvVars.icx_inv_ztp_vars.static_ip_pool.end_ip|default()}}'
+      next_ip: '{{tInvVars.icx_inv_ztp_vars.static_ip_pool.next_ip|default()}}'
+    OldHostnameVars:
+      base_name: '{{tInvVars.icx_inv_ztp_vars.hostname_pool.base_name|default()}}'
+      next_name: '{{tInvVars.icx_inv_ztp_vars.hostname_pool.next_name|default()}}'
+    OldPostZtpInv: '{{tInvVars.icx_inv_ztp_vars.post_provisioning_inv|default()}}'
+  vars: {tInvVars: '{{GetZtpInventory.json.results[0].variables|from_yaml}}'}
+
 - name: Create ZTP Inventory
   block:
     - name: Create Inventory
@@ -64,19 +78,25 @@
       set_fact: {InventoryId: '{{NewInventory.json.id}}'}
   when: GetZtpInventory.json.count == 0
 
-- name: Update Inventory Config
-  uri:
-    url: '{{AwxApi}}/inventories/{{InventoryId}}/'
-    method: PATCH
-    headers: {Content-Type: 'application/json'}
-    body:
-      variables: >-
-        icx_inv_ztp_vars:
-          provisioning_vars:
-            default_pass: '{{ProvisioningVars.provisioning_pass|default(ZtpDefPassword)}}'
-            workflow: '{{ProvisioningVars.provisioning_workflow|default()}}'
-            awx_api_cb: '{{ProvisioningVars.awx_api_cb|default(AwxApi)}}'
-    body_format: json
+- name: Create Post-ZTP Inventory
+  block:
+    - name: Check for Existing Post-ZTP Inventory
+      uri: {url: '{{AwxApi}}/inventories/?name={{prompt_ztp_postztp_inv|urlencode}}'}
+      register: GetPostZtpInventory
+
+    - name: Create Inventory
+      uri:
+        url: '{{AwxApi}}/inventories/'
+        method: POST
+        headers: {Content-Type: "application/json"}
+        body:
+          name: '{{prompt_ztp_postztp_inv}}'
+          description: ''
+          organization: '{{ZtpParams.OrgId}}'
+        body_format: json
+        status_code: 201
+      when: GetPostZtpInventory.json.count == 0
+  when: prompt_ztp_postztp_inv is defined
 
 - name: Configure DHCP
   block:
@@ -169,3 +189,144 @@
   when:
     - prompt_ztp_dhcp_subnet is defined
     - prompt_ztp_dhcp_range is defined
+
+- name: Configure Static IP Pool
+  block:
+    - name: IP Pool - Reformat Subnet if Needed
+      set_fact: {IpPoolSubnet: "{{prompt_ztp_ippool_subnet|ipaddr('network/prefix')}}"}
+
+    - name: Check Subnet
+      block:
+        - name: IP Pool - Ensure Proper Subnet Provided
+          debug:
+            msg: "WARNING: Subnet {{prompt_ztp_ippool_subnet}} is improperly formatted"
+
+        - name: IP Pool - Set Skip Flag - Subnet Format Error
+          set_fact: {SkipIpPool: true}
+      when: not IpPoolSubnet|ipaddr('bool')
+
+    - name: Check Range
+      block:
+        - name: IP Pool - Ensure Range IP Addresses are in Subnet
+          debug: {msg: "WARNING: IP Range is outside of subnet {{IpPoolSubnet}}"}
+
+        - name: IP Pool - Set Skip Flag - Range Outside of Subnet
+          set_fact: {SkipIpPool: true}
+      when:
+        - not PromptIpPoolRangeLow|ipaddr(IpPoolSubnet)|ipaddr('bool')
+        - not PromptIpPoolRangeHigh|ipaddr(IpPoolSubnet)|ipaddr('bool')
+
+    - name: IP Pool - Set Range Variables
+      set_fact:
+        IpPoolStart: '{{PromptIpPoolRangeLow}}'
+        IpPoolEnd: '{{PromptIpPoolRangeHigh}}'
+      when: PromptIpPoolRangeHigh is version(PromptIpPoolRangeLow, '>')
+
+    - name: IP Pool - Set Range Variables (Reordered)
+      set_fact:
+        IpPoolStart: '{{PromptIpPoolRangeHigh}}'
+        IpPoolEnd: '{{PromptIpPoolRangeLow}}'
+      when:
+        - IpPoolStart is not defined
+        - IpPoolEnd is not defined
+
+    - name: IP Pool - Check IP Pool Interface
+      set_fact: {IpPoolInt: "{{prompt_ztp_ippool_int|default('')}}"}
+
+    - name: IP Pool - Grab Current DHCP Config
+      set_fact: {AwxDhcpConfig: '{{vars[AwxDhcpCfgKey]}}'}
+      when: vars[AwxDhcpCfgKey] is defined
+
+    - name: Check for DHCP Overlap
+      block:
+        - name: Check Start IP for DHCP Overlap
+          block:
+            - name: IP Pool - Warning
+              debug:
+                msg:
+                  - "WARNING: {{IpPoolStart}} overlaps with DHCP Range:"
+                  - " {{AwxDhcpConfig.start_ip}} - {{AwxDhcpConfig.end_ip}}"
+
+            - name: IP Pool - Set Skip Flag - Start IP and DHCP Overlap
+              set_fact: {SkipIpPool: true}
+          when:
+            - IpPoolStart is version(AwxDhcpConfig.ip_pool.start_ip, '>=')
+            - IpPoolStart is version(AwxDhcpConfig.ip_pool.end_ip, '<=')
+
+        - name: Check End IP for DHCP Overlap
+          block:
+            - name: IP Pool - Warning
+              debug:
+                msg:
+                  - "WARNING: {{IpPoolEnd}} overlaps with DHCP Range:"
+                  - " {{AwxDhcpConfig.start_ip}} - {{AwxDhcpConfig.end_ip}}"
+
+            - name: IP Pool - Set Skip Flag - End IP and DHCP Overlap
+              set_fact: {SkipIpPool: true}
+          when:
+            - IpPoolEnd is version(AwxDhcpConfig.ip_pool.start_ip, '>=')
+            - IpPoolEnd is version(AwxDhcpConfig.ip_pool.end_ip, '<=')
+
+        - name: IP Pool - Configure Ip Interface Overwrite
+          set_fact: {IpPoolInt: ''}
+      when: IpPoolStart|ipaddr(AwxDhcpConfig.subnet)|ipaddr('bool')
+
+    - name: IP Pool - Set Skip Flag - No Config Change
+      set_fact: {SkipIpPool: true}
+      when:
+        - OldIpPoolVars is defined
+        - OldIpPoolVars.interface == IpPoolInt
+        - OldIpPoolVars.subnet == IpPoolSubnet
+        - OldIpPoolVars.start_ip == IpPoolStart
+        - OldIpPoolVars.end_ip == IpPoolEnd
+
+    - name: IP Pool - Check for Skip Condition
+      debug: {msg: "Skipping creation of static IP pool"}
+      when: SkipIpPool is defined
+
+    - name: IP Pool - Prepare Config
+      set_fact:
+        NewIpPoolVars:
+          interface: '{{IpPoolInt}}'
+          subnet: '{{IpPoolSubnet}}'
+          start_ip: '{{IpPoolStart}}'
+          end_ip: '{{IpPoolEnd}}'
+          next_ip: '{{IpPoolStart}}'
+      when: SkipIpPool is not defined
+  vars:
+    PromptIpPoolRangeLow: '{{prompt_ztp_ippool_range.split("-")[0]}}'
+    PromptIpPoolRangeHigh: '{{prompt_ztp_ippool_range.split("-")[1]}}'
+  when:
+    - prompt_ztp_ippool_subnet is defined
+    - prompt_ztp_ippool_range is defined
+
+- name: Hostname Pool - Prepare Config
+  set_fact:
+    NewHostnameVars:
+      base_name: '{{prompt_ztp_hostname_base}}'
+      next_name: '{{prompt_ztp_hostname_base}}01'
+  when: prompt_ztp_hostname_base is defined
+
+- name: Update Inventory Config
+  uri:
+    url: '{{AwxApi}}/inventories/{{InventoryId}}/'
+    method: PATCH
+    headers: {Content-Type: 'application/json'}
+    body:
+      variables: >-
+        icx_inv_ztp_vars:
+          provisioning_vars:
+            default_pass: '{{ProvisioningVars.default_pass|default(ZtpDefPassword)}}'
+            workflow: '{{ProvisioningVars.workflow|default()}}'
+            awx_api_cb: '{{AwxApi}}'
+          static_ip_pool:
+            interface: '{{NewIpPoolVars.interface|default(OldIpPoolVars.interface)}}'
+            subnet: '{{NewIpPoolVars.subnet|default(OldIpPoolVars.subnet)}}'
+            start_ip: '{{NewIpPoolVars.start_ip|default(OldIpPoolVars.start_ip)}}'
+            end_ip: '{{NewIpPoolVars.end_ip|default(OldIpPoolVars.end_ip)}}'
+            next_ip: '{{NewIpPoolVars.next_ip|default(OldIpPoolVars.next_ip)}}'
+          hostname_pool:
+            base_name: '{{NewHostnameVars.base_name|default(OldHostnameVars.base_name)}}'
+            next_name: '{{NewHostnameVars.next_name|default(OldHostnameVars.next_name)}}'
+          post_provisioning_inv: '{{prompt_ztp_postztp_inv|default(OldPostZtpInv)}}'
+    body_format: json

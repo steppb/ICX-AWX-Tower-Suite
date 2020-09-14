@@ -1,0 +1,244 @@
+#! AwxMgmtIgnore
+---
+- hosts: all
+  connection: local
+  gather_facts: no
+  module_defaults:
+    uri:
+      validate_certs: '{{template_validate_certs|default("no")}}'
+      method: PATCH
+      user: '{{awxlogin_user}}'
+      password: '{{awxlogin_pass}}'
+      force_basic_auth: yes
+      timeout: 60
+  vars:
+    NewlineVar: "\r"
+    ErrParse: '^.*ConnectionError: '
+    ZtpIpCfg: '{{icx_inv_ztp_vars.static_ip_pool}}'
+    ZtpHostCfgBase: '{{icx_inv_ztp_vars.hostname_pool.base_name|default("null", true)}}'
+    ZtpHostCfgNext: '{{icx_inv_ztp_vars.hostname_pool.next_name|default("null", true)}}'
+    PostZtpInv: '{{icx_inv_ztp_vars.post_provisioning_inv|default("null", true)}}'
+    PortVar: '([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2})'
+    AwxApi: '{{icx_inv_ztp_vars.provisioning_vars.awx_api_cb}}'
+
+  tasks:
+  - name: Get Info for Current Host
+    uri: {url: '{{AwxApi}}/hosts/?name={{inventory_hostname|urlencode}}', method: GET}
+    register: HostInfo
+
+  - name: Store Host ID
+    set_fact: {HostId: '{{HostInfo.json.results[0].id}}'}
+
+  - name: Store Host IP Address
+    set_fact: {HostIp: '{{ansible_host}}'}
+
+  - name: Store Hostname
+    set_fact: {HostName: '{{inventory_hostname}}'}
+
+  - name: Store Host Description
+    set_fact: {HostDesc: '{{HostInfo.json.results[0].description}}'}
+
+  - name: Check for Static IP Configuration
+    set_fact: {SkipStaticIpCfg: true}
+    when: ZtpIpCfg.start_ip is not defined or ZtpIpCfg.start_ip == ''
+
+  - name: Check for Previous Static IP Configuration
+    set_fact: {SkipStaticIpCfg: true}
+    when:
+      - SkipStaticIpCfg is not defined
+      - ansible_host is version(ZtpIpCfg.start_ip, '>=')
+      - ansible_host is version(ZtpIpCfg.end_ip, '<=')
+
+  - name: Hostname Configuration
+    block:
+    - name: Configure Hostname
+      icx_config:
+        lines: hostname {{ZtpHostCfgNext}}
+        save_when: changed
+      failed_when: false
+      register: IcxStatus
+      connection: network_cli
+      vars:
+        ansible_network_os: icx
+        ansible_become: true
+        ansible_become_method: enable
+
+    - name: Parse Switch Error
+      set_fact:
+        ErrMsg: "{{IcxStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+      when:
+        - IcxStatus.rc is defined
+        - IcxStatus.rc == 1
+
+    - name: Display Switch Error
+      assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(NewlineVar)}}'}
+      when: ErrMsg is defined
+
+    - name: Update AWX Host Name
+      uri:
+        url: '{{AwxApi}}/hosts/{{HostId}}/'
+        headers: {Content-Type: 'application/json'}
+        body: {name: '{{ZtpHostCfgNext}}'}
+        body_format: json
+
+    - name: Store New Hostname
+      set_fact: {HostName: '{{ZtpHostCfgNext}}'}
+
+    - name: Get Hostname IDs
+      set_fact: {HostNum: '{{ZtpHostCfgNext|regex_replace(ZtpHostCfgBase)}}'}
+
+    - name: Save New Hostname (One Digit ID)
+      set_fact: {NewHostName: '{{ZtpHostCfgBase}}{{HostNum + 1}}'}
+      when: HostNum|length == 1
+
+    - name: Save New Hostname (Two Digit ID)
+      set_fact: {NewHostName: '{{ZtpHostCfgBase}}{{"%02d"|format(HostNum|int + 1)}}'}
+      when: HostNum|length == 2
+
+    - name: Save New Hostname (Three Digit ID)
+      set_fact: {NewHostName: '{{ZtpHostCfgBase}}{{"%03d"|format(HostNum|int + 1)}}'}
+      when: HostNum|length == 3
+
+    - name: Save New Hostname (Four Digit ID)
+      set_fact: {NewHostName: '{{ZtpHostCfgBase}}{{"%04d"|format(HostNum|int + 1)}}'}
+      when: HostNum|length == 4
+
+    - name: Set Change Flag
+      set_fact: {HostCfgChange: true}
+    when:
+      - ZtpHostCfgBase != 'null'
+      - ZtpHostCfgNext != 'null'
+      - ZtpHostCfgBase in ZtpHostCfgNext
+      - ZtpHostCfgBase not in inventory_hostname
+
+  - name: Static IP Pool
+    block:
+      - name: Find Current Management Interface
+        icx_command:
+          commands: show ip interface | include {{ansible_host}}
+        register: IpIntInfo
+        connection: network_cli
+        vars:
+          ansible_network_os: icx
+          ansible_become: true
+          ansible_become_method: enable
+
+      - name: Set Interface Values
+        set_fact:
+          DynInt: '{{"mana1" if DynIntMgmt else DynPortNum}}'
+          StaticInt: '{{"mana1" if StaticIntMgmt else StaticPortNum}}'
+        vars:
+          DynIntMgmt: '{{IpIntInfo.stdout[0].split(" ")[1]|regex_search("^m") == "m"}}'
+          DynPortNum: '{{IpIntInfo.stdout[0].split(" ")[1]}}'
+          StaticIntMgmt: '{{ZtpIpCfg.interface|regex_search("^m") == "m"}}'
+          StaticPortNum: '{{ZtpIpCfg.interface|regex_search(PortVar)}}'
+
+      - name: Apply Static IP Configuration
+        icx_config:
+          lines: ip address {{ZtpIpCfg.next_ip}} {{ZtpIpCfg.subnet|ipaddr("netmask")}}
+          parents: int {{StaticInt|default(DynInt, true)}}
+          save_when: changed
+        failed_when: false
+        register: IcxStatus
+        connection: network_cli
+        vars:
+          ansible_network_os: icx
+          ansible_become: true
+          ansible_become_method: enable
+
+      - name: Parse Switch Error
+        set_fact:
+          ErrMsg: "{{IcxStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+        when:
+          - IcxStatus.rc is defined
+          - IcxStatus.rc == 1
+          - "'timeout value' not in IcxStatus.module_stderr"
+
+      - name: Display Switch Error
+        assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(NewlineVar)}}'}
+        when: ErrMsg is defined
+
+      - name: Write Memory if IP Address Replaced
+        icx_config:
+          lines: write mem
+        connection: network_cli
+        vars:
+          ansible_host: '{{ZtpIpCfg.next_ip}}'
+          ansible_network_os: icx
+          ansible_become: true
+          ansible_become_method: enable
+        when:
+          - IcxStatus.rc is defined
+          - IcxStatus.rc == 1
+          - "'timeout value' in IcxStatus.module_stderr"
+
+      - name: Update AWX Host IP Address
+        uri:
+          url: '{{AwxApi}}/hosts/{{HostId}}/'
+          headers: {Content-Type: 'application/json'}
+          body:
+            variables: >-
+              ansible_host: '{{ZtpIpCfg.next_ip}}'
+          body_format: json
+
+      - name: Store New Host IP Address
+        set_fact: {HostIp: '{{ZtpIpCfg.next_ip}}'}
+
+      - name: Increment Next Static IP
+        set_fact: {NextStaticIp: '{{ZtpIpCfg.next_ip|ipmath(1)}}'}
+
+      - name: Set Config Change Flag
+        set_fact: {HostCfgChange: true}
+    when: SkipStaticIpCfg is not defined
+
+  - name: Update Inventory Variables
+    uri:
+      url: '{{AwxApi}}/inventories/{{awx_inventory_id}}/'
+      headers: {Content-Type: 'application/json'}
+      body:
+        variables: >-
+          icx_inv_ztp_vars:
+            provisioning_vars:
+              default_pass: '{{icx_inv_ztp_vars.provisioning_vars.default_pass}}'
+              workflow: '{{icx_inv_ztp_vars.provisioning_vars.workflow}}'
+              awx_api_cb: '{{icx_inv_ztp_vars.provisioning_vars.awx_api_cb}}'
+            static_ip_pool:
+              interface: '{{icx_inv_ztp_vars.static_ip_pool.interface}}'
+              subnet: '{{icx_inv_ztp_vars.static_ip_pool.subnet}}'
+              start_ip: '{{icx_inv_ztp_vars.static_ip_pool.start_ip}}'
+              end_ip: '{{icx_inv_ztp_vars.static_ip_pool.end_ip}}'
+              next_ip: '{{NextStaticIp|default(ZtpIpCfg.next_ip)}}'
+            hostname_pool:
+              base_name: '{{ZtpHostCfgBase}}'
+              next_name: '{{NewHostName|default(ZtpHostCfgNext)}}'
+            post_provisioning_inv: '{{icx_inv_ztp_vars.post_provisioning_inv}}'
+      body_format: json
+    when: HostCfgChange is defined
+
+  - name: Switch Host to Post-Provisioning Inventory
+    block:
+    - name: Get Post-Provisioning Inventory ID
+      uri: {url: '{{AwxApi}}/inventories/?name={{PostZtpInv|urlencode}}', method: GET}
+      register: PostZtpInvInfo
+
+    - name: Get 'Provisioning-Inventory-Swap Template ID
+      uri: {url: '{{AwxApi}}/job_templates/?name=Provisioning-Inventory-Swap', method: GET}
+      register: PostZtpTemplateInfo
+
+    - name: Launch Inventory Swap Template
+      uri:
+        url: '{{AwxApi}}/job_templates/{{PostZtpTemplateInfo.json.results[0].id}}/launch/'
+        method: POST
+        headers: {Content-Type: "application/json"}
+        body:
+          extra_vars: >-
+            template_inv_swap_vars:
+              host_id: '{{HostId}}'
+              awx_api: '{{AwxApi}}'
+              name: '{{HostName}}'
+              description: '{{HostDesc}}'
+              inventory: '{{PostZtpInvInfo.json.results[0].id}}'
+              ansible_host: '{{HostIp}}'
+        body_format: json
+        status_code: 201
+    when: PostZtpInv != 'null'

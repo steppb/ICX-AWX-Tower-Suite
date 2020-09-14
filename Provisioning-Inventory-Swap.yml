@@ -1,0 +1,35 @@
+#! AwxMgmtIgnore
+---
+- hosts: all
+  connection: local
+  gather_facts: no
+  module_defaults:
+    uri:
+      validate_certs: '{{template_validate_certs|default("no")}}'
+      user: '{{awxlogin_user}}'
+      password: '{{awxlogin_pass}}'
+      force_basic_auth: yes
+      timeout: 60
+  vars:
+    JobVars: '{{template_inv_swap_vars}}'
+
+  tasks:
+  - name: Remove Host from Provisioning Inventory
+    uri:
+      url: '{{JobVars.awx_api}}/hosts/{{JobVars.host_id}}/'
+      method: DELETE
+      status_code: 204
+
+  - name: Add Host to Post-Provisioning Inventory
+    uri:
+      url: '{{JobVars.awx_api}}/hosts/'
+      method: POST
+      headers: {Content-Type: "application/json"}
+      body:
+        name: '{{JobVars.name}}'
+        description: '{{JobVars.description}}'
+        inventory: '{{JobVars.inventory}}'
+        variables: >-
+          ansible_host: '{{JobVars.ansible_host}}'
+      body_format: json
+      status_code: 201
