@@ -8,7 +8,7 @@
     - PInfo.packages.pip3.netaddr is not defined
 
 - name: Attempt to Install ISC-DHCP-Server
-  apt: {name: isc-dhcp-server}
+  apt: {name: isc-dhcp-server, update_cache: yes}
   register: DhcpInstallStatus
   vars: {ansible_become: true, ansible_become_method: sudo}
 
