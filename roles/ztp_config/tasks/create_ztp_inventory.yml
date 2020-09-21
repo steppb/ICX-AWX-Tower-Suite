@@ -57,7 +57,7 @@
       base_name: '{{tInvVars.icx_inv_ztp_vars.hostname_pool.base_name|default()}}'
       next_name: '{{tInvVars.icx_inv_ztp_vars.hostname_pool.next_name|default()}}'
     OldPostZtpInv: '{{tInvVars.icx_inv_ztp_vars.post_provisioning_inv|default()}}'
-  vars: {tInvVars: '{{GetZtpInventory.json.results[0].variables|from_yaml}}'}
+  vars: {tInvVars: '{{GetZtpInventory.json.results[0].variables|from_yaml|default()}}'}
 
 - name: Create ZTP Inventory
   block:
