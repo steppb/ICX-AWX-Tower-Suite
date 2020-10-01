@@ -4,6 +4,8 @@ AuthToken={{AuthToken}}
 ClientIP=$1
 ClientName=$2
 InventoryName=$3
+ClientMac=$4
+Description="$ClientName($ClientMac)"
 
 # Get the 'Provisioning' Inventory ID
 InventoryID=$(curl -s -k -H "Authorization: Bearer $AuthToken" \
@@ -13,7 +15,7 @@ InventoryID=$(curl -s -k -H "Authorization: Bearer $AuthToken" \
 # Verify if device exists in Provisioning Inventory
 number_re='^[0-9]+$'
 rc=$(curl -s -k -H "Authorization: Bearer $AuthToken" \
-        -X GET https://localhost/api/v2/hosts/?name=$ClientIP |\
+        -X GET https://localhost/api/v2/hosts/?description__contains=$ClientMac |\
         sed 's/^.*results\":\[{\"id\":\([0-9]*\).*/\1/g')
 
 # Add Device to Provisioning Inventory in AWX
@@ -23,7 +25,7 @@ if ! [[ $rc =~ $number_re ]] ; then
              -H "Content-Type: application/json" -X POST -d '{
                 "variables":"---\nansible_host: '$ClientIP'",
                 "name":"'$ClientIP'",
-                "description":"'$ClientName'",
+                "description":"'$Description'",
                 "inventory":"'$InventoryID'"
             }' https://localhost/api/v2/hosts/
 else
