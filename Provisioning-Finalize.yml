@@ -18,7 +18,7 @@
     ZtpHostCfgBase: '{{icx_inv_ztp_vars.hostname_pool.base_name|default("null", true)}}'
     ZtpHostCfgNext: '{{icx_inv_ztp_vars.hostname_pool.next_name|default("null", true)}}'
     PostZtpInv: '{{icx_inv_ztp_vars.post_provisioning_inv|default("null", true)}}'
-    PortVar: '([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2})'
+    PortVar: '(^e.*[0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}|^ve.*[0-9]{1,4})'
     AwxApi: '{{icx_inv_ztp_vars.provisioning_vars.awx_api_cb}}'
 
   tasks:
@@ -26,14 +26,11 @@
     uri: {url: '{{AwxApi}}/hosts/?name={{inventory_hostname|urlencode}}', method: GET}
     register: HostInfo
 
-  - name: Store Host ID
-    set_fact: {HostId: '{{HostInfo.json.results[0].id}}'}
+  - {name: Store Host ID, set_fact: {HostId: '{{HostInfo.json.results[0].id}}'}}
 
-  - name: Store Host IP Address
-    set_fact: {HostIp: '{{ansible_host}}'}
+  - {name: Store Host IP Address, set_fact: {HostIp: '{{ansible_host}}'}}
 
-  - name: Store Hostname
-    set_fact: {HostName: '{{inventory_hostname}}'}
+  - {name: Store Hostname, set_fact: {HostName: '{{inventory_hostname}}'}}
 
   - name: Store Host Description
     set_fact: {HostDesc: '{{HostInfo.json.results[0].description}}'}
@@ -81,8 +78,7 @@
         body: {name: '{{ZtpHostCfgNext}}'}
         body_format: json
 
-    - name: Store New Hostname
-      set_fact: {HostName: '{{ZtpHostCfgNext}}'}
+    - {name: Store New Hostname, set_fact: {HostName: '{{ZtpHostCfgNext}}'}}
 
     - name: Get Hostname IDs
       set_fact: {HostNum: '{{ZtpHostCfgNext|regex_replace(ZtpHostCfgBase)}}'}
@@ -114,14 +110,9 @@
   - name: Static IP Pool
     block:
       - name: Find Current Management Interface
-        icx_command:
-          commands: show ip interface | include {{ansible_host}}
+        icx_command: {commands: 'show ip interface | include {{ansible_host}}'}
         register: IpIntInfo
         connection: network_cli
-        vars:
-          ansible_network_os: icx
-          ansible_become: true
-          ansible_become_method: enable
 
       - name: Set Interface Values
         set_fact:
@@ -141,10 +132,6 @@
         failed_when: false
         register: IcxStatus
         connection: network_cli
-        vars:
-          ansible_network_os: icx
-          ansible_become: true
-          ansible_become_method: enable
 
       - name: Parse Switch Error
         set_fact:
@@ -159,18 +146,21 @@
         when: ErrMsg is defined
 
       - name: Write Memory if IP Address Replaced
-        icx_config:
-          lines: write mem
+        icx_config: {lines: write mem}
         connection: network_cli
-        vars:
-          ansible_host: '{{ZtpIpCfg.next_ip}}'
-          ansible_network_os: icx
-          ansible_become: true
-          ansible_become_method: enable
+        failed_when: false
+        register: ReIpStatus
+        vars: {ansible_host: '{{ZtpIpCfg.next_ip}}'}
         when:
           - IcxStatus.rc is defined
           - IcxStatus.rc == 1
           - "'timeout value' in IcxStatus.module_stderr"
+
+      - name: Set Error Message
+        set_fact: {ErrMsg: "ERROR: Device unreachable after replacing IP address"}
+        when:
+          - ReIpStatus.rc is defined
+          - ReIpStatus.rc == 1
 
       - name: Update AWX Host IP Address
         uri:
@@ -181,14 +171,16 @@
               ansible_host: '{{ZtpIpCfg.next_ip}}'
           body_format: json
 
-      - name: Store New Host IP Address
-        set_fact: {HostIp: '{{ZtpIpCfg.next_ip}}'}
+      - {name: Store New Host IP Address, set_fact: {HostIp: '{{ZtpIpCfg.next_ip}}'}}
 
       - name: Increment Next Static IP
         set_fact: {NextStaticIp: '{{ZtpIpCfg.next_ip|ipmath(1)}}'}
 
-      - name: Set Config Change Flag
-        set_fact: {HostCfgChange: true}
+      - {name: Set Config Change Flag, set_fact: {HostCfgChange: true}}
+    vars:
+      ansible_network_os: icx
+      ansible_become: true
+      ansible_become_method: enable
     when: SkipStaticIpCfg is not defined
 
   - name: Update Inventory Variables
@@ -221,7 +213,7 @@
       uri: {url: '{{AwxApi}}/inventories/?name={{PostZtpInv|urlencode}}', method: GET}
       register: PostZtpInvInfo
 
-    - name: Get 'Provisioning-Inventory-Swap Template ID
+    - name: Get 'Provisioning-Inventory-Swap' Template ID
       uri: {url: '{{AwxApi}}/job_templates/?name=Provisioning-Inventory-Swap', method: GET}
       register: PostZtpTemplateInfo
 
@@ -242,3 +234,7 @@
         body_format: json
         status_code: 201
     when: PostZtpInv != 'null'
+
+  - name: Display Error Message
+    debug: var=ErrMsg
+    when: ErrMsg is defined
