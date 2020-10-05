@@ -180,6 +180,7 @@
           set_fact:
             ansible_ztp_inventories: "{{ZtpInvList}}"
             cacheable: true
+          when: AwxZtpInvFound is not defined
       when: SkipDhcpCfg is not defined
   vars:
     PromptDhcpRangeLow: '{{prompt_ztp_dhcp_range.split("-")[0]}}'
