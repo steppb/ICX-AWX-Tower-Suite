@@ -13,8 +13,8 @@
       force_basic_auth: yes
       timeout: 60
   vars:
-    AwxMgmtVer: 1.3
-    TemplateVersion: '{{template_version|default(0)}}'
+    AwxMgmtVer: 1.4
+    ServerVersion: '{{ansible_icx_mgmt_ver|default(0)}}'
     AwxApi: https://{{ansible_host}}/api/v2
     YamlExt: '.yml'
     NewlineVar: '\\\\n'

@@ -1,74 +1,90 @@
 ---
-- name: Debug
-  debug: msg="Updating template '{{PbFileName|regex_replace(YamlExt)}}'"
+- name: Store Version from Template
+  set_fact: {TemplateVer: '{{ExtraVars|regex_replace("\n")|regex_replace(tVerStr, "\2")}}'}
+  vars: {tVerStr: '^.*(playbook|template)_version: ([0-9].[0-9]).*$'}
 
-- name: Get Playbook Descriptions
-  shell: grep '{{DescRegex}}' {{PjPath}}/{{PbFileName}} | sed 's/{{DescRegex}}//g'
-  register: description
-  changed_when: false
-  failed_when: false
-  vars: {DescRegex: '#! Description: '}
-
-- name: Get Playbook Version
-  shell: cat {{PjPath}}/{{PbFileName}} | grep '^#! PlaybookVersion'
-  register: PbVer
-  changed_when: false
-  failed_when: false
-
-- name: Get Playbook Comments
-  shell: cat {{PjPath}}/{{PbFileName}} | grep '^# '
-  changed_when: false
-  failed_when: false
-  register: ExtraVar
-
-- name: Add Playbook Description and Comments
-  uri:
-    url: '{{AwxApi}}/job_templates/{{TemplateId}}/'
-    method: PATCH
-    headers: {Content-Type: "application/json"}
-    body:
-      description: '{{description.stdout_lines[0]|default("")}}'
-      extra_vars: >-
-        playbook_version: {{PbVer.stdout|regex_replace(PbVerRegex)}}
-
-        {{ExtraVar.stdout}}
-    body_format: json
-  vars: {PbVerRegex: '^#! PlaybookVersion: '}
-
-- name: Scrape Playbook Prompts
-  shell: "grep '^#! Prompt' {{PjPath}}/{{PbFileName}} | sed 's/^.*Prompt: //g'"
-  failed_when: false
-  changed_when: false
-  register: RawPrompts
-
-- name: Add Survey Prompts
+- name: Update Templates
   block:
-    - name: Prepare Survey Prompt Payload
-      set_fact:
-        PromptPayload:
-          name: ''
-          description: ''
-          spec: "{{tPrompt|regex_replace(NewlineVar, '\\\\n')}}"
-      vars: {tPrompt: '{{RawPrompts.stdout_lines[0]|from_yaml}}'}
+  - name: Debug
+    debug: msg="Updating template '{{PbFileName|regex_replace(YamlExt)}}'"
 
-    - name: Add Survey Prompts
-      uri:
-        url: '{{AwxApi}}/job_templates/{{TemplateId}}/survey_spec/'
-        method: POST
-        headers: {Content-Type: "application/json"}
-        body: "{{tPromptPayload|regex_replace('@question','?')}}"
-        body_format: json
-      register: PromptStatus
-      vars: {tPromptPayload: "{{PromptPayload|regex_replace('@colon', ':')}}"}
+  - name: Get Playbook Descriptions
+    shell: grep '{{DescRegex}}' {{PjPath}}/{{PbFileName}} | sed 's/{{DescRegex}}//g'
+    register: description
+    changed_when: false
+    failed_when: false
+    vars: {DescRegex: '#! Description: '}
 
-    - name: Enable Survey Prompts
-      uri:
-        url: '{{AwxApi}}/job_templates/{{TemplateId}}/'
-        method: PATCH
-        headers: {Content-Type: "application/json"}
-        body: {survey_enabled: true}
-        body_format: json
-      when:
-        - PromptStatus.status is defined
-        - PromptStatus.status == 200
-  when: RawPrompts.stdout_lines[0] is defined
+  - name: Get Playbook Comments
+    shell: cat {{PjPath}}/{{PbFileName}} | grep '^# '
+    changed_when: false
+    failed_when: false
+    register: PlaybookComments
+
+  - name: Add Description to Template
+    uri:
+      url: '{{AwxApi}}/job_templates/{{TemplateId}}/'
+      method: PATCH
+      headers: {Content-Type: "application/json"}
+      body: {description: '{{description.stdout_lines[0]|default("")}}'}
+      body_format: json
+
+  - name: Scrape Playbook Prompts
+    shell: "grep '^#! Prompt' {{PjPath}}/{{PbFileName}} | sed 's/^.*Prompt: //g'"
+    failed_when: false
+    changed_when: false
+    register: RawPrompts
+
+  - name: Add Survey Prompts
+    block:
+      - name: Prepare Survey Prompt Payload
+        set_fact:
+          PromptPayload:
+            name: ''
+            description: ''
+            spec: "{{tPrompt|regex_replace(NewlineVar, '\\\\n')}}"
+        vars: {tPrompt: '{{RawPrompts.stdout_lines[0]|from_yaml}}'}
+
+      - name: Add Survey Prompts
+        uri:
+          url: '{{AwxApi}}/job_templates/{{TemplateId}}/survey_spec/'
+          method: POST
+          headers: {Content-Type: "application/json"}
+          body: "{{tPromptPayload|regex_replace('@question','?')}}"
+          body_format: json
+        register: PromptStatus
+        vars: {tPromptPayload: "{{PromptPayload|regex_replace('@colon', ':')}}"}
+
+      - name: Enable Survey Prompts
+        uri:
+          url: '{{AwxApi}}/job_templates/{{TemplateId}}/'
+          method: PATCH
+          headers: {Content-Type: "application/json"}
+          body: {survey_enabled: true}
+          body_format: json
+        when:
+          - PromptStatus.status is defined
+          - PromptStatus.status == 200
+    when: RawPrompts.stdout_lines[0] is defined
+
+  - name: Add Prompt for Limit (v1.4 Update)
+    uri:
+      url: '{{AwxApi}}/job_templates/{{TemplateId}}/'
+      method: PATCH
+      headers: {Content-Type: "application/json"}
+      body: {ask_limit_on_launch: true}
+      body_format: json
+    when: TemplateVer is version(1.4, "<")
+
+  - name: Add Comments and Version to Template
+    uri:
+      url: '{{AwxApi}}/job_templates/{{TemplateId}}/'
+      method: PATCH
+      headers: {Content-Type: "application/json"}
+      body:
+        extra_vars: >-
+          template_version: {{AwxMgmtVer}}
+
+          {{PlaybookComments.stdout}}
+      body_format: json
+  when: TemplateVer is version(AwxMgmtVer, "<")

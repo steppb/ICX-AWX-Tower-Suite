@@ -32,14 +32,14 @@
       description: ''
       spec:
       - question_name: 'Template management function:'
-        required: true
+        required: false
         type: multiplechoice
         variable: prompt_mgmt_role
         choices: |-
           Create/Update Templates
           Remove Templates
       - question_name: 'Project:'
-        required: true
+        required: false
         type: multiplechoice
         variable: prompt_project_name
         choices: '{{ProjectList|regex_replace("@NL@","\n")|default("")}}'
@@ -57,25 +57,23 @@
     url: '{{AwxApi}}/job_templates/{{awx_job_template_id}}/'
     method: PATCH
     headers: {Content-Type: "application/json"}
-    body: {extra_vars: 'template_version: {{AwxMgmtVer}}', survey_enabled: true}
+    body: {extra_vars: , survey_enabled: true, use_fact_cache: true}
     body_format: json
 
-- name: Update Template Version
+- name: Display Update Message and Exit
   block:
-    - name: Update Template Version
-      uri:
-        url: '{{AwxApi}}/job_templates/{{awx_job_template_id}}/'
-        method: PATCH
-        headers: {Content-Type: "application/json"}
-        body: {extra_vars: 'template_version: {{AwxMgmtVer}}'}
-        body_format: json
+    - name: Set AWX Management Version
+      set_fact: {ansible_icx_mgmt_ver: '{{AwxMgmtVer}}', cacheable: yes}
 
-    - name: Debug
+    - name: Update Message
       debug:
         msg:
           - "Template updated to version {{AwxMgmtVer}}."
           - "Relaunch template to continue."
 
-    - name: Ending Play
-      meta: end_play
-  when: TemplateVersion is version(AwxMgmtVer, '<')
+    - {name: Ending Play, meta: end_play}
+  vars:
+    NoMgmtPrompt: '{{prompt_mgmt_role is not defined}}'
+    NoPjPrompt: '{{prompt_project_name is not defined}}'
+    TemplateUpdate: '{{ServerVersion is version(AwxMgmtVer, "<")}}'
+  when: TemplateUpdate|bool or NoMgmtPrompt|bool or NoPjPrompt|bool

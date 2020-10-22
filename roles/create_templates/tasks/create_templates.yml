@@ -10,6 +10,7 @@
       playbook: "{{PbFileName}}"
       ask_credential_on_launch: true
       ask_inventory_on_launch: '{{prompt_ask_inventory_on_launch|default(true)}}'
+      ask_limit_on_launch: true
   register: JobTemplate
 
 - name: Create Template
@@ -24,4 +25,4 @@
 
 - name: Update Templates
   include_tasks: update_template.yml
-  vars: {TemplateId: '{{NewJobTemplate.json.id}}'}
+  vars: {TemplateId: '{{NewJobTemplate.json.id}}', ExtraVars: 'template_version: 0.0'}

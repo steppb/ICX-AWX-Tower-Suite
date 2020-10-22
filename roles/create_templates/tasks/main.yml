@@ -46,4 +46,6 @@
   when:
     - AwxMgmtIgnored.results[idx].msg != ''
     - ExistingTemplates.results[idx].json.results[0] is defined
-  vars: {TemplateId: '{{ExistingTemplates.results[idx].json.results[0].id}}'}
+  vars:
+    TemplateId: '{{ExistingTemplates.results[idx].json.results[0].id}}'
+    ExtraVars: '{{ExistingTemplates.results[idx].json.results[0].extra_vars}}'
