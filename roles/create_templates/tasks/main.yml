@@ -11,6 +11,28 @@
     PjId: "{{PjInfo.json.results[0].id}}"
     PjPath: "{{AwxCfg.json.project_base_dir}}/{{PjInfo.json.results[0].local_path}}"
 
+- name: Check if Project Can Be Updated
+  uri: {url: '{{AwxApi}}/projects/{{PjId}}/update/'}
+  register: PjUpdateInfo
+
+- name: Update Project
+  block:
+  - name: Trigger Project Update
+    uri:
+      url: '{{AwxApi}}/projects/{{PjId}}/update/'
+      method: POST
+      headers: {Content-Type: "application/json"}
+      status_code: 202
+    register: PjUpdateRet
+
+  - name: Wait For Project Update Completion
+    uri: {url: '{{AwxApi}}/project_updates/{{PjUpdateRet.json.id}}/'}
+    register: PjUpdateStatus
+    until: PjUpdateStatus.json.status != "running"
+    retries: 5
+    delay: 10
+  when: PjUpdateInfo.json.can_update|bool
+
 - name: Get Playbook List
   uri: {url: '{{AwxApi}}/projects/{{PjId}}/playbooks/'}
   register: PbList
