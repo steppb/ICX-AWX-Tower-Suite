@@ -1,5 +1,4 @@
 #! Description: Configure RADIUS AAA authentication.
-#! PlaybookVersion: 1.3
 # =====================
 ---
 - hosts: all

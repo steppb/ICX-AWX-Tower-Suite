@@ -1,6 +1,5 @@
 #! Description: Add or modify IPv4/6 ACL.
 #! Prompt: [{question_name: ACL Name@colon, question_description: '', required: true, type: text, variable: prompt_mgmt_aclname, min: 1, max: 1024, default: '', choices: ''}, {question_name: IPv4/6 Address or Range to Permit@colon, question_description: (For range use /xx@comma e.g. 192.168.1.0/24), required: true, type: text, variable: prompt_mgmt_allowip, min: 1, max: 1024, default: '', choices: ''}]
-#! PlaybookVersion: 1.3
 # =====================
 ---
 - hosts: all

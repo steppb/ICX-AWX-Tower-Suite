@@ -1,6 +1,5 @@
 #! Description: Add IPv4/6 SNMPv2 community string.
 #! Prompt: [{question_name: IP Version@colon, question_description: '', required: true, type: multiplechoice, variable: prompt_snmp_ipver, min: null, max: null, default: ipv4, choices: ipv4\nipv6}, {question_name: SNMPv2 Community String@colon, question_description: '', required: true, type: password, variable: prompt_snmp_community, min: 1, max: 32, default: '', choices: ''}, {question_name: SNMPv2 ACL@colon, question_description: (Leave blank to apply deny ACL), required: false, type: text, variable: prompt_snmp_acl, min: 1, max: 1024, default: '', choices: ''}, {question_name: SNMPv2 Server IPv4/6 Address@colon, question_description: '', required: false, type: text, variable: prompt_snmp_host, min: 1, max: 1024, default: '', choices: ''}]
-#! PlaybookVersion: 1.3
 # =====================
 # Note: 'Remote-MGMT-ACLDenyCreate' will need to be applied before running this template
 #       if denying SNMPv2 traffic.

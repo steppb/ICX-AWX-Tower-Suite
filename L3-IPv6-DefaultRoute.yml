@@ -1,6 +1,5 @@
 #! Description: Configure default IPv6 route.
 #! Prompt: [{question_name: Default Router, question_description: Enter IPv6 address of default router@colon, required: true, type: text, variable: template_rtr_defv6rtr, min: 1, max: 1024, default: '', choices: ''}]
-#! PlaybookVersion: 1.3
 # =====================
 ---
 - hosts: all

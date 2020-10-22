@@ -1,6 +1,5 @@
 #! Description: Add or replace SNMPv3 user.
 #! Prompt: [{question_name: SNMPv3 User Name@colon, question_description: '', required: true, type: text, variable: prompt_snmp_user, min: 1, max: 32, default: '', choices: ''}, {question_name: SNMPv3 Group Name@colon, question_description: '', required: true, type: text, variable: prompt_snmp_group, min: 1, max: 32, default: '', choices: ''}, {question_name: Auth@colon, question_description: (SHA), required: true, type: text, variable: prompt_snmp_auth, min: 8, max: 20, default: '', choices: ''}, {question_name: Priv@colon, question_description: (AES), required: true, type: text, variable: prompt_snmp_priv, min: 12, max: 16, default: '', choices: ''}]
-#! PlaybookVersion: 1.3
 # =====================
 ---
 - hosts: all

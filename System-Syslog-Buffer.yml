@@ -1,6 +1,5 @@
 #! Description: Modify syslog buffer length.
 #! Prompt: [{question_name: Syslog Buffer Length@colon, question_description: '', required: true, type: integer, variable: prompt_log_buffer, min: 1, max: 4000, default: '', choices: ''}, {question_name: Reboot After Config@question, question_description: (Configuration will only take effect after reboot), required: false, type: multiplechoice, variable: prompt_log_reload, min: null, max: null, default: 'yes', choices: yes\nno}]
-#! PlaybookVersion: 1.3
 # =====================
 # Note: Change of syslog length will not take affect until after a reboot.
 #       Survey prompt will give this option.

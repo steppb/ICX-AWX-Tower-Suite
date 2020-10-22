@@ -1,6 +1,5 @@
 #! Description: Add a DNS domain and server IPv4/6 address.
 #! Prompt: [{question_name: DNS Domain@colon, question_description: '', required: true, type: text, variable: prompt_dns_domain, min: 1, max: 1024, default: '', choices: ''}, {question_name: DNS Server IPv4/6 Address@colon, question_description: '', required: true, type: text, variable: prompt_dns_server, min: 1, max: 1024, default: '', choices: ''}]
-#! PlaybookVersion: 1.3
 # =====================
 ---
 - hosts: all

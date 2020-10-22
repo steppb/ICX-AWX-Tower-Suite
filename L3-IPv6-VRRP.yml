@@ -1,6 +1,5 @@
 #! Description: Add or modify VRRPv3 VRID on interface.
 #! Prompt: [{question_name: Interface@colon, question_description: Enter the interface to configure VRRPv3 on@colon (e.g. e1/1/1 or ve20), required: false, type: text, variable: prompt_rtr_vrrpv3_int, min: 1, max: 1024, default: '', choices: ''}, {question_name: VRRPv3 VRID@colon, question_description: '', required: false, type: integer, variable: prompt_rtr_vrrpv3_vrid, min: 1, max: 255, default: '', choices: ''}, {question_name: VRRPv3 Router Mode@colon, question_description: '', required: false, type: multiplechoice, variable: prompt_rtr_vrrpv3_mode, min: null, max: null, default: '', choices: backup\nowner}, {question_name: VRRPv3 IPv6 Address@colon, question_description: '', required: false, type: text, variable: prompt_rtr_vrrpv3_ip, min: 1, max: 1024, default: '', choices: ''}, {question_name: VRRPv3 Priority@colon, question_description: '', required: false, type: integer, variable: prompt_rtr_vrrpv3_priority, min: 1, max: 254, default: '', choices: ''}]
-#! PlaybookVersion: 1.3
 # =====================
 # Note: If template is run on more than one switch, the 'host_icx_int' variable needs to be
 #       defined for each host in the 'VARIABLES' section of the AWX Inventory Host page.

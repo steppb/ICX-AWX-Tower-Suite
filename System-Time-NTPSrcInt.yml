@@ -1,6 +1,5 @@
 #! Description: Configure the source interface for network time queries.
 #! Prompt: [{question_name: Source Interface Type, question_description: Select the interface type@colon, required: false, type: multiplechoice, variable: prompt_ntp_inttype, min: null, max: null, default: '', choices: ethernet\nloopback\nve}, {question_name: Source Interface Number, question_description: Enter the interface number, required: false, type: text, variable: prompt_ntp_intnum, min: 0, max: 1024, default: '', choices: ''}]
-#! PlaybookVersion: 1.3
 # =====================
 # The following variables can be used to set the NTP source interface.
 # They are listed in order of precedence (higher overrides lower).

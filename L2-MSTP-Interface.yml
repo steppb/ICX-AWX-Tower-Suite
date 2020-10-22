@@ -1,6 +1,5 @@
 #! Description: Configure interfaces as MSTP admin-edge or point-to-point ports.
 #! Prompt: [{question_name: MSTP Point-to-Point Interface, question_description: Enter the MSTP Point-to-Point Interface(s). (e.g. e 1/1/1 or e1/1/1 to 1/1/24), required: false, type: text, variable: template_l2_mstp_pt2pt, min: 0, max: 1024, default: '', choices: '', new_question: true}, {question_name: MSTP Edge Interface, question_description: Enter the MSTP Edge Interface(s). (e.g. e1/1/1 or e1/1/1 to 1/1/24), required: false, type: text, variable: template_l2_mstp_edgeint, min: 0, max: 1024, default: '', choices: '', new_question: true}]
-#! PlaybookVersion: 1.3
 # =====================
 # Note: L2-MSTP-Config template needs to be applied before running this template.
 #       Only interfaces in an MSTP VLAN will be added to config.

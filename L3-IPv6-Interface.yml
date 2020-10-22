@@ -1,6 +1,5 @@
 #! Description: Add/Remove/Replace IPv6 address on interface.
 #! Prompt: [{question_name: IP Interface (For single host deployment), question_description: Enter the interface to configure as L3@colon (e.g. ve20 or e1/1/1), required: false, type: text, variable: prompt_rtr_int, min: 1, max: 1024, default: '', choices: ''}, {question_name: IPv6 Address and Mask@colon, question_description: (e.g. fc01@colon@colon1/64), required: false, type: text, variable: prompt_rtr_int_ip, min: 0, max: 1024, default: '', choices: ''}]
-#! PlaybookVersion: 1.3
 # =====================
 # Note: If template is run on more than one switch, the 'host_icx_int' variable needs to be
 #       defined for each host in the 'VARIABLES' section of the AWX Inventory Host page.

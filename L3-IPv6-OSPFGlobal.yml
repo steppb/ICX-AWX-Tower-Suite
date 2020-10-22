@@ -1,6 +1,5 @@
 #! Description: Configure OSPFv3 area.
 #! Prompt: [{question_name: OSPFv3 Area@colon, question_description: '', required: true, type: text, variable: prompt_rtr_ospfv3_area, min: 0, max: 1024, default: '', choices: '', new_question: true}]
-#! PlaybookVersion: 1.3
 # =====================
 ---
 - hosts: all

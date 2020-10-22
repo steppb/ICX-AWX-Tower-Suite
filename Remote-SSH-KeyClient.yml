@@ -1,5 +1,4 @@
 #! Description: Generate SSH client key.
-#! PlaybookVersion: 1.3
 # =====================
 ---
 - hosts: all

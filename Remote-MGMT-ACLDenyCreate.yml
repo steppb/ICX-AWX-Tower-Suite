@@ -1,5 +1,4 @@
 #! Description: Create Deny ACLs for IPv4 and IPv6
-#! PlaybookVersion: 1.3
 # =====================
 # Note: Creates deny ACLs named '86' for IPv4 and 'NoRemoteAccess' for IPv6.
 #       These ACLs are required for other templates that blackhole traffic.

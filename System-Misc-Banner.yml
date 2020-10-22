@@ -1,6 +1,5 @@
 #! Description: Apply DoD login banner.
 #! Prompt: [{question_name: Banner Connection@colon, question_description: '', required: true, type: multiplechoice, variable: prompt_banner_conn, min: null, max: null, default: '', choices: exec\nincoming\nmotd}]
-#! PlaybookVersion: 1.3
 # =====================
 # Note: Running this template applies the following banner to the specified connection:
 # 
