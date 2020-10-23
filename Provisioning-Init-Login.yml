@@ -81,5 +81,8 @@
       url: '{{WorkflowUrl}}/{{ProvisioningWorkflow.json.results[0].id}}/launch/'
       method: POST
       headers: {Content-Type: "application/json"}
+      body:
+        limit: '{{ansible_host}}'
+      body_format: json
       status_code: 201
     when: ProvisioningWorkflow.json.results[0].id is defined

@@ -15,12 +15,14 @@
         description: 'Setup ICX initial login'
         inventory:
         ask_inventory: true
+        ask_limit: true
         playbook: 'Provisioning-Init-Login.yml'
         credentials: '{{RestCredentialList.results}}'
       - name: Provisioning-Finalize
         description: 'Configure static IP and move host to final Inventory'
         inventory:
         ask_inventory: true
+        ask_limit: true
         playbook: 'Provisioning-Finalize.yml'
         ask_credential: true
       - name: Provisioning-Inventory-Swap

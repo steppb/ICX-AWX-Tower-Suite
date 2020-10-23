@@ -20,6 +20,7 @@
           project: '{{ThisTemplate.json.project}}'
           inventory: '{{tTemplateParams.inventory|default(awx_inventory_id)}}'
           playbook: '{{tTemplateParams.playbook|default("ZTP-Install.yml")}}'
+          ask_limit_on_launch: '{{tTemplateParams.ask_limit|default(false)}}'
           ask_inventory_on_launch: '{{tTemplateParams.ask_inventory|default(false)}}'
           ask_credential_on_launch: '{{tTemplateParams.ask_credential|default(false)}}'
           ask_variables_on_launch: '{{tTemplateParams.ask_variables|default(false)}}'
@@ -65,3 +66,16 @@
         body: {survey_enabled: true}
         body_format: json
   when: tTemplateParams.survey_spec is defined
+
+- name: Add Prompt for Limit
+  uri:
+    url: '{{AwxApi}}/job_templates/{{TemplateInfo.id}}/'
+    method: PATCH
+    headers: {Content-Type: 'application/json'}
+    body: {ask_limit_on_launch: true}
+    body_format: json
+  when:
+    - GetTemplateInfo.json.count > 0
+    - not TemplateInfo.ask_limit_on_launch|bool
+    - tTemplateParams.ask_limit is defined
+    - tTemplateParams.ask_limit|bool
