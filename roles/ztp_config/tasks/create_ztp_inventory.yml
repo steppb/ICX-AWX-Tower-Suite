@@ -56,7 +56,6 @@
     OldHostnameVars:
       base_name: '{{tInvVars.icx_inv_ztp_vars.hostname_pool.base_name|default()}}'
       next_name: '{{tInvVars.icx_inv_ztp_vars.hostname_pool.next_name|default()}}'
-    OldPostZtpInv: '{{tInvVars.icx_inv_ztp_vars.post_provisioning_inv|default()}}'
   vars: {tInvVars: '{{GetZtpInventory.json.results[0].variables|from_yaml|default()}}'}
 
 - name: Create ZTP Inventory
@@ -77,26 +76,6 @@
     - name: Store Inventory Id
       set_fact: {InventoryId: '{{NewInventory.json.id}}'}
   when: GetZtpInventory.json.count == 0
-
-- name: Create Post-ZTP Inventory
-  block:
-    - name: Check for Existing Post-ZTP Inventory
-      uri: {url: '{{AwxApi}}/inventories/?name={{prompt_ztp_postztp_inv|urlencode}}'}
-      register: GetPostZtpInventory
-
-    - name: Create Inventory
-      uri:
-        url: '{{AwxApi}}/inventories/'
-        method: POST
-        headers: {Content-Type: "application/json"}
-        body:
-          name: '{{prompt_ztp_postztp_inv}}'
-          description: ''
-          organization: '{{ZtpParams.OrgId}}'
-        body_format: json
-        status_code: 201
-      when: GetPostZtpInventory.json.count == 0
-  when: prompt_ztp_postztp_inv is defined
 
 - name: Configure DHCP
   block:
@@ -329,5 +308,4 @@
           hostname_pool:
             base_name: '{{NewHostnameVars.base_name|default(OldHostnameVars.base_name)}}'
             next_name: '{{NewHostnameVars.next_name|default(OldHostnameVars.next_name)}}'
-          post_provisioning_inv: '{{prompt_ztp_postztp_inv|default(OldPostZtpInv)}}'
     body_format: json

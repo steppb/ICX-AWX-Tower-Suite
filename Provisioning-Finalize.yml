@@ -17,7 +17,6 @@
     ZtpIpCfg: '{{icx_inv_ztp_vars.static_ip_pool}}'
     ZtpHostCfgBase: '{{icx_inv_ztp_vars.hostname_pool.base_name|default("null", true)}}'
     ZtpHostCfgNext: '{{icx_inv_ztp_vars.hostname_pool.next_name|default("null", true)}}'
-    PostZtpInv: '{{icx_inv_ztp_vars.post_provisioning_inv|default("null", true)}}'
     PortVar: '(^e.*[0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}|^ve.*[0-9]{1,4})'
     AwxApi: '{{icx_inv_ztp_vars.provisioning_vars.awx_api_cb}}'
 
@@ -25,12 +24,6 @@
   - name: Get Info for Current Host
     uri: {url: '{{AwxApi}}/hosts/?name={{inventory_hostname|urlencode}}', method: GET}
     register: HostInfo
-
-  - {name: Store Host ID, set_fact: {HostId: '{{HostInfo.json.results[0].id}}'}}
-
-  - {name: Store Host IP Address, set_fact: {HostIp: '{{ansible_host}}'}}
-
-  - {name: Store Hostname, set_fact: {HostName: '{{inventory_hostname}}'}}
 
   - name: Store Host Description
     set_fact: {HostDesc: '{{HostInfo.json.results[0].description}}'}
@@ -73,7 +66,7 @@
 
     - name: Update AWX Host Name
       uri:
-        url: '{{AwxApi}}/hosts/{{HostId}}/'
+        url: '{{AwxApi}}/hosts/{{HostInfo.json.results[0].id}}/'
         headers: {Content-Type: 'application/json'}
         body: {name: '{{ZtpHostCfgNext}}'}
         body_format: json
@@ -164,14 +157,12 @@
 
       - name: Update AWX Host IP Address
         uri:
-          url: '{{AwxApi}}/hosts/{{HostId}}/'
+          url: '{{AwxApi}}/hosts/{{HostInfo.json.results[0].id}}/'
           headers: {Content-Type: 'application/json'}
           body:
             variables: >-
               ansible_host: '{{ZtpIpCfg.next_ip}}'
           body_format: json
-
-      - {name: Store New Host IP Address, set_fact: {HostIp: '{{ZtpIpCfg.next_ip}}'}}
 
       - name: Increment Next Static IP
         set_fact: {NextStaticIp: '{{ZtpIpCfg.next_ip|ipmath(1)}}'}
@@ -203,37 +194,8 @@
             hostname_pool:
               base_name: '{{ZtpHostCfgBase}}'
               next_name: '{{NewHostName|default(ZtpHostCfgNext)}}'
-            post_provisioning_inv: '{{icx_inv_ztp_vars.post_provisioning_inv}}'
       body_format: json
     when: HostCfgChange is defined
-
-  - name: Switch Host to Post-Provisioning Inventory
-    block:
-    - name: Get Post-Provisioning Inventory ID
-      uri: {url: '{{AwxApi}}/inventories/?name={{PostZtpInv|urlencode}}', method: GET}
-      register: PostZtpInvInfo
-
-    - name: Get 'Provisioning-Inventory-Swap' Template ID
-      uri: {url: '{{AwxApi}}/job_templates/?name=Provisioning-Inventory-Swap', method: GET}
-      register: PostZtpTemplateInfo
-
-    - name: Launch Inventory Swap Template
-      uri:
-        url: '{{AwxApi}}/job_templates/{{PostZtpTemplateInfo.json.results[0].id}}/launch/'
-        method: POST
-        headers: {Content-Type: "application/json"}
-        body:
-          extra_vars: >-
-            template_inv_swap_vars:
-              host_id: '{{HostId}}'
-              awx_api: '{{AwxApi}}'
-              name: '{{HostName}}'
-              description: '{{HostDesc}}'
-              inventory: '{{PostZtpInvInfo.json.results[0].id}}'
-              ansible_host: '{{HostIp}}'
-        body_format: json
-        status_code: 201
-    when: PostZtpInv != 'null'
 
   - name: Display Error Message
     debug: var=ErrMsg

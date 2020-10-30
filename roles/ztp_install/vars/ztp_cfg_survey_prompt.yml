@@ -90,12 +90,3 @@ ZtpCfgSurveyPrompt:
   max: 1024
   default: ''
   choices: ''
-- question_name: 'Post-Provisioning Inventory Name'
-  question_description: ''
-  required: false
-  type: text
-  variable: prompt_ztp_postztp_inv
-  min: 1
-  max: 1024
-  default: ''
-  choices: ''

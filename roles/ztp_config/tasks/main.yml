@@ -25,12 +25,6 @@
         ask_limit: true
         playbook: 'Provisioning-Finalize.yml'
         ask_credential: true
-      - name: Provisioning-Inventory-Swap
-        description: 'Swap Host Inventory.  Called by Provisioning-Finalize'
-        inventory: '{{awx_inventory_id}}'
-        ask_variables: true
-        playbook: 'Provisioning-Inventory-Swap.yml'
-        credentials: '{{RestCredentialList.results}}'
       - name: ZTP-Configure
         survey_spec: '{{ZtpCfgSurveyPrompt}}'
   when: ZtpParams.CreateTemplates|bool
