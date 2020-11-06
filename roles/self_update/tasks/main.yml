@@ -1,4 +1,8 @@
 ---
+- name: Manually set path to Python Interpreter
+  set_fact: {discovered_interpreter_python: /usr/bin/python3, cacheable: true}
+  when: "'platform-python' in discovered_interpreter_python"
+
 - name: Get This Template Info
   uri: {url: '{{AwxApi}}/job_templates/{{awx_job_template_id}}/'}
   register: ThisTemplate
