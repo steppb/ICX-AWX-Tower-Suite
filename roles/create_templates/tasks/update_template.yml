@@ -1,7 +1,9 @@
 ---
 - name: Store Version from Template
-  set_fact: {TemplateVer: '{{ExtraVars|regex_replace("\n")|regex_replace(tVerStr, "\2")}}'}
-  vars: {tVerStr: '^.*(playbook|template)_version: ([0-9].[0-9]).*$'}
+  set_fact: {TemplateVer: '{{tVerStr|regex_search(tVerRe)|regex_replace(tVerRe, "\2")}}'}
+  vars:
+    tVerStr: '{{ExtraVars|regex_replace("\n")}}'
+    tVerRe: '^.*(playbook|template)_version: ([0-9].[0-9]).*$'
 
 - name: Update Templates
   block:
@@ -74,7 +76,7 @@
       headers: {Content-Type: "application/json"}
       body: {ask_limit_on_launch: true}
       body_format: json
-    when: TemplateVer is version(1.4, "<")
+    when: TemplateVer == "None" or TemplateVer is version("1.4", "<")
 
   - name: Add Comments and Version to Template
     uri:
@@ -87,4 +89,4 @@
 
           {{PlaybookComments.stdout}}
       body_format: json
-  when: TemplateVer is version(AwxMgmtVer, "<")
+  when: TemplateVer == "None" or TemplateVer is version(AwxMgmtVer, "<")
