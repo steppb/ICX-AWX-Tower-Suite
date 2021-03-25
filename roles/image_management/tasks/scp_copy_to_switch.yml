@@ -1,0 +1,128 @@
+- name: Image-Flash-Copy - Get Switch Information
+  icx_facts: {gather_subset: hardware}
+  connection: network_cli
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+
+- name: Check Bootrom for Compatibility
+  block:
+  - {name: Load Platform Support Lookup Table, include_vars: platform_support_table.yml}
+
+  - name: Image-Flash-Copy - Get Current Boot Version
+    icx_command: {commands: show flash | include Boot}
+    register: IcxShFlash
+    connection: network_cli
+    vars:
+      ansible_network_os: icx
+      ansible_become: true
+      ansible_become_method: enable
+
+  - name: Store Current Boot Version
+    set_fact: {CurBootVer: '{{IcxShFlash.stdout_lines[0][0]|regex_search(tBootVerRe)}}'}
+    vars: {tBootVerRe: '[0-9]{2}\.[0-9]{1}\.[0-9]{1,2}'}
+
+  - name: Get Max Compatible Image Version
+    set_fact: {MaxCompVer: '{{BootToImgVer[idx].max_comp_ver|default()}}'}
+    loop: '{{range(0, BootToImageVer|length)|list}}'
+    loop_control: {index_var: idx}
+    when: CurBootVer == BootToImageVer[idx].boot_version
+
+  - name: Assert Compatibility with New Image
+    assert:
+      that: ScpFileEntry.software_version is version(MaxCompVer, '<=')
+      msg: "ERROR: Bootrom {{CurBootVer}} is not compatible with {{FileEntry.filename}}"
+    when: MaxCompVer|default("null", true) != "null"
+  when:
+    - not ScpFileEntry.is_ufi|bool
+    - ScpBootPath == "null"
+
+- name: Image-Flash-Copy - Save SSH Username
+  set_fact: {RemUser: '{{ansible_user}}'}
+  connection: ssh
+
+- name: Image-Flash-Copy - Copy Image to Switch Flash
+  expect:
+    command: scp {{tOpts}} {{tKex}} {{item.Src}} {{item.Dest}}
+    echo: yes
+    timeout: '{{ScpTimeout}}'
+    responses:
+      'Password:': "{{ansible_password}}"
+  no_log: true
+  loop: '{{tCpFiles}}'
+  vars:
+    tOpts: "-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
+    tKex: "-o KexAlgorithms=+diffie-hellman-group1-sha1"
+    tCpFiles:
+      - Src: '{{ScpBootPath}}'
+        Dest: "{{RemUser}}@{{ansible_host}}:flash:bootrom"
+      - Src: "{{ScpFileEntry.path}}"
+        Dest: "{{RemUser}}@{{ansible_host}}:flash:{{BootPart}}:{{ScpFileEntry.filename}}"
+  when: item.Src != "null"
+
+- name: Image-Flash-Copy - Change Boot Preference
+  block:
+  - name: Image-Flash-Copy - Get Current Boot Preference from Switch
+    icx_command: {commands: show boot-preference}
+    register: CurBootPref
+
+  - name: Image-Flash-Copy - Check if Boot Preference Change is Needed
+    block:
+    - name: Remove Boot Statements
+      icx_config: {lines: 'no boot sys fl {{item}}', save_when: changed}
+      with_items:
+        - pri
+        - sec
+      when:
+        - '"Use Default" not in FirstPart'
+        - item in FirstPart or item in CurBootPref.stdout_lines[0][2]|lower
+
+    - name: Image-Flash-Copy - Configure Boot Priority
+      icx_config: {lines: 'boot sys fl {{FlPart}}', save_when: changed}
+      when: FlPart != "pri"
+
+    vars: {FirstPart: '{{CurBootPref.stdout_lines[0][1]|lower}}'}
+    when: ("Use Default" not in FirstPart and FlPart not in FirstPart) or
+          ("Use Default" in FirstPart and FlPart == "sec")
+  connection: network_cli
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+  when: BootPrefChange|bool
+
+- name: Image-Flash-Copy - Reload Device
+  block:
+  - name: Image-Flash-Copy - Reload Device
+    include_tasks: reboot_device.yml
+    loop: '{{range(0, 10)|list}}'
+    when: ReloadSuccess|default('null', true) == 'null'
+
+  - name: Image-Flash-Copy - Wait For Device to Finish Boot
+    wait_for:
+      host: '{{ansible_host}}'
+      port: 22
+      delay: 30
+      timeout: '{{ReloadTimeout}}'
+    delegate_to: localhost
+
+  - name: Image-Flash-Copy - Post-Boot Info
+    icx_facts: {gather_subset: hardware}
+
+  - name: Image-Flash-Copy Ensure Successful Image Update
+    assert:
+      that: ImageName in ScpFileEntry.filename
+      msg:
+        - "ERROR: Failed to boot into {{ScpFileEntry.filename}}"
+        - "Current image: {{ansible_net_image}}"
+    vars: {ImageName: '{{ansible_net_image|regex_replace(".bin")}}'}
+
+  - name: Reset Reload Return Variable
+    set_fact: {ReloadSuccess: }
+  connection: network_cli 
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+  when: ReloadDevice|bool

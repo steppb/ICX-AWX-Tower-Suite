@@ -1,0 +1,23 @@
+---
+- name: Image-Management Task Block
+  block:
+  - name: Perform "Image-Management" Tasks
+    include_tasks: image_management.yml
+  module_defaults:
+    uri:
+      validate_certs: '{{template_validate_certs}}'
+      method: GET
+      user: '{{awxlogin_user}}'
+      password: '{{awxlogin_pass}}'
+      force_basic_auth: yes
+      timeout: 60
+  vars:
+    AwxApi: https://{{ansible_host}}/api/v2
+    template_validate_certs: no
+    ValidFileTypes:
+      - .bin
+  when: awx_job_template_name == "Image-Management"
+
+- name: Perform "Image-Flash-Copy" Tasks
+  include_tasks: image_flash_copy.yml
+  when: awx_job_template_name == "Image-Flash-Copy"

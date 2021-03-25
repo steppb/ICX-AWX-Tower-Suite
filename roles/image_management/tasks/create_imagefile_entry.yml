@@ -1,0 +1,80 @@
+---
+- {name: Init Variables, set_fact: {SupportedPlatforms: [], BootVer: , IsSupported: no, ImgType: }}
+
+- name: Parse Filename for Image Info
+  set_fact:
+    BinImgVersion: '{{ImgRepoFileName|regex_replace(BinVerRe, "\1.\2.\3")}}'
+    ImageType: '{{ImgRepoFileName|regex_replace("^.*([RrSsZzUu])[0-9].*", "\1")|upper}}'
+    PlatCode: '{{ImgRepoFileName|regex_replace("^([A-Za-z]{2,3})[RrSsZzUu].*", "\1")|upper}}'
+    IsUfi: "{{'ufi' in ImgRepoFileName|lower}}"
+
+- {name: Flag as Router Image, set_fact: {ImgType: router}, when: ImageType == "R"}
+- {name: Flag as Switch Image, set_fact: {ImgType: switch}, when: ImageType == "S"}
+- {name: Flag as Boot Code, set_fact: {ImgType: boot}, when: ImageType == "Z"}
+- {name: Flag as Boot Code, set_fact: {ImgType: boot}, when: ImageType == "U"}
+
+- name: Create Boot File Info List
+  set_fact:
+    BootImgList: '{{BootImgList|default([])}} + {{tBootFileInfo}}'
+    BootImgFileList: "{{BootImgFileList|default('None\nAuto Select\n')}}{{ImgRepoFileName}}\n"
+  vars:
+    tBootFileInfo:
+      - filename: '{{ImgRepoFileName}}'
+        path: '{{ImgRepoFilePath}}'
+        software_version: '{{BinImgVersion}}'
+        supported_platforms: '{{BootPlatCodeSupport[PlatCode]}}'
+  when:
+    - ImgType == "boot"
+    - BootPlatCodeSupport[PlatCode] is defined
+
+- name: Create Image File Info List
+  block:
+  - name: Build List of Supported Platforms
+    set_fact:
+      SupportedPlatforms: '{{SupportedPlatforms}} + {{[item.platform]}}'
+      IsSupported: yes
+    loop: "{{PlatSupportByCode[PlatCode]}}"
+    when:
+      - item[ImgType~'_min_ver'] is defined
+      - BinImgVersion is version(item[ImgType~'_min_ver'], '>')
+      - (item.ufi_only|bool and IsUfi|bool) or not item.ufi_only|bool
+
+  - name: Create and Add File Entry to List
+    block:
+    - name: Find Intermediate Update Images for 8.0.90+
+      find:
+        paths: '{{ImgRepoProjectDir.path}}'
+        recurse: yes
+        patterns:
+          - '{{PlatCode}}{{ImageType}}08080[a-zA-Z]{0,2}.bin'
+        use_regex: yes
+      register: ImdImgList
+      when: BinImgVersion is version('8.0.90', '>=')
+
+    - name: Get Boot Image Version
+      set_fact: {BootVer: '{{item.boot_version}}'}
+      loop: '{{BootToImageVer}}'
+      when:
+        - not IsUfi|bool
+        - BinImgVersion is version(item.image_ver_min, '>=')
+        - BinImgVersion is version(item.image_ver_max, '<=')
+
+    - name: Create File Info Entry for List
+      set_fact:
+        SwImgInfo:
+          - filename: '{{ImgRepoFileName}}'
+            image_type: '{{ImgType}}'
+            is_ufi: '{{IsUfi}}'
+            path: '{{ImgRepoFilePath}}'
+            software_version: '{{BinImgVersion}}'
+            supported_platforms: '{{SupportedPlatforms}}'
+            supported_bootrom_ver: '{{BootVer|default()}}'
+            intermediate_image: '{{ImdImgList.files[0].path|default()}}'
+
+    - name: Add Entry to List
+      set_fact: {SwImgList: '{{SwImgList|default([])}} + {{SwImgInfo}}'}
+
+    - name: Add Filename to Survey Prompt List
+      set_fact: {SwImgFileList: "{{SwImgFileList|default()}}{{ImgRepoFileName}}\n"}
+    when: IsSupported|bool
+  when: ImgType == "router" or ImgType == "switch"

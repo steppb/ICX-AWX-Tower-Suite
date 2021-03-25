@@ -1,0 +1,17 @@
+- name: Reload Device
+  block:
+  - name: Issue Reload Command
+    icx_command: {commands: 'boot system flash {{BootPart}} yes'}
+    register: ReloadResult
+
+  - name: Handle Return of Reload Command
+    block:
+    - name: Pause If Error Returned
+      wait_for: {timeout: 30}
+      when: '"Error" in ReloadResult.stdout[0]'
+
+    - name: Reload Command Accepted
+      set_fact: {ReloadSuccess: true}
+      when: '"Error" not in ReloadResult.stdout[0]'
+    when: ReloadResult.stdout[0] is defined
+  when: ReloadSuccess is not defined or not ReloadSuccess|bool 

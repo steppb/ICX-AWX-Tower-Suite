@@ -1,0 +1,175 @@
+- {name: Get Pip Packages, pip_package_info: {clients: ['pip', 'pip3']}, register: PipInfo}
+
+- name: Install 'pexpect' Package
+  pip: {name: pexpect}
+  when: PipInfo.packages.pip.pexpect is not defined
+
+- {name: Get Projects Directory, uri: {url: '{{AwxApi}}/config/'}, register: AwxCfg}
+
+- name: Create Directory for Image Repo in Projects Directory
+  file:
+    path: '{{AwxCfg.json.project_base_dir}}/{{prompt_project_name}}'
+    state: directory
+  register: ImgRepoProjectDir
+
+- name: Download Image from TFTP Server
+  block:
+  - name: Verify File Type
+    assert:
+      that: prompt_tftp_filepath|basename|splitext|last is in ValidFileTypes
+      fail_msg: "{{prompt_tftp_filepath|basename|splitext|last}} is not a valid file type"
+
+  - name: Install 'tftpy' Package
+    pip: {name: tftpy}
+    when:
+      - PipInfo.packages.pip.tftpy is not defined
+      - PipInfo.packages.pip3.tftpy is not defined
+
+  - name: Download Image via TFTP
+    tftpy:
+      host: '{{prompt_tftp_srv_ip}}'
+      filename: '{{prompt_tftp_filepath}}'
+      output: '{{ImgRepoProjectDir.path}}/{{prompt_tftp_filepath | basename}}'
+  connection: ssh
+  vars:
+    ansible_become: true
+    ansible_become_method: sudo
+  when:
+    - prompt_tftp_srv_ip is defined
+    - prompt_tftp_filepath is defined
+
+- name: Search for Binary Files in Repo
+  find:
+    paths: '{{ImgRepoProjectDir.path}}'
+    recurse: yes
+    patterns: '*.bin'
+  register: ImgRepoFileReg
+
+- {name: Load Platform Support Lookup Table, include_vars: platform_support_table.yml}
+
+- name: Populate Image Table
+  include_tasks: create_imagefile_entry.yml
+  loop: '{{ImgRepoFileReg.files|sort(attribute="path")}}'
+  loop_control: {loop_var: ImgRepoFile, index_var: idx}
+  vars:
+    ImgRepoFilePath: '{{ImgRepoFile.path}}'
+    ImgRepoFileName: '{{ImgRepoFile.path|basename}}'
+  when: ImgRepoFileReg.files is defined
+
+- name: Store File List and Create Utility Templates
+  block:
+  - name: Store IP Address of AWX Server
+    set_fact: {RemoteServerIp: '{{ansible_host}}'}
+    register: AwxSvrIp
+
+  - name: Store File Entry List in AWX Host Facts
+    set_fact: {ansible_image_repo_files: '{{SwImgList}}', cacheable: yes}
+    register: ImgRepoFileList
+
+  - name: Store Boot File Entry List in AWX Host Facts
+    set_fact: {ansible_image_repo_boot_files: '{{BootImgList|default()}}', cacheable: yes}
+    register: ImgRepoBootFileList
+
+  - name: Create Path for File Entry Variable File
+    file:
+      path: '{{ImgRepoProjectDir.path}}/host_vars'
+      state: directory
+
+  - name: Create File Entry Variable File in Image Repo Directory
+    template:
+      src: all.yml.j2
+      dest: '{{ImgRepoProjectDir.path}}/host_vars/all.yml'
+      mode: 0644
+
+  - name: Check For Existing 'Image-Flash-Copy' Template
+    uri: {url: '{{AwxApi}}/job_templates/?name=Image-Flash-Copy'}
+    register: ImgFlCpTemplate
+
+  - name: Store 'Image-Flash-Copy' Template Info
+    set_fact: {ImgFlCpTemplateInfo: '{{ImgFlCpTemplate.json.results[0]}}'}
+    when: ImgFlCpTemplate.json.count > 0
+
+  - name: Create 'Image-Flash-Copy' Template
+    block:
+    - name: Get This Template Info
+      uri: {url: '{{AwxApi}}/job_templates/{{awx_job_template_id}}/'}
+      register: ThisTemplate
+
+    - name: Create 'Image-Flash-Copy' Template
+      uri:
+        url: '{{AwxApi}}/job_templates/'
+        method: POST
+        headers: {Content-Type: "application/json"}
+        body:
+          name: Image-Flash-Copy
+          description: "Copy File(s) to Switch"
+          project: '{{ThisTemplate.json.project}}'
+          playbook: Image-Management.yml
+          ask_limit_on_launch: true
+          ask_inventory_on_launch: true
+          ask_credential_on_launch: true
+        body_format: json
+        status_code: 201
+      register: NewImgFlCpTemplate
+
+    - name: Store 'Image-Flash-Copy' Template Info
+      set_fact: {ImgFlCpTemplateInfo: '{{NewImgFlCpTemplate.json}}'}
+    when: ImgFlCpTemplate.json.count == 0
+
+  - name: Create 'Image-Flash-Copy' Survey Prompt
+    uri:
+      url: '{{AwxApi}}/job_templates/{{ImgFlCpTemplateInfo.id}}/survey_spec/'
+      method: POST
+      headers: {Content-Type: 'application/json'}
+      body:
+        name: ''
+        description: ''
+        spec:
+        - question_name: 'Select the Image File to Flash:'
+          required: true
+          type: multiplechoice
+          variable: prompt_flash_copy_filename
+          choices: '{{SwImgFileList}}'
+        - question_name: 'Flash Partition:'
+          required: true
+          type: multiplechoice
+          variable: prompt_flash_part
+          choices: |-
+            Primary
+            Secondary
+          default: Secondary
+        - question_name: 'Configure Selected Flash Partition as First in Boot Order?'
+          required: true
+          type: multiplechoice
+          variable: prompt_flash_change_boot
+          choices: |-
+            Yes
+            No
+          default: "Yes"
+        - question_name: 'Select Boot Image to Flash:'
+          required: true
+          type: multiplechoice
+          variable: prompt_bootflash_copy_filename
+          choices: '{{BootImgFileList|default("None\nAuto Select")}}'
+          default: "Auto Select"
+        - question_name: 'Reboot Into New Image After Deployment?'
+          required: true
+          type: multiplechoice
+          variable: prompt_flash_reload
+          choices: |-
+            Yes
+            No
+          default: "No"
+      body_format: json
+
+  - name: Enable Survey Prompt
+    uri:
+      url: '{{AwxApi}}/job_templates/{{ImgFlCpTemplateInfo.id}}/'
+      method: PATCH
+      headers: {Content-Type: "application/json"}
+      body:
+        survey_enabled: true
+        extra_vars: >-
+          template_image_repo_dir: {{ImgRepoProjectDir.path}}
+      body_format: json
+  when: SwImgList is defined

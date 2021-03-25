@@ -1,0 +1,93 @@
+---
+PlatSupportByCode:
+  SP:
+    - platform: ICX7150
+      switch_min_ver: 08.0.60a
+      router_min_ver: 08.0.61
+      ufi_only: no
+    - platform: ICX7250
+      switch_min_ver: 08.0.30a
+      router_min_ver: 08.0.30a
+      ufi_only: no
+    - platform: ICX7450
+      switch_min_ver: 08.0.20
+      router_min_ver: 08.0.20
+      ufi_only: no
+  GZ:
+    - platform: ICX7550
+      switch_min_ver: 08.0.95
+      router_min_ver: 08.0.95
+      ufi_only: no
+  TN:
+    - platform: ICX7650
+      switch_min_ver: 08.0.70c
+      router_min_ver: 08.0.70c
+      ufi_only: no
+    - platform: ICX7850
+      router_min_ver: 08.0.90
+      ufi_only: yes
+  SW:
+    - platform: ICX7750
+      switch_min_ver: 08.0.10
+      router_min_ver: 08.0.10
+      ufi_only: no
+
+BootPlatCodeSupport:
+  MN:
+    - ICX7150
+  SP:
+    - ICX7250
+    - ICX7450
+  TN:
+    - ICX7650
+  SW:
+    - ICX7750
+
+BootToImageVer:
+  - boot_version: 10.1.00
+    image_ver_min: 8.0.10
+    image_ver_max: 8.0.10a
+  - boot_version: 10.1.01
+    image_ver_min: 8.0.10b
+    image_ver_max: 8.0.10e
+  - boot_version: 10.1.02
+    image_ver_min: 8.0.10f
+    image_ver_max: 8.0.10m
+  - boot_version: 10.1.04
+    image_ver_min: 8.0.20
+    image_ver_max: 8.0.20d
+  - boot_version: 10.1.05
+    image_ver_min: 8.0.30
+    image_ver_max: 8.0.30g
+  - boot_version: 10.1.06
+    image_ver_min: 8.0.30h
+    image_ver_max: 8.0.40c
+  - boot_version: 10.1.08b005
+    image_ver_min: 8.0.50
+    image_ver_max: 8.0.50
+  - boot_version: 10.1.09
+    image_ver_min: 8.0.60
+    image_ver_max: 8.0.60a
+  - boot_version: 10.1.10
+    image_ver_min: 8.0.61
+    image_ver_max: 8.0.61a
+    max_comp_ver: 8.0.61c
+  - boot_version: 10.1.11b006
+    image_ver_min: 8.0.61b
+    image_ver_max: 8.0.61b
+    max_comp_ver: 8.0.61c
+  - boot_version: 10.1.11
+    image_ver_min: 8.0.61c
+    image_ver_max: 8.0.61c
+  - boot_version: 10.1.13
+    image_ver_min: 8.0.70c
+    image_ver_max: 8.0.70c
+  - boot_version: 10.1.14
+    image_ver_min: 8.0.70aa
+    image_ver_max: 8.0.70aa
+  - boot_version: 10.1.14
+    image_ver_min: 8.0.70d
+    image_ver_max: 8.0.80f
+  - boot_version: 10.1.15
+    image_ver_min: 8.0.90
+    image_ver_max: 8.0.90h

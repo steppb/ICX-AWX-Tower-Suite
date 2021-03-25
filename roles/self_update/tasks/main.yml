@@ -29,40 +29,121 @@
     - PjInfo.json.results[idx].id != ThisTemplate.json.project
     - idx != FirstPjIdx
 
+- name: Check For Existing 'Image-Management' Template
+  uri: {url: '{{AwxApi}}/job_templates/?name=Image-Management'}
+  register: ImageTemplate
+
+- name: Store 'Image-Management' Template Info
+  set_fact: {ImageTemplateInfo: '{{ImageTemplate.json.results[0]}}'}
+  when: ImageTemplate.json.count > 0
+
+- name: Create 'Image-Management' Template
+  block:
+  - name: Create Template
+    uri:
+      url: '{{AwxApi}}/job_templates/'
+      method: POST
+      headers: {Content-Type: "application/json"}
+      body:
+        name: Image-Management
+        description: Create image repo, import images and create/update file list.
+        project: '{{ThisTemplate.json.project}}'
+        inventory: '{{awx_inventory_id}}'
+        playbook: Image-Management.yml
+        ask_credential_on_launch: '{{ThisTemplate.json.ask_credential_on_launch}}'
+        use_fact_cache: true
+      body_format: json
+      status_code: 201
+    register: NewImageTemplate
+
+  - name: Store 'Image-Management'  Template Info
+    set_fact: {ImageTemplateInfo: '{{NewImageTemplate.json}}'}
+
+  - name: Copy Saved Credentials
+    block:
+    - name: Get Credentials for This Template
+      uri: {url: '{{AwxApi}}/job_templates/{{ThisTemplate.json.id}}/credentials/'}
+      register: ThisTemplateCreds
+
+    - name: Store Credentials from This Template
+      set_fact: {Credential: "id: {{ThisTemplateCreds.json.results[idx].id}}"}
+      loop: "{{range(0, ThisTemplateCreds.json.results|length)|list}}"
+      loop_control: {index_var: idx}
+      register: TemplateCreds
+
+    - name: Add Credentials to 'Image-Management' Template
+      uri:
+        url: '{{AwxApi}}/job_templates/{{ImageTemplateInfo.id}}/credentials/'
+        method: POST
+        headers: {Content-Type: "application/json"}
+        body: '{{TemplateCreds.results[idx].ansible_facts.Credential|from_yaml}}'
+        body_format: json
+        status_code: 204
+      loop: '{{range(0, TemplateCreds.results|length)|list}}'
+      loop_control: {index_var: idx}
+    when: not ThisTemplate.json.ask_credential_on_launch|bool
+  when: ImageTemplate.json.count == 0
+
 - name: Create New Survey Prompt Payload
   set_fact:
-    PromptPayload:
-      name: ''
-      description: ''
-      spec:
-      - question_name: 'Template management function:'
-        required: false
-        type: multiplechoice
-        variable: prompt_mgmt_role
-        choices: |-
-          Create/Update Templates
-          Remove Templates
-      - question_name: 'Project:'
-        required: false
-        type: multiplechoice
-        variable: prompt_project_name
-        choices: '{{ProjectList|regex_replace("@NL@","\n")|default("")}}'
+    PromptPayloads:
+    - JobId: '{{awx_job_template_id}}'
+      SurveyPrompt:
+        name: ''
+        description: ''
+        spec:
+        - question_name: 'Template management function:'
+          required: false
+          type: multiplechoice
+          variable: prompt_mgmt_role
+          choices: |-
+            Create/Update Templates
+            Remove Templates
+        - question_name: 'Project:'
+          required: false
+          type: multiplechoice
+          variable: prompt_project_name
+          choices: '{{ProjectList|regex_replace("@NL@","\n")|default("")}}'
+    - JobId: '{{ImageTemplateInfo.id}}'
+      SurveyPrompt:
+        name: ''
+        description: ''
+        spec:
+        - question_name: 'Image Repository Name:'
+          required: true
+          type: text
+          variable: prompt_project_name
+          min: 1
+          max: 50
+          default: Images
+        - question_name: 'TFTP Server IPv4 Address:'
+          required: false
+          type: text
+          variable: prompt_tftp_srv_ip
+          min: 7
+          max: 15
+        - question_name: 'TFTP Image File Path:'
+          required: false
+          type: text
+          variable: prompt_tftp_filepath
 
 - name: Create Survey Prompt
   uri:
-    url: '{{AwxApi}}/job_templates/{{awx_job_template_id}}/survey_spec/'
+    url: '{{AwxApi}}/job_templates/{{item.JobId}}/survey_spec/'
     method: POST
     headers: {Content-Type: 'application/json'}
-    body: '{{PromptPayload}}'
+    body: '{{item.SurveyPrompt}}'
     body_format: json
+  loop: '{{PromptPayloads}}'
 
 - name: Update Template
   uri:
-    url: '{{AwxApi}}/job_templates/{{awx_job_template_id}}/'
+    url: '{{AwxApi}}/job_templates/{{item.JobId}}/'
     method: PATCH
     headers: {Content-Type: "application/json"}
     body: {extra_vars: , survey_enabled: true, use_fact_cache: true}
     body_format: json
+  loop: '{{PromptPayloads}}'
 
 - name: Display Update Message and Exit
   block:
