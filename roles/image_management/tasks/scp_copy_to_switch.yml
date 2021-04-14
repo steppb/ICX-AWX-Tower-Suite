@@ -38,29 +38,6 @@
     - not ScpFileEntry.is_ufi|bool
     - ScpBootPath == "null"
 
-- name: Image-Flash-Copy - Save SSH Username
-  set_fact: {RemUser: '{{ansible_user}}'}
-  connection: ssh
-
-- name: Image-Flash-Copy - Copy Image to Switch Flash
-  expect:
-    command: scp {{tOpts}} {{tKex}} {{item.Src}} {{item.Dest}}
-    echo: yes
-    timeout: '{{ScpTimeout}}'
-    responses:
-      'Password:': "{{ansible_password}}"
-  no_log: true
-  loop: '{{tCpFiles}}'
-  vars:
-    tOpts: "-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
-    tKex: "-o KexAlgorithms=+diffie-hellman-group1-sha1"
-    tCpFiles:
-      - Src: '{{ScpBootPath}}'
-        Dest: "{{RemUser}}@{{ansible_host}}:flash:bootrom"
-      - Src: "{{ScpFileEntry.path}}"
-        Dest: "{{RemUser}}@{{ansible_host}}:flash:{{BootPart}}:{{ScpFileEntry.filename}}"
-  when: item.Src != "null"
-
 - name: Image-Flash-Copy - Change Boot Preference
   block:
   - name: Image-Flash-Copy - Get Current Boot Preference from Switch
@@ -91,6 +68,29 @@
     ansible_become: true
     ansible_become_method: enable
   when: BootPrefChange|bool
+
+- name: Image-Flash-Copy - Save SSH Username
+  set_fact: {RemUser: '{{ansible_user}}'}
+  connection: ssh
+
+- name: Image-Flash-Copy - Copy Image to Switch Flash
+  expect:
+    command: scp {{tOpts}} {{tKex}} {{item.Src}} {{item.Dest}}
+    echo: yes
+    timeout: '{{ScpTimeout}}'
+    responses:
+      'Password:': "{{ansible_password}}"
+  no_log: true
+  loop: '{{tCpFiles}}'
+  vars:
+    tOpts: "-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
+    tKex: "-o KexAlgorithms=+diffie-hellman-group1-sha1"
+    tCpFiles:
+      - Src: '{{ScpBootPath}}'
+        Dest: "{{RemUser}}@{{ansible_host}}:flash:bootrom"
+      - Src: "{{ScpFileEntry.path}}"
+        Dest: "{{RemUser}}@{{ansible_host}}:flash:{{BootPart}}:{{ScpFileEntry.filename}}"
+  when: item.Src != "null"
 
 - name: Image-Flash-Copy - Reload Device
   block:
