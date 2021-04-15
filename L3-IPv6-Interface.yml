@@ -39,8 +39,8 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
-    newline_var: "\r"
-    error_parse: '^.*ConnectionError: '
+    NewlineVar: "\r"
+    ErrParse: '^.*ConnectionError: '
 
   tasks:
   - name: Check Host Variables and Setup Config List
@@ -61,17 +61,21 @@
   - name: Check Prompt Variables and Setup Config List
     set_fact:
       iface: '{{prompt_rtr_int}}'
-      ipaddr: '{{prompt_rtr_int_v6addr|default("")}}'
+      ipaddr: '{{prompt_rtr_int_ip|default("")}}'
     register: PromptVarCfg
     with_items: 1
-    when: ansible_play_hosts|length == 1 and ConfigList is not defined and prompt_rtr_int is defined
+    when:
+      - ansible_play_hosts|length == 1
+      - ConfigList is not defined
+      - prompt_rtr_int is defined
 
   - name: Store Prompt Variable List
     set_fact: {ConfigList: '{{PromptVarCfg.results}}'}
     when: PromptVarCfg.results[0].ansible_facts is defined
 
   - name: Get IP Interface Info
-    icx_command: {commands: 'show run interface {{item.ansible_facts.iface}} | include ipv6 address'}
+    icx_command:
+      commands: 'show run interface {{item.ansible_facts.iface}} | include ipv6 address'
     register: IpIntInfo
     loop: '{{ConfigList}}'
     when: item.ansible_facts is defined
@@ -93,8 +97,7 @@
       parents: int {{ConfigList[idx].ansible_facts.iface}}
       save_when: changed
     loop: '{{IpIntList.results}}'
-    loop_control:
-      index_var: idx
+    loop_control: {index_var: idx}
     register: IcxCfgStatus
     when:
       - ConfigList[idx].ansible_facts is defined
@@ -103,12 +106,12 @@
       - item.ansible_facts.OldIp != ConfigList[idx].ansible_facts.ipaddr
 
   - name: Parse Switch Error
-    set_fact: {ErrMsg: "{{item.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"}
+    set_fact: {ErrMsg: "{{item.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"}
     loop: '{{IcxCfgStatus.results}}'
     when: item.rc is defined and item.rc == 1
 
   - name: Display Switch Error
-    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(newline_var)}}'}
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(NewlineVar)}}'}
     when: ErrMsg is defined
 
   - name: Configure Router Interface
@@ -119,23 +122,22 @@
       parents: int {{item.ansible_facts.iface}}
       save_when: changed
     loop: '{{ConfigList}}'
-    loop_control:
-      index_var: idx
+    loop_control: {index_var: idx}
     register: IcxCfgStatus
     failed_when: false
-    when:
-      - item.ansible_facts is defined
-      - item.ansible_facts.ipaddr != ansible_host
-      - item.ansible_facts.ipaddr != ''
-      - IpIntList.results[idx].ansible_facts.OldIp is not defined or IpIntList.results[idx].ansible_facts.OldIp != item.ansible_facts.ipaddr
+    when: item.ansible_facts is defined and
+          item.ansible_facts.ipaddr != ansible_host and
+          item.ansible_facts.ipaddr != '' and
+          (IpIntList.results[idx].ansible_facts.OldIp is not defined or
+          IpIntList.results[idx].ansible_facts.OldIp != item.ansible_facts.ipaddr)
 
   - name: Parse Switch Error
-    set_fact: {ErrMsg: "{{item.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"}
+    set_fact: {ErrMsg: "{{item.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"}
     loop: '{{IcxCfgStatus.results}}'
     when: item.rc is defined and item.rc == 1
 
   - name: Display Switch Error
-    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(newline_var)}}'}
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(NewlineVar)}}'}
     when: ErrMsg is defined
 
   - name: Get Interface Config
@@ -145,6 +147,4 @@
     when: ConfigList is defined and item.ansible_facts is defined
 
   - name: Display Interface Config
-    debug: var=item.stdout_lines[0]
-    loop: '{{IntConfig.results}}'
-    when: item.stdout_lines[0] is defined
+    debug: var=IntConfig.results[0].stdout_lines[0]
