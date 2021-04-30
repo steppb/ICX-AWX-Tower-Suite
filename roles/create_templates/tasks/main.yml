@@ -68,6 +68,7 @@
   when:
     - AwxMgmtIgnored.results[idx].msg != ''
     - ExistingTemplates.results[idx].json.results[0] is defined
+    - ExistingTemplates.results[idx].json.results[0].project == PjId|int
   vars:
     TemplateId: '{{ExistingTemplates.results[idx].json.results[0].id}}'
     ExtraVars: '{{ExistingTemplates.results[idx].json.results[0].extra_vars}}'
