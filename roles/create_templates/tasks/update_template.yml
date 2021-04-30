@@ -52,10 +52,10 @@
           url: '{{AwxApi}}/job_templates/{{TemplateId}}/survey_spec/'
           method: POST
           headers: {Content-Type: "application/json"}
-          body: "{{tPromptPayload|regex_replace('@question','?')}}"
+          body: "{{tPayload|regex_replace('@question','?')|regex_replace('@comma',',')}}"
           body_format: json
         register: PromptStatus
-        vars: {tPromptPayload: "{{PromptPayload|regex_replace('@colon', ':')}}"}
+        vars: {tPayload: "{{PromptPayload|regex_replace('@colon', ':')}}"}
 
       - name: Enable Survey Prompts
         uri:
