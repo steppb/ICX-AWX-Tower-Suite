@@ -46,7 +46,7 @@
 
   - name: Image-Flash-Copy - Check if Boot Preference Change is Needed
     block:
-    - name: Remove Boot Statements
+    - name: Image-Flash-Copy - Remove Boot Statements
       icx_config: {lines: 'no boot sys fl {{item}}', save_when: changed}
       with_items:
         - pri

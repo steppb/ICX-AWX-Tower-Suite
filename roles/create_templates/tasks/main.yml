@@ -33,42 +33,65 @@
     delay: 10
   when: PjUpdateInfo.json.can_update|bool
 
-- name: Get Playbook List
-  uri: {url: '{{AwxApi}}/projects/{{PjId}}/playbooks/'}
+- name: Get List of Playbooks
+  find:
+    paths: '{{PjPath}}'
+    recurse: no
+    patterns: '*.yml'
+    get_checksum: yes
   register: PbList
 
 - name: Get List of Ignored Playbooks
   lineinfile:
-    path: '{{PjPath}}/{{item}}'
+    path: '{{PbList.files[idx].path}}'
     regex: '^#! AwxMgmtIgnore$'
     line: '#! AwxMgmtIgnore'
   changed_when: false
   check_mode: yes
-  loop: "{{PbList.json}}"
+  loop: '{{range(0, PbList.files|length)|list}}'
+  loop_control: {index_var: idx}
   register: AwxMgmtIgnored
 
 - name: Get List of Existing Templates
-  uri: {url: '{{AwxApi}}/job_templates/?name={{item|regex_replace(YamlExt)}}'}
-  loop: '{{PbList.json}}'
+  uri: {url: '{{AwxApi}}/job_templates/?name={{tBasename|regex_replace(YamlExt)}}'}
+  loop: '{{range(0, PbList.files|length)|list}}'
   loop_control: {index_var: idx}
+  vars: {tBasename: '{{PbList.files[idx].path|basename}}'}
   register: ExistingTemplates
 
 - name: Create Templates
   include_tasks: create_templates.yml
-  loop: '{{PbList.json}}'
-  loop_control: {loop_var: PbFileName, index_var: idx}
+  loop: '{{range(0, PbList.files|length)|list}}'
+  loop_control: {loop_var: PbFileEntry, index_var: idx}
+  vars: {PbFileName: '{{PbList.files[idx].path|basename}}'}
   when:
     - AwxMgmtIgnored.results[idx].msg != ''
     - ExistingTemplates.results[idx].json.results[0] is not defined
 
 - name: Update Existing Templates
   include_tasks: update_template.yml
-  loop: '{{PbList.json}}'
-  loop_control: {loop_var: PbFileName, index_var: idx}
+  loop: '{{range(0, PbList.files|length)|list}}'
+  loop_control: {loop_var: PbFileEntry, index_var: idx}
+  vars:
+    PbChecksum: '{{PbList.files[idx].checksum}}'
+    PbFileName: '{{PbList.files[idx].path|basename}}'
+    TemplateId: '{{ExistingTemplates.results[idx].json.results[0].id}}'
+    ExtraVars: '{{ExistingTemplates.results[idx].json.results[0].extra_vars}}'
   when:
     - AwxMgmtIgnored.results[idx].msg != ''
     - ExistingTemplates.results[idx].json.results[0] is defined
     - ExistingTemplates.results[idx].json.results[0].project == PjId|int
+
+- name: Create List of Playbook Checksums
+  set_fact: {PjPlaybooks: '{{PjPlaybooks|default({})|combine({tBasename:tChecksum})}}'}
+  loop: '{{range(0, PbList.files|length)|list}}'
+  loop_control: {index_var: idx}
   vars:
-    TemplateId: '{{ExistingTemplates.results[idx].json.results[0].id}}'
-    ExtraVars: '{{ExistingTemplates.results[idx].json.results[0].extra_vars}}'
+    tBasename: '{{PbList.files[idx].path|basename}}'
+    tChecksum: '{{PbList.files[idx].checksum}}'
+
+- name: Add Checksums to AWX Server Facts
+  set_fact:
+    ansible_icx_mgmt_playbooks: '{{tMgmtFact|combine({prompt_project_name:PjPlaybooks})}}'
+    cacheable: yes
+  vars: {tMgmtFact: '{{ansible_icx_mgmt_playbooks|default({}, true)}}'}

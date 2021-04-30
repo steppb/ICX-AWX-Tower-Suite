@@ -89,4 +89,7 @@
 
           {{PlaybookComments.stdout}}
       body_format: json
-  when: TemplateVer == "None" or TemplateVer is version(AwxMgmtVer, "<")
+  when: TemplateVer == "None" or
+        TemplateVer is version(AwxMgmtVer, "<") or
+        ansible_icx_mgmt_playbooks[prompt_project_name][PbFileName] is not defined or
+        ansible_icx_mgmt_playbooks[prompt_project_name][PbFileName] != PbChecksum
