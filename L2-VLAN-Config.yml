@@ -1,5 +1,5 @@
 #! Description: Add or modify VLAN.
-#! Prompt: [{question_name: VLAN ID@colon, question_description: '', required: true, type: integer, variable: prompt_l2_vid, min: 1, max: 4086, default: '', choices: ''}, {question_name: VLAN Name@colon, question_description: '', required: false, type: text, variable: prompt_l2_vname, min: 1, max: 1024, default: '', choices: ''}, {question_name: VLAN Tagging@colon, question_description: '', required: false, type: multiplechoice, variable: prompt_l2_vtag, min: null, max: null, default: '', choices: tagged\nuntagged}, {question_name: Interface(s)@colon, question_description: Enter single interface or range (e.g. e1/1/1 or e1/1/1 to 1/1/10), required: false, type: text, variable: prompt_l2_vint, min: 5, max: 1024, default: '', choices: ''}, {question_name: Remove Interface(s) From VLAN@question, question_description: '', required: false, type: multiplechoice, variable: prompt_l2_vremove, min: null, max: null, default: 'no', choices: yes\nno}, {question_name: Create Router Interface@question, question_description: '', required: false, type: multiplechoice, variable: prompt_l2_vrtr, min: null, max: null, default: 'no', choices: yes\nno}]
+#! Prompt: [{question_name: VLAN ID@colon, question_description: '', required: true, type: integer, variable: prompt_l2_vid, min: 1, max: 4086, default: '', choices: ''}, {question_name: VLAN Name@colon, question_description: '', required: false, type: text, variable: prompt_l2_vname, min: 1, max: 1024, default: '', choices: ''}, {question_name: VLAN Tagging@colon, question_description: '', required: false, type: multiplechoice, variable: prompt_l2_vtag, min: null, max: null, default: '', choices: tagged\nuntagged}, {question_name: Interface(s)@colon, question_description: Enter single interface or range (e.g. e1/1/1 or e1/1/1 to 1/1/10), required: false, type: text, variable: prompt_l2_vint, min: 5, max: 1024, default: '', choices: ''}, {question_name: Remove Interface(s) From VLAN@question, question_description: '', required: false, type: multiplechoice, variable: prompt_l2_vremove, min: null, max: null, default: 'no', choices: yes\nno}, {question_name: Create Router Interface@question, question_description: '', required: false, type: multiplechoice, variable: prompt_l2_vrtr, min: null, max: null, default: 'no', choices: yes\nno}, {question_name: Spanning-Tree Protocol@colon, question_description: '', required: false, type: multiplechoice, variable: prompt_l2_vstp, min: null, max: null, default: '', choices: Disable\n802.1d\n802.1w}]
 # =====================
 ---
 - hosts: all
@@ -9,26 +9,23 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
-    newline_var: "\r"
-    error_parse: '^.*ConnectionError: '
-    eth_var: '(e|et|eth|ethe|ether|ethern|etherne|ethernet)'
-    port_var: '([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2})'
-    range_var: '^.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*to.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*$'
-    VlanName:
-    RemCmd:
-    VlanIntCmd:
-    RtrIntCmd:
+    NewlineVar: "\r"
+    ErrParse: '^.*ConnectionError: '
+    EthRe: '(e|et|eth|ethe|ether|ethern|etherne|ethernet)'
+    PortRe: '([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2})'
+    RngRe: '^.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*to.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*$'
 
   tasks:
   - name: Format Interface List
-    set_fact: {VlanInt: '{{prompt_l2_vint|regex_replace(eth_var)|regex_replace(port_var, "e \1")}}'}
+    set_fact:
+      VlanInt: '{{prompt_l2_vint|regex_replace(EthRe)|regex_replace(PortRe, "e \1")}}'
     when:
       - prompt_l2_vint is defined
       - prompt_l2_vint != ''
       - "'to' not in prompt_l2_vint"
 
   - name: Format Interface Range
-    set_fact: {VlanInt: '{{prompt_l2_vint|regex_replace(range_var, "e \1 to \2")}}'}
+    set_fact: {VlanInt: '{{prompt_l2_vint|regex_replace(RngRe, "e \1 to \2")}}'}
     when:
       - prompt_l2_vint is defined
       - prompt_l2_vint != ''
@@ -48,7 +45,7 @@
       - VlanInt is defined
 
   - name: Setup VLAN Interface Command
-    set_fact: {VlanIntCmd: '{{RemCmd}} {{prompt_l2_vtag}} {{VlanInt}}'}
+    set_fact: {VlanIntCmd: '{{RemCmd|default()}} {{prompt_l2_vtag}} {{VlanInt}}'}
     when:
       - prompt_l2_vtag is defined
       - prompt_l2_vtag != ''
@@ -58,28 +55,60 @@
     set_fact: {RtrIntCmd: 'router-interface ve {{prompt_l2_vid}}'}
     when: prompt_l2_vrtr is defined and prompt_l2_vrtr|bool
 
+  - name: STP Config Block
+    block:
+    - name: STP Disable Setup Block
+      block:
+      - name: Check For Current STP Config
+        icx_command: {commands: 'show run vlan {{prompt_l2_vid}} | incl spanning'}
+        register: CurStpCfg
+
+      - name: Set Command to Remove 802.1w STP
+        set_fact: {DisableRstpCmd: 'no spanning-tree 802-1w'}
+        when: "'802-1w' in CurStpCfg.stdout[0]"
+
+      - name: Set Command to Remove 802.1d STP
+        set_fact: {DisableStpCmd: 'no spanning-tree'}
+        when: "'spanning-tree' in CurStpCfg.stdout[0]"
+      when: prompt_l2_vstp == 'Disable'
+
+    - name: STP Enable Block
+      block:
+      - name: Set Spanning-Tree Command
+        set_fact: {EnableStp: 'spanning-tree'}
+        when: "'802.1d' in prompt_l2_vstp"
+
+      - name: Set RSTP Command
+        set_fact: {EnableStp: 'spanning-tree 802-1w'}
+        when: "'802.1w' in prompt_l2_vstp"
+      when: prompt_l2_vstp != 'Disable'
+    when: prompt_l2_vstp is defined
+
   - name: Configure VLAN
     icx_config:
       lines: |
-        vlan {{prompt_l2_vid}} {{VlanName}}
-         {{VlanIntCmd}}
-         {{RtrIntCmd}}
+        vlan {{prompt_l2_vid}} {{VlanName|default()}}
+         {{VlanIntCmd|default()}}
+         {{RtrIntCmd|default()}}
+         {{DisableRstpCmd|default()}}
+         {{DisableStpCmd|default()}}
+         {{EnableStp|default()}}
       save_when: changed
-    register: icxconfig_status
-    failed_when: icxconfig_status.msg is defined and "MODULE FAILURE" not in icxconfig_status.msg
+    register: IcxCfgStatus
+    failed_when: IcxCfgStatus.msg is defined and "MODULE FAILURE" not in IcxCfgStatus.msg
 
   - name: Parse Switch Error
     set_fact:
-      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"
-    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
+      ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+    when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
 
   - name: Display Switch Error
-    assert: {that: error_msg is not defined, fail_msg: '{{error_msg.split(newline_var)}}'}
-    when: error_msg is defined
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(NewlineVar)}}'}
+    when: ErrMsg is defined
 
   - name: Get VLAN Info
-    icx_command: {commands: 'show vlan {{prompt_l2_vid}}'}
-    register: output
+    icx_command: {commands: 'show run vlan {{prompt_l2_vid}}'}
+    register: VlanCfg
 
   - name: Display VLAN Info
-    debug: var=output.stdout_lines[0]
+    debug: var=VlanCfg.stdout_lines[0]
