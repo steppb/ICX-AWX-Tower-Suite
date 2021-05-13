@@ -1,0 +1,28 @@
+#! Description: Configure the system location.
+#! Prompt: [{question_name: SNMP Location@colon, required: true, type: text, variable: prompt_snmp_loc, min: 1, max: 255}]
+# =====================
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+    NewlineVar: "\r"
+    ErrParse: '^.*ConnectionError: '
+
+  tasks:
+  - name: Configure System Location
+    icx_config: {lines: 'snmp-server location {{prompt_snmp_loc}}', save_when: changed}
+    register: IcxCfgStatus
+    failed_when: IcxCfgStatus.msg is defined and "MODULE FAILURE" not in IcxCfgStatus.msg
+
+  - name: Parse Switch Error
+    set_fact:
+      ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+    when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(NewlineVar)}}'}
+    when: ErrMsg is defined
