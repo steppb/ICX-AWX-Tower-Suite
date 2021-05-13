@@ -1,6 +1,8 @@
 #! Description: Apply SSH hardening config.
+#! Prompt: [{question_name: SSH IPv4 Access-List Name or Number@colon, required: false, type: text, variable: prompt_ssh_ipv4_acl, min: 1, max: 1024, default: SSH_ACCESS}, {question_name: SSH IPv6 Access-List Name or Number@colon, required: false, type: text, variable: prompt_ssh_ipv6_acl, min: 1, max: 1024, default: RemoteAccess}, {question_name: SSH Idle Time@colon, question_description: Idle time in minutes, required: true, type: integer, variable: prompt_ssh_idletime, min: 0, max: 240, default: 10}, {question_name: SSH Timeout@colon, question_description: SSH login timeout in seconds, required: true, type: integer, variable: prompt_ssh_timeout, min: 1, max: 120, default: 60}, {question_name: Disable AES-CBC Encryption Mode@question, required: true, type: multiplechoice, variable: prompt_ssh_disable_aescbc, default: 'yes', choices: yes\nno}]
 # =====================
-# Note: Remote-SSH-ACLPermit needs to be applied before running this template.
+# Note: SSH access-list must be created with L3-IPv4-ACL or Remote-SSH-ACLPermit before
+# running this template.
 ---
 - hosts: all
   connection: network_cli
@@ -14,18 +16,19 @@
     LgcyOffset: 0
 
   tasks:
-  - name: Get SSH_ACCESS ACL
-    icx_command: {commands: sh ip access-list SSH_ACCESS}
+  - name: Get IPv4 SSH ACL
+    icx_command: {commands: 'show ip access-list {{prompt_ssh_ipv4_acl}}'}
     register: AclStatus
 
-  - name: Verify SSH_ACCESS ACL
+  - name: Verify SSH ACL
     assert:
       that: AclStatus.stdout[0]|default("null", true) != "null"
       fail_msg:
-        - "ERROR: ACL 'SSH_ACCESS' is not configured"
-        - "Remote-SSH-ACLPermit needs to be applied before running this template"
+        - "ERROR: Access-list {{prompt_ssh_ipv4_acl}} is not configured."
+        - "       Create SSH access-list with L3-IPv4-ACL or Remote-SSH-ACLPermit"
+        - "       before running this template."
 
-  - name: Get client IP
+  - name: Get List of Connected Users
     icx_command: {commands: sh who | incl client|you are connecting}
     register: WhoOut
 
@@ -45,7 +48,7 @@
     - name: Get SSH ACL from device
       icx_command:
         commands: |
-          sh ip access-list SSH_ACCESS
+          sh ip access-list {{prompt_ssh_ipv4_acl}}
           sh run | incl Current configuration
       register: SshAcl
 
@@ -101,24 +104,35 @@
       assert:
         that:
           - PermitIdx is defined
-          - PermitIdx|int < DenyIdx|default(PermitIdx|int + 1)
+          - PermitIdx|int < DenyIdx|default(PermitIdx|int + 1)|int
         msg: "ERROR: Your IP is blocked in SSH ACL for switch. Aborting..."
-      vars: {tDenyIdx: '{{DenyIdx|default(PermitIdx|int + 1)}}'}
     vars:
       bIp1: '{{ClientIp.split(".")[0]}}'
       bIp2: '{{ClientIp.split(".")[1]}}'
       bIp3: '{{ClientIp.split(".")[2]}}'
       bIp4: '{{ClientIp.split(".")[3]}}'
-    when: "':' not in ClientIp"
+    when: prompt_ssh_ipv4_acl|default("null", true) != "null" and ':' not in ClientIp
+
+  - name: Setup IPv4 ACL Configuration
+    set_fact: {Ipv4AccessGroup: 'ssh access-group {{prompt_ssh_ipv4_acl}}'}
+    when: prompt_ssh_ipv4_acl|default("null", true) != "null"
+
+  - name: Setup IPv6 ACL Configuration
+    set_fact: {Ipv6AccessGroup: 'ssh access-group ipv6 {{prompt_ssh_ipv6_acl}}'}
+    when: prompt_ssh_ipv6_acl|default("null", true) != "null"
+
+  - name: Setup AES-CBC Disable Configuration
+    set_fact: {DisableAesCbc: ip ssh encryption disable-aes-cbc}
+    when: prompt_ssh_disable_aescbc|bool
 
   - name: Harden SSH Server
     icx_config:
       lines: |
-        ip ssh idle-time 10
-        ip ssh timeout 60
-        ssh access-group SSH_ACCESS
-        ssh access-group ipv6 RemoteAccess
-        ip ssh encryption disable-aes-cbc
+        ip ssh idle-time {{prompt_ssh_idletime|default("10")}}
+        ip ssh timeout {{prompt_ssh_timeout|default("60")}}
+        {{Ipv4AccessGroup|default()}}
+        {{Ipv6AccessGroup|default()}}
+        {{DisableAesCbc|default()}}
       save_when: changed
     register: IcxCfgStatus
     failed_when: false
@@ -132,9 +146,5 @@
     assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(NewlineVar)}}'}
     when: ErrMsg is defined
 
-  - name: Get SSH Config
-    icx_command: {commands: show ip ssh config}
-    register: SshCfg
-
-  - name: Display SSH Config
-    debug: var=SshCfg.stdout_lines[0]
+  - {name: Get SSH Config, icx_command: {commands: show ip ssh config}, register: SshCfg}
+  - {name: Display SSH Config, debug: {msg: "{{SshCfg.stdout_lines[0]}}"}}

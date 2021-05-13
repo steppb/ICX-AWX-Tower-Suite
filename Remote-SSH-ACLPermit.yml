@@ -1,5 +1,5 @@
 #! Description: Add SSH ACL permit entry for IPv4/6 host or range.
-#! Prompt: [{question_name: IPv4/6 Address or Range@colon, question_description: (e.g. 10.10.10.0/24 or fc00@colon@colon0/64 for range), required: true, type: text, variable: prompt_ssh_allow, min: 1, max: 1024, default: '', choices: ''}, {question_name: Log Matches@question, question_description: '', required: false, type: multiplechoice, variable: prompt_log_match, min: null, max: null, default: 'no', choices: yes\nno, new_question: true}]
+#! Prompt: [{question_name: SSH Access-List name or number@colon, required: true, type: text, variable: prompt_ssh_acl_name, min: 1, max: 1024}, {question_name: IPv4/6 Address or Range@colon, question_description: (e.g. 10.10.10.0/24 or fc00@colon@colon0/64 for range), required: true, type: text, variable: prompt_ssh_allow, min: 1, max: 1024}, {question_name: Log Matches@question, required: true, type: multiplechoice, variable: prompt_log_match, default: 'no', choices: yes\nno}]
 # =====================
 ---
 - hosts: all
@@ -9,74 +9,65 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
-    newline_var: "\r"
-    error_parse: '^.*ConnectionError: '
-    log_match:
+    NewlineVar: "\r"
+    ErrParse: '^.*ConnectionError: '
 
   tasks:
-  - name: Set Log Option
-    set_fact: {log_match: log}
-    when: prompt_log_match|bool
+  - {name: Set Log Option, set_fact: {log_match: log}, when: prompt_log_match|bool}
 
-  - name: Add IPv4 Host or Subnet to ACL
-    icx_config:
-      lines: permit {{prompt_ssh_allow}} {{log_match}}
-      parents: ip access-list standard SSH_ACCESS
-      save_when: changed
-    register: icxconfig_status
-    failed_when: icxconfig_status.msg is defined and "MODULE FAILURE" not in icxconfig_status.msg
+  - name: IPv4 ACL Config Block
+    block:
+    - name: Add IPv4 Host or Subnet to ACL
+      icx_config:
+        lines: permit {{prompt_ssh_allow}} {{log_match|default()}}
+        parents: ip access-list standard {{prompt_ssh_acl_name}}
+        save_when: changed
+      register: IcxCfgStatus
+      failed_when: IcxCfgStatus.msg is defined and "MODULE FAILURE" not in IcxCfgStatus.msg
+
+    - name: Parse Switch Error
+      set_fact:
+        ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+      when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
+
+    - name: Display Switch Error
+      assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(NewlineVar)}}'}
+      when: ErrMsg is defined
+
+    - name: Get IPv4 ACL
+      icx_command: {commands: 'show ip access-list {{prompt_ssh_acl_name}}'}
+      register: AclCfg
+
+    - {name: Display IPv4 ACL, debug: {msg: "{{AclCfg.stdout_lines[0]}}"}}
+    - {name: End Play for IPv4 Config, meta: end_host}
     when: "':' not in prompt_ssh_allow"
 
-  - name: Parse Switch Error
-    set_fact:
-      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"
-    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
+  - name: IPv6 Config Block
+    block:
+    - name: Setup for IPv6 Host
+      set_fact: {Ipv6Host: host}
+      when: "'/' not in prompt_ssh_allow"
 
-  - name: Display Switch Error
-    assert: {that: error_msg is not defined, fail_msg: '{{error_msg.split(newline_var)}}'}
-    when: error_msg is defined
+    - name: Add IPv6 Host to ACL
+      icx_config:
+        lines: permit ipv6 {{Ipv6Host|default()}} {{prompt_ssh_allow}} 
+               any {{log_match|default()}}
+        parents: ipv6 access-list {{prompt_ssh_acl_name}}
+        save_when: changed
+      register: IcxCfgStatus
+      failed_when: IcxCfgStatus.msg is defined and "MODULE FAILURE" not in IcxCfgStatus.msg
 
-  - name: Get IPv4 ACL
-    icx_command: {commands: show ip access-list SSH_ACCESS}
-    register: output
-    when: "':' not in prompt_ssh_allow"
+    - name: Parse Switch Error
+      set_fact:
+        ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+      when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
 
-  - name: Display IPv4 ACL
-    debug: var=output.stdout_lines[0]
-    when: "':' not in prompt_ssh_allow"
+    - name: Display Switch Error
+      assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(NewlineVar)}}'}
+      when: ErrMsg is defined
 
-  - name: End Play for IPv4 Config
-    meta: end_host
-    when: "':' not in prompt_ssh_allow"
+    - name: Get IPv6 ACL
+      icx_command: {commands: 'show ipv6 access-list {{prompt_ssh_acl_name}}'}
+      register: AclCfg
 
-  - name: Setup for IPv6 Host
-    set_fact: {ipv6_permit: 'host {{prompt_ssh_allow}}'}
-    when: "'/' not in prompt_ssh_allow"
-
-  - name: Setup for IPv6 Prefix
-    set_fact: {ipv6_permit: '{{prompt_ssh_allow}}'}
-    when: "'/' in prompt_ssh_allow"
-
-  - name: Add IPv6 Host to ACL
-    icx_config:
-      lines: permit ipv6 {{ipv6_permit}} any {{log_match}}
-      parents: ipv6 access-list RemoteAccess
-      save_when: changed
-    register: icxconfig_status
-    failed_when: icxconfig_status.msg is defined and "MODULE FAILURE" not in icxconfig_status.msg
-
-  - name: Parse Switch Error
-    set_fact:
-      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"
-    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
-
-  - name: Display Switch Error
-    assert: {that: error_msg is not defined, fail_msg: '{{error_msg.split(newline_var)}}'}
-    when: error_msg is defined
-
-  - name: Get IPv6 ACL
-    icx_command: {commands: show ipv6 access-list RemoteAccess}
-    register: output
-
-  - name: Display IPv6 ACL
-    debug: var=output.stdout_lines[0]
+    - {name: Display IPv6 ACL, debug: {msg: "{{output.stdout_lines[0]}}"}}
