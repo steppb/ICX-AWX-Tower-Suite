@@ -1,0 +1,46 @@
+#! Description: Enable/Disable LLDP on interface(s).
+#! Prompt: [{question_name: Enable/Disable LLDP@colon, required: true, type: multiplechoice, variable: prompt_lldp_enable, default: Enable, choices: Enable\nDisable}, {question_name: LLDP Operating Mode@colon, required: true, type: multiplechoice, variable: prompt_lldp_opmode, default: ports, choices: ports\nreceive\ntransmit}, {question_name: Ethernet Interface(s)@colon, question_description: (e.g. e 1/1/1@comma e 1/1/2 to 1/1/5), required: true, type: text, variable: prompt_lldp_enable_int, min: 3, max: 1024, default: all}]
+# =====================
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+    NewlineVar: "\r"
+    ErrParse: '^.*ConnectionError: '
+    EthRe: '(e|et|eth|ethe|ether|ethern|etherne|ethernet)'
+    PortRe: '([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2})'
+    RngRe: '^.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*to.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*$'
+
+  tasks:
+  - name: Setup for LLDP Disable
+    set_fact: {NoLldp: "no lldp enable"}
+    when: "'Disable' in prompt_lldp_enable"
+
+  - name: Format Interface List
+    set_fact: {EthInt: '{{tEthInt|regex_replace(PortRe, "e \1")}}'}
+    vars: {tEthInt: '{{prompt_lldp_enable_int|regex_replace(EthRe)}}'}
+    when: "'to' not in prompt_lldp_enable_int"
+
+  - name: Format Interface Range
+    set_fact: {EthInt: '{{prompt_lldp_enable_int|regex_replace(RngRe, "e \1 to \2")}}'}
+    when: "'to' in prompt_lldp_enable_int"
+
+  - name: Apply LLDP Interface Enable Configuration
+    icx_config:
+      lines: '{{NoLldp|default("lldp enable", true)}} {{prompt_lldp_opmode}} {{EthInt}}'
+      save_when: changed
+    register: IcxCfgStatus
+    failed_when: IcxCfgStatus.msg is defined and "MODULE FAILURE" not in IcxCfgStatus.msg
+
+  - name: Parse Switch Error
+    set_fact:
+      ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+    when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(NewlineVar)}}'}
+    when: ErrMsg is defined
