@@ -1,5 +1,5 @@
 #! Description: Add or replace SNMPv3 user.
-#! Prompt: [{question_name: SNMPv3 User Name@colon, question_description: '', required: true, type: text, variable: prompt_snmp_user, min: 1, max: 32, default: '', choices: ''}, {question_name: SNMPv3 Group Name@colon, question_description: '', required: true, type: text, variable: prompt_snmp_group, min: 1, max: 32, default: '', choices: ''}, {question_name: Auth@colon, question_description: (SHA), required: true, type: text, variable: prompt_snmp_auth, min: 8, max: 20, default: '', choices: ''}, {question_name: Priv@colon, question_description: (AES), required: true, type: text, variable: prompt_snmp_priv, min: 12, max: 16, default: '', choices: ''}]
+#! Prompt: [{question_name: SNMPv3 User Name@colon, required: true, type: text, variable: prompt_snmp_user, min: 1, max: 32}, {question_name: SNMPv3 Group Name@colon, required: true, type: text, variable: prompt_snmp_group, min: 1, max: 32}, {question_name: SNMPv3 Access ACL@colon, question_description: (Optional), required: false, type: integer, variable: prompt_snmp_acl, min: 1, max: 99}, {question_name: Authentication Method@colon, required: true, type: multiplechoice, variable: prompt_snmp_auth_method, default: sha, choices: md5\nsha}, {question_name: Authentication Password@colon, question_description: (8 to 16 chars for MD5@comma 8 to 20 chars for SHA), required: true, type: password, variable: prompt_snmp_auth, min: 8, max: 20}, {question_name: Privacy Method@colon, required: true, type: multiplechoice, variable: prompt_snmp_priv_method, default: aes, choices: aes\ndes}, {question_name: Privacy Password@colon, question_description: (8 to 16 chars for DES@comma 12 to 16 chars for AES), required: true, type: password, variable: prompt_snmp_priv, min: 8, max: 16}]
 # =====================
 ---
 - hosts: all
@@ -9,10 +9,14 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
-    newline_var: "\r"
+    NewlineVar: "\r"
     ErrParse: '^.*ConnectionError: '
 
   tasks:
+  - name: Setup for Access ACL
+    set_fact: {AccessAcl: 'access {{prompt_snmp_acl}}'}
+    when: prompt_snmp_acl|default('null', true) != 'null'
+
   - name: Get SNMPv3 User Config
     icx_command: {commands: 'show run | include snmp-server user {{prompt_snmp_user}}'}
     register: SnmpUserCfg
@@ -23,8 +27,9 @@
 
   - name: Configuring SNMPv3 User
     icx_config:
-      lines: |
-        snmp-server user {{prompt_snmp_user}} {{prompt_snmp_group}} v3 auth sha {{prompt_snmp_auth}} priv aes {{prompt_snmp_priv}}
+      lines: snmp-server user {{prompt_snmp_user}} {{prompt_snmp_group}} v3
+             {{AccessAcl|default()}} auth {{prompt_snmp_auth_method}}
+             {{prompt_snmp_auth}} priv {{prompt_snmp_priv_method}} {{prompt_snmp_priv}}
       save_when: changed
     register: IcxCfgStatus
     failed_when: false
@@ -35,12 +40,8 @@
     when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
 
   - name: Display Switch Error
-    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(newline_var)}}'}
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(NewlineVar)}}'}
     when: ErrMsg is defined
 
-  - name: Get SNMPv3 User Config
-    icx_command: {commands: show snmp user}
-    register: SnmpCfg
-
-  - name: Display SNMPv3 User Config
-    debug: var=SnmpCfg.stdout_lines[0]
+  - {name: Get SNMP Config, icx_command: {commands: show snmp user}, register: SnmpCfg}
+  - {name: Display SNMPv3 User Config, debug: {msg: '{{SnmpCfg.stdout_lines[0]}}'}}
