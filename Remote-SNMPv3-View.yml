@@ -1,0 +1,31 @@
+#! Description: Include/exclude MIB subtree from view.
+#! Prompt: [{question_name: SNMPv3 View Name@colon, required: true, type: text, variable: prompt_snmp_view_name, min: 1, max: 32,}, {question_name: MIB subtree@colon, required: true, type: text, variable: prompt_snmp_view_mib, min: 1, max: 1024}, {question_name: Include or Exclude MIB Subtree from view@colon, required: true, type: multiplechoice, variable: prompt_snmp_view_include, choices: included\nexcluded}]
+# =====================
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+    NewlineVar: "\r"
+    ErrParse: '^.*ConnectionError: '
+
+  tasks:
+  - name: Configure SNMP View
+    icx_config:
+      lines: snmp-server view {{prompt_snmp_view_name}}
+             {{prompt_snmp_view_mib}}  {{prompt_snmp_view_include}} 
+      save_when: changed
+    register: IcxCfgStatus
+    failed_when: IcxCfgStatus.msg is defined and "MODULE FAILURE" not in IcxCfgStatus.msg
+
+  - name: Parse Switch Error
+    set_fact:
+      ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+    when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(NewlineVar)}}'}
+    when: ErrMsg is defined
