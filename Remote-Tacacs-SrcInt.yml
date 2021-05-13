@@ -1,4 +1,4 @@
-#! Description: Configure the source interface for RADIUS traffic.
+#! Description: Configure the source interface for TACACS traffic.
 #! Prompt: [{question_name: Source Interface@colon, question_description: (i.e. eth 1/2/2@comma management 1), required: true, type: text, variable: prompt_srcint, min: 2, max: 1024, default: ''}]
 # =====================
 # The <host_srcint> variable takes precedence over the <prompt_srcint> variable that
@@ -31,8 +31,8 @@
     set_fact: {SrcInt: '{{SrcInt|regex_replace("^([A-Za-z]*)","\1 ")}}'}
     when: "' ' not in prompt_srcint"
 
-  - name: Configure RADIUS Source-Interface
-    icx_config: {lines: 'ip radius source-interface {{SrcInt}}', save_when: changed}
+  - name: Configure TACACS Source-Interface
+    icx_config: {lines: 'ip tacacs source-interface {{SrcInt}}', save_when: changed}
     register: IcxCfgStatus
     failed_when: IcxCfgStatus.msg is defined and "MODULE FAILURE" not in IcxCfgStatus.msg
 

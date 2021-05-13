@@ -1,13 +1,17 @@
-#! Description: Configure the source interface for network time queries.
-#! Prompt: [{question_name: Source Interface Type, question_description: Select the interface type@colon, required: false, type: multiplechoice, variable: prompt_ntp_inttype, min: null, max: null, default: '', choices: ethernet\nloopback\nve}, {question_name: Source Interface Number, question_description: Enter the interface number, required: false, type: text, variable: prompt_ntp_intnum, min: 0, max: 1024, default: '', choices: ''}]
+#! Description: Configure the source interface for NTP traffic.
+#! Prompt: [{question_name: Source Interface@colon, question_description: (i.e. eth 1/2/2@comma ve 10), required: true, type: text, variable: prompt_srcint, min: 2, max: 1024, default: ''}]
 # =====================
-# The following variables can be used to set the NTP source interface.
-# They are listed in order of precedence (higher overrides lower).
-# 
-# <host_ntp_srcint>: Define at the Inventory Host. Only defines the NTP source interface for the host.
-# <host_srcint>: Define at the Inventory Host.  Define source interface for all services.  Valid interface types: (ethernet|loopback|ve)
-# <prompt_ntp_inttype> & <prompt_ntp_intnum>: Defined by AWX Survey Prompt.
-# <template_ntp_srcint>: Set at template to configure all inventory hosts with the same source interface
+# The <host_srcint> variable takes precedence over the <prompt_srcint> variable that
+# is set by the AWX survey prompt.  The <host_srcint> variable is used to set the
+# source-interface for outgoing RADIUS, TACACS, NTP, SNMP and syslog traffic.
+# It can be manually defined for the host, inventory, template, etc.
+#
+# The management interface cannot be used as the source-interface for NTP or SNMP.
+# A LAG interface cannot be used as a source-interface for SNMP.
+# If the management or a LAG interface is defined in the <host_srcint> variable,
+# the following variables can be used to override for the corresponding application:
+# <host_snmp_srcint>: Use to set source-interface for SNMP.
+# <host_ntp_srcint>: Use to set source-interface for NTP.
 ---
 - hosts: all
   connection: network_cli
@@ -16,38 +20,20 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
-    newline_var: "\r"
+    NewlineVar: "\r"
     ErrParse: '^.*ConnectionError: '
 
   tasks:
-  - name: Use 'host_ntp_srcint' Variable
-    set_fact: {NtpSrcInt: "{{host_ntp_srcint}}"}
-    when: host_ntp_srcint is defined
-
-  - name: Use 'host_srcint' Variable
-    set_fact: {NtpSrcInt: "{{host_srcint}}"}
-    when: host_srcint is defined and NtpSrcInt is not defined
-
-  - name: Use AWX Survey Prompt Variables
-    set_fact: {NtpSrcInt: "{{prompt_ntp_inttype}} {{prompt_ntp_intnum}}"}
-    when:
-      - prompt_ntp_inttype is defined
-      - prompt_ntp_intnum is defined
-      - NtpSrcInt is not defined
-
-  - name: Use 'template_ntp_srcint' Variable
-    set_fact: {NtpSrcInt: "{{template_ntp_srcint}}"}
-    when: template_ntp_srcint is defined and NtpSrcInt is not defined
-
-  - name: Check Variable
-    assert: {that: NtpSrcInt is defined, fail_msg: "No variable defined"}
+  - name: Set Source-Interface Variable
+    set_fact:
+      SrcInt: '{{host_ntp_srcint|default(host_srcint, true)|default(prompt_srcint, true)}}'
 
   - name: Correct Variable Spacing
-    set_fact: {NtpSrcInt: '{{NtpSrcInt|regex_replace("^([a-z]*)","\1 ")}}'}
-    when: "' ' not in NtpSrcInt"
+    set_fact: {SrcInt: '{{SrcInt|regex_replace("^([A-Za-z]*)","\1 ")}}'}
+    when: "' ' not in prompt_srcint"
 
-  - name: Configure NTP Source Interface
-    icx_config: {lines: 'source-interface {{NtpSrcInt}}', parents: ntp, save_when: changed}
+  - name: Configure NTP Source-Interface
+    icx_config: {lines: 'source-interface {{SrcInt}}', parents: ntp, save_when: changed}
     register: IcxCfgStatus
     failed_when: IcxCfgStatus.msg is defined and "MODULE FAILURE" not in IcxCfgStatus.msg
 
@@ -57,5 +43,5 @@
     when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
 
   - name: Display Switch Error
-    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(newline_var)}}'}
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(NewlineVar)}}'}
     when: ErrMsg is defined
