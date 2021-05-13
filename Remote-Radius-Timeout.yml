@@ -1,0 +1,39 @@
+#! Description: Configure RADIUS timeout.
+#! Prompt: [{question_name: Radius-Server Retransmit@colon, question_description: Number of retries before giving up, required: true, type: integer, variable: prompt_radius_retransmit, min: 1, max: 5, default: 3, choices: ''}, {question_name: Radius-Server Timeout@colon, question_description: Server timeout in seconds, required: true, type: integer, variable: prompt_radius_timeout, min: 1, max: 15, default: 3, choices: ''}]
+# =====================
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+    NewlineVar: "\r"
+    ErrParse: '^.*ConnectionError: '
+
+  tasks:
+  - name: Configure Radius Timeout Settings
+    icx_config:
+      lines: |
+        radius-server retransmit {{prompt_radius_retransmit|default(3)}}
+        radius-server timeout {{prompt_radius_timeout|default(3)}}
+      save_when: changed
+    register: IcxCfgStatus
+    failed_when: IcxCfgStatus.msg is defined and "MODULE FAILURE" not in IcxCfgStatus.msg
+
+  - name: Parse Switch Error
+    set_fact:
+      ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+    when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(NewlineVar)}}'}
+    when: ErrMsg is defined
+
+  - name: Get RADIUS Config
+    icx_command: {commands: show aaa | beg Radius Server}
+    register: RadiusCfg
+
+  - name: Display RADIUS Config
+    debug: var=RadiusCfg.stdout_lines[0]
