@@ -9,10 +9,8 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
-    newline_var: "\r"
+    NewlineVar: "\r"
     ErrParse: '^.*ConnectionError: '
-    Dot1x:
-    Ipv6:
 
   tasks:
   - name: Setup for IPv6
@@ -25,23 +23,22 @@
 
   - name: Configure Radius Host
     icx_config:
-      lines: radius-server host {{Ipv6}} {{prompt_rem_radiusip}} auth-port {{prompt_rem_radiusauth|default("1812")}} acct-port {{prompt_rem_radiusacct|default("1813")}} default key {{prompt_rem_radiuskey}} {{Dot1x}}
+      lines: radius-server host {{Ipv6|default()}} {{prompt_rem_radiusip}}
+             auth-port {{prompt_rem_radiusauth|default("1812")}}
+             acct-port {{prompt_rem_radiusacct|default("1813")}}
+             default key {{prompt_rem_radiuskey}} {{Dot1x|default()}}
       save_when: changed
-    register: icxconfig_status
-    failed_when: icxconfig_status.msg is defined and "MODULE FAILURE" not in icxconfig_status.msg
+    register: IcxCfgStatus
+    failed_when: IcxCfgStatus.msg is defined and "MODULE FAILURE" not in IcxCfgStatus.msg
 
   - name: Parse Switch Error
     set_fact:
-      ErrMsg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
-    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
+      ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+    when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
 
   - name: Display Switch Error
-    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(newline_var)}}'}
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(NewlineVar)}}'}
     when: ErrMsg is defined
 
-  - name: Get RADIUS Config
-    icx_command: {commands: show aaa | beg Radius Server}
-    register: RadiusCfg
-
-  - name: Display RADIUS Config
-    debug: var=RadiusCfg.stdout_lines[0]
+  - {name: Get AAA Config, icx_command: {commands: show aaa}, register: RadiusCfg}
+  - {name: Display AAA Config, debug: {msg: "{{RadiusCfg.stdout_lines[0]}}"}}
