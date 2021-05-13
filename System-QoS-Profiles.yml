@@ -1,4 +1,5 @@
 #! Description: Configure QoS queues and mapping.
+#! Prompt: [{question_name: DSCP to Internal Forwarding Priority Map@colon, required: false, type: textarea, variable: prompt_qos_dscpmap, min: 0, max: 4096, default: 0 to 0\n8 to 1\n16 to 2\n38 to 3\n49 to 4\n48 to 7}, {question_name: IPv6 Cache-Lifetime in Seconds@colon, required: false, type: integer, variable: prompt_ipv6_cache, min: 0, max: 4294967295, default: 0}, {question_name: Egress Shaper IFG Bytes@colon, question_description: (FI 8.0.70+ Option), required: false, type: integer, variable: prompt_qos_ifgbytes, min: 1, max: 127, default: 20}, {question_name: Queue 7 Name@colon, required: true, type: text, variable: prompt_qos_qn7, min: 1, max: 32, default: qosp7}, {question_name: Queue 7 Bandwidth@colon, question_description: Enter percentage or "sp" (strict priority), required: true, type: text, variable: prompt_qos_qbw7, min: 1, max: 3, default: sp}, {question_name: Queue 6 Name@colon, required: true, type: text, variable: prompt_qos_qn6, min: 1, max: 32, default: qosp6}, {question_name: Queue 6 Bandwidth@colon, question_description: Enter percentage or "sp" (strict priority), required: true, type: text, variable: prompt_qos_qbw6, min: 1, max: 3, default: sp}, {question_name: Queue 5 Name@colon, required: true, type: text, variable: prompt_qos_qn5, min: 1, max: 32, default: qosp5}, {question_name: Queue 5 Bandwidth@colon, question_description: Enter percentage or "sp" (strict priority), required: true, type: text, variable: prompt_qos_qbw5, min: 1, max: 3, default: '3'}, {question_name: Queue 4 Name@colon, required: true, type: text, variable: prompt_qos_qn4, min: 1, max: 32, default: qosp4}, {question_name: Queue 4 Bandwidth@colon, question_description: Enter percentage or "sp" (strict priority), required: true, type: text, variable: prompt_qos_qbw4, min: 1, max: 3, default: '24'}, {question_name: Queue 3 Name@colon, required: true, type: text, variable: prompt_qos_qn3, min: 1, max: 32, default: qosp3}, {question_name: Queue 3 Bandwidth@colon, question_description: Enter percentage or "sp" (strict priority), required: true, type: text, variable: prompt_qos_qbw3, min: 1, max: 3, default: '3'}, {question_name: Queue 2 Name@colon, required: true, type: text, variable: prompt_qos_qn2, min: 1, max: 32, default: qosp2}, {question_name: Queue 2 Bandwidth@colon, question_description: Enter percentage or "sp" (strict priority), required: true, type: text, variable: prompt_qos_qbw2, min: 1, max: 3, default: '64'}, {question_name: Queue 1 Name@colon, required: true, type: text, variable: prompt_qos_qn1, min: 1, max: 32, default: qosp1}, {question_name: Queue 1 Bandwidth@colon, question_description: Enter percentage or "sp" (strict priority), required: true, type: text, variable: prompt_qos_qbw1, min: 1, max: 3, default: '3'}, {question_name: Queue 0 Name@colon, required: true, type: text, variable: prompt_qos_qn0, min: 1, max: 32, default: qosp0}, {question_name: Queue 0 Bandwidth@colon, question_description: Enter percentage or "sp" (strict priority), required: true, type: text, variable: prompt_qos_qbw0, min: 1, max: 3, default: '3'}]
 # =====================
 ---
 - hosts: all
@@ -8,39 +9,139 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
-    newline_var: "\r"
-    error_parse: '^.*ConnectionError: '
+    NewlineVar: "\r"
+    ErrParse: '^.*ConnectionError: '
+    BinVerRe: '^[A-Za-z]{3,4}([0-9]{2})([0-9])([0-9]{2}[a-zA-Z]{0,2}(b[0-9]{3})?)(ufi)?.bin'
 
   tasks:
-  - name: Configure Quality of Service
-    icx_config:
-      lines: |
-        qos mechanism mixed-sp-wrr
-        qos profile qosp7 sp qosp6 sp qosp5 3 qosp4 24 qosp3 3 qosp2 64 qosp1 3 qosp0 3
-        qos egress-shape-ifg-bytes 20
-        qos-tos map dscp-priority 0 to 0
-        qos-tos map dscp-priority 8 to 1
-        qos-tos map dscp-priority 16 to 2
-        qos-tos map dscp-priority 38 to 3
-        qos-tos map dscp-priority 49 to 4
-        qos-tos map dscp-priority 48 to 7
-        ipv6 cache-lifetime 0
-      save_when: changed
-    register: icxconfig_status
-    failed_when: icxconfig_status.msg is defined and "MODULE FAILURE" not in icxconfig_status.msg
+  - name: Egress Shaper Config Block
+    block:
+    - {name: Get System Hardware Info, icx_facts: {gather_subset: hardware}}
+
+    - name: Prepare Egress Shaper Command
+      set_fact: {IfgBytes: 'qos egress-shape-ifg-bytes {{prompt_qos_ifgbytes}}'}
+      vars: {tCurSwVer: '{{ansible_net_image|regex_replace(BinVerRe, "\1.\2.\3")}}'}
+      when: tCurSwVer is version('8.0.70', '>=')
+    when: prompt_qos_ifgbytes|default("null", true) != "null"
+
+  - name: Prepare IPv6 Cache-Lifetime Command
+    set_fact: {Ipv6Cache: 'ipv6 cache-lifetime {{prompt_ipv6_cache}}'}
+    when: prompt_ipv6_cache is defined
+
+  - name: Prepare DSCP to Internal Forwarding Map Configuration
+    set_fact: {DscpMap: "{{DscpMap|default([]) + ['qos-tos map dscp-priority '~item]}}"}
+    loop: '{{prompt_qos_dscpmap.split(NewlineRe)}}'
+    vars: {NewlineRe: "\n"}
+    when: prompt_qos_dscpmap|default("null", true) != "null" and "to" in item
+
+  - name: Configure QoS Mixed Scheduling
+    icx_config: {lines: qos mechanism mixed-sp-wrr}
+    register: IcxCfgStatus
+    failed_when: IcxCfgStatus.msg is defined and "MODULE FAILURE" not in IcxCfgStatus.msg
 
   - name: Parse Switch Error
     set_fact:
-      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"
-    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
+      ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+    when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
 
   - name: Display Switch Error
-    assert: {that: error_msg is not defined, fail_msg: '{{error_msg.split(newline_var)}}'}
-    when: error_msg is defined
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(NewlineVar)}}'}
+    when: ErrMsg is defined
 
-  - name: Display Results
-    icx_command:
-      commands: show qos-tos
-    register: output
-  - debug:
-      msg: "{{output.stdout_lines}}"
+  - name: Configure DSCP to Internal Forwarding Mapping
+    icx_config: {lines: "{{DscpMap|join('\n')}}"}
+    register: IcxCfgStatus
+    failed_when: IcxCfgStatus.msg is defined and "MODULE FAILURE" not in IcxCfgStatus.msg
+    when: DscpMap|default("null", true) != "null"
+
+  - name: Parse Switch Error
+    set_fact:
+      ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+    when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(NewlineVar)}}'}
+    when: ErrMsg is defined
+
+  - name: Get Current QoS Profile Names
+    icx_command: {commands: show run | include qos name}
+    register: QosNames
+
+  - name: Set Current Queue 7 Name
+    set_fact: {CurQName7: '{{item.split()[3]}}'}
+    loop: '{{QosNames.stdout_lines[0]}}'
+    when: "'qos name qosp7' in item"
+
+  - name: Set Current Queue 6 Name
+    set_fact: {CurQName6: '{{item.split()[3]}}'}
+    loop: '{{QosNames.stdout_lines[0]}}'
+    when: "'qos name qosp6' in item"
+
+  - name: Set Current Queue 5 Name
+    set_fact: {CurQName5: '{{item.split()[3]}}'}
+    loop: '{{QosNames.stdout_lines[0]}}'
+    when: "'qos name qosp5' in item"
+
+  - name: Set Current Queue 4 Name
+    set_fact: {CurQName4: '{{item.split()[3]}}'}
+    loop: '{{QosNames.stdout_lines[0]}}'
+    when: "'qos name qosp4' in item"
+
+  - name: Set Current Queue 3 Name
+    set_fact: {CurQName3: '{{item.split()[3]}}'}
+    loop: '{{QosNames.stdout_lines[0]}}'
+    when: "'qos name qosp3' in item"
+
+  - name: Set Current Queue 2 Name
+    set_fact: {CurQName2: '{{item.split()[3]}}'}
+    loop: '{{QosNames.stdout_lines[0]}}'
+    when: "'qos name qosp2' in item"
+
+  - name: Set Current Queue 1 Name
+    set_fact: {CurQName1: '{{item.split()[3]}}'}
+    loop: '{{QosNames.stdout_lines[0]}}'
+    when: "'qos name qosp1' in item"
+
+  - name: Set Current Queue 0 Name
+    set_fact: {CurQName0: '{{item.split()[3]}}'}
+    loop: '{{QosNames.stdout_lines[0]}}'
+    when: "'qos name qosp0' in item"
+
+  - name: Configure Quality of Service
+    icx_config:
+      lines: |
+        qos name {{CurQName7|default("qosp7")}} {{prompt_qos_qn7}}
+        qos name {{CurQName6|default("qosp6")}} {{prompt_qos_qn6}}
+        qos name {{CurQName5|default("qosp5")}} {{prompt_qos_qn5}}
+        qos name {{CurQName4|default("qosp4")}} {{prompt_qos_qn4}}
+        qos name {{CurQName3|default("qosp3")}} {{prompt_qos_qn3}}
+        qos name {{CurQName2|default("qosp2")}} {{prompt_qos_qn2}}
+        qos name {{CurQName1|default("qosp1")}} {{prompt_qos_qn1}}
+        qos name {{CurQName0|default("qosp0")}} {{prompt_qos_qn0}}
+        qos profile {{tQ7}} {{tQ6}} {{tQ5}} {{tQ4}} {{tQ3}} {{tQ2}} {{tQ1}} {{tQ0}}
+        {{IfgBytes|default()}}
+        {{Ipv6Cache|default()}}
+      save_when: changed
+    register: IcxCfgStatus
+    failed_when: IcxCfgStatus.msg is defined and "MODULE FAILURE" not in IcxCfgStatus.msg
+    vars:
+      tQ7: "{{prompt_qos_qn7}} {{prompt_qos_qbw7}}"
+      tQ6: "{{prompt_qos_qn6}} {{prompt_qos_qbw6}}"
+      tQ5: "{{prompt_qos_qn5}} {{prompt_qos_qbw5}}"
+      tQ4: "{{prompt_qos_qn4}} {{prompt_qos_qbw4}}"
+      tQ3: "{{prompt_qos_qn3}} {{prompt_qos_qbw3}}"
+      tQ2: "{{prompt_qos_qn2}} {{prompt_qos_qbw2}}"
+      tQ1: "{{prompt_qos_qn1}} {{prompt_qos_qbw1}}"
+      tQ0: "{{prompt_qos_qn0}} {{prompt_qos_qbw0}}"
+
+  - name: Parse Switch Error
+    set_fact:
+      ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+    when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(NewlineVar)}}'}
+    when: ErrMsg is defined
+
+  - {name: Get QoS Config, icx_command: {commands: show qos-tos}, register: QosTosCfg}
+  - {name: Display QoS Config, debug: {msg: "{{QosTosCfg.stdout_lines[0]}}"}}
