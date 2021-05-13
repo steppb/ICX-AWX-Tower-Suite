@@ -1,7 +1,6 @@
 #! Description: Enable 802.1X on interface.
-#! Prompt: [{question_name: Interface or Range@colon, question_description: (e.g. e 1/1/2 to 1/1/4 for range), required: true, type: text, variable: prompt_flexauth_int, min: 5, max: 1024, default: '', choices: ''}]
+#! Prompt: [{question_name: Interface or Range@colon, question_description: (e.g. e 1/1/1 or e 1/1/2 to 1/1/4 for range), required: true, type: text, variable: prompt_flexauth_int, min: 5, max: 1024}, {question_name: Interface Authentication Order@colon, question_description: '', required: false, type: multiplechoice, variable: prompt_flexauth_int_order, min: null, max: null, default: '', choices: dot1x mac-auth\nmac-auth dot1x}, {question_name: Interface Authentication Default VLAN@colon, question_description: '', required: false, type: integer, variable: prompt_flexauth_int_vlan, min: 1, max: 4086}]
 # =====================
-
 ---
 - hosts: all
   connection: network_cli
@@ -10,20 +9,39 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
-    newline_var: "\r"
+    NewlineVar: "\r"
     ErrParse: '^.*ConnectionError: '
-    EthVar: '(e|et|eth|ethe|ether|ethern|etherne|ethernet)'
-    PortVar: '([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2})'
-    RangeVar: '^.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*to.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*$'
+    EthRe: '(e|et|eth|ethe|ether|ethern|etherne|ethernet)'
+    PortRe: '([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2})'
+    RngRe: '^.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*to.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*$'
+    BinVerRe: '^[A-Za-z]{3,4}([0-9]{2})([0-9])([0-9]{2}[a-zA-Z]{0,2}(b[0-9]{3})?)(ufi)?.bin'
 
   tasks:
+  - {name: Gather Switch Info, icx_facts: {gather_subset: hardware}}
+
+  - name: Get Current Switch Version - ansible_net_image
+    set_fact: {CurSwVer: '{{ansible_net_image|regex_replace(BinVerRe, "\1.\2.\3")}}'}
+    when: ansible_net_image|default('null', true) != 'null'
+
   - name: Format Interface List
-    set_fact: {EthInt: '{{prompt_flexauth_int|regex_replace(EthVar)|regex_replace(PortVar, "e \1")}}'}
+    set_fact: {EthInt: '{{tEthInt|regex_replace(PortRe, "e \1")}}'}
+    vars: {tEthInt: '{{prompt_flexauth_int|regex_replace(EthRe)}}'}
     when: "'to' not in prompt_flexauth_int"
 
   - name: Format Interface Range
-    set_fact: {EthInt: '{{prompt_flexauth_int|regex_replace(RangeVar, "e \1 to \2")}}'}
+    set_fact: {EthInt: '{{prompt_flexauth_int|regex_replace(RngRe, "e \1 to \2")}}'}
     when: "'to' in prompt_flexauth_int"
+
+  - name: FlexAuth-Only Command Block
+    block:
+    - name: Prepare Authentication Order Command
+      set_fact: {AuthOrder: "authentication auth-order {{prompt_flexauth_int_order}}"}
+      when: prompt_flexauth_int_order|default('null', true) != 'null'
+
+    - name: Prepare Authentication Default VLAN Command
+      set_fact: {DefVlan: "authentication auth-default-vlan {{prompt_flexauth_int_vlan}}"}
+      when: prompt_flexauth_int_vlan|default('null', true) != 'null'
+    when: CurSwVer|default('null', true) != 'null' and CurSwVer is version('8.0.20', '>=')
 
   - name: Configuring FlexAuth on Interface
     icx_config:
@@ -33,11 +51,11 @@
           exit
          interface {{EthInt}}
           dot1x port-control auto
+          {{AuthOrder|default()}}
+          {{DefVlan|default()}}
       save_when: changed
     register: IcxCfgStatus
-    failed_when:
-      - IcxCfgStatus.msg is defined
-      - "'MODULE FAILURE' not in IcxCfgStatus.msg"
+    failed_when: IcxCfgStatus.msg is defined and "MODULE FAILURE" not in IcxCfgStatus.msg
 
   - name: Parse Switch Error
     set_fact:
@@ -45,12 +63,11 @@
     when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
 
   - name: Display Switch Error
-    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(newline_var)}}'}
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(NewlineVar)}}'}
     when: ErrMsg is defined
 
-  - name: Get 802.1X Config
+  - name: Get 802.1X Config 
     icx_command: {commands: show dot1x config all}
     register: Dot1xConfig
 
-  - name: Display 802.1X Config
-    debug: var=Dot1xConfig.stdout_lines[0]
+  - {name: Display 802.1X Config, debug: {msg: "{{Dot1xConfig.stdout_lines[0]}}"}}
