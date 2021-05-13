@@ -1,0 +1,44 @@
+#! Description: Enable/Disable proxy-arp for an interface.
+#! Prompt: [{question_name: Enable/Disable Proxy-ARP@colon, question_description: '', required: true, type: multiplechoice, variable: prompt_ipv4_pxyarp, min: null, max: null, default: Disable, choices: Enable\nDisable}, {question_name: Interface or Range@colon, question_description: (e.g. eth 1/1/1 or eth 1/1/2 to 1/1/4 for range), required: true, type: text, variable: prompt_ipv4_pxyarp_int, min: 5, max: 1024, default: ''}]
+# =====================
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+    NewlineVar: "\r"
+    ErrParse: '^.*ConnectionError: '
+    EthRe: '(e|et|eth|ethe|ether|ethern|etherne|ethernet)'
+    PortRe: '([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2})'
+    RangeRe: '^.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*to.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*$'
+
+  tasks:
+  - name: Format Interface List
+    set_fact: {EthInt: '{{tEthInt|regex_replace(PortRe, "e \1")}}'}
+    vars: {tEthInt: '{{prompt_ipv4_pxyarp_int|regex_replace(EthRe)}}'}
+    when: "'to' not in prompt_ipv4_pxyarp_int"
+
+  - name: Format Interface Range
+    set_fact: {EthInt: '{{prompt_ipv4_pxyarp_int|regex_replace(RangeRe, "e \1 to \2")}}'}
+    when: "'to' in prompt_ipv4_pxyarp_int"
+
+  - name: Apply Proxy-ARP Configuration
+    icx_config:
+      lines: ip proxy-arp {{prompt_ipv4_pxyarp}}
+      save_when: changed
+      parents: interface {{EthInt}}
+    register: IcxCfgStatus
+    failed_when: IcxCfgStatus.msg is defined and "MODULE FAILURE" not in IcxCfgStatus.msg
+
+  - name: Parse Switch Error
+    set_fact:
+      ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+    when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(NewlineVar)}}'}
+    vars: {NewlineVar: "\r"}
+    when: ErrMsg is defined
