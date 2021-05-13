@@ -1,5 +1,5 @@
 #! Description: Add or replace SNMPv3 group.
-#! Prompt: [{question_name: SNMPv3 Group Name@colon, question_description: '', required: true, type: text, variable: prompt_snmp_group, min: 1, max: 32, default: '', choices: ''}, {question_name: SNMPv3 ACL@colon, question_description: '', required: true, type: text, variable: prompt_snmp_acl, min: 1, max: 1024, default: '', choices: ''}]
+#! Prompt: [{question_name: SNMPv3 Group Name@colon, required: true, type: text, variable: prompt_snmp_group, min: 1, max: 32}, {question_name: SNMPv3 ACL@colon, required: false, type: text, variable: prompt_snmp_acl, min: 1, max: 1024}, {question_name: SNMPv3 View Authentication@colon, required: true, type: multiplechoice, variable: prompt_snmp_auth, default: priv, choices: auth\nnoauth\npriv}, {question_name: SNMPv3 Read View Name@colon, required: false, type: text, variable: prompt_snmp_readview, min: 1, max: 32, default: all}, {question_name: SNMPv3 Write View Name@colon, required: false, type: text, variable: prompt_snmp_writeview, min: 1, max: 32, default: all}, {question_name: SNMPv3 Notify View Name@colon, required: false, type: text, variable: prompt_snmp_notifyview, min: 1, max: 32, default: all}]
 # =====================
 ---
 - hosts: all
@@ -9,17 +9,33 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
-    newline_var: "\r"
+    NewlineVar: "\r"
     ErrParse: '^.*ConnectionError: '
-    ipv6:
 
   tasks:
-  - name: Setup for IPv6
-    set_fact: {ipv6: 'ipv6 '}
-    when: prompt_snmp_acl|int == 0
+  - name: Setup for IPv6 ACL
+    set_fact: {AccessAcl: 'access ipv6 {{prompt_snmp_acl}}'}
+    when: prompt_snmp_acl|default('null', true) != 'null' and prompt_snmp_acl|int == 0
+
+  - name: Setup for IPv4 ACL
+    set_fact: {AccessAcl: 'access {{prompt_snmp_acl}}'}
+    when: prompt_snmp_acl|default('null', true) != 'null' and AccessAcl is not defined
+
+  - name: Setup Read View
+    set_fact: {SnmpRead: 'read {{prompt_snmp_readview}}'}
+    when: prompt_snmp_readview|default('null', true) != 'null'
+
+  - name: Setup Write View
+    set_fact: {SnmpWrite: 'write {{prompt_snmp_writeview}}'}
+    when: prompt_snmp_writeview|default('null', true) != 'null'
+
+  - name: Setup Notify View
+    set_fact: {SnmpNotify: 'notify {{prompt_snmp_notifyview}}'}
+    when: prompt_snmp_notifyview|default('null', true) != 'null'
 
   - name: Get SNMP Group Config
-    icx_command: {commands: 'show run | include snmp-server group {{prompt_snmp_group}}'}
+    icx_command: {commands: 'show run | include snmp-server group {{tGroupAuth}}'}
+    vars: {tGroupAuth: '{{prompt_snmp_group}} v3 {{prompt_snmp_auth}}'}
     register: SnmpGroupCfg
 
   - name: Remove Old SNMPv3 Group
@@ -28,13 +44,12 @@
 
   - name: Configuring SNMPv3 Group
     icx_config:
-      lines: |
-        snmp-server group {{prompt_snmp_group}} v3 priv access {{ipv6}}{{prompt_snmp_acl}} read all write all notify all
+      lines: snmp-server group {{prompt_snmp_group}} v3 {{prompt_snmp_auth}}
+             {{AccessAcl|default()}} {{SnmpRead|default()}}
+             {{SnmpWrite|default()}} {{SnmpNotify|default()}}
       save_when: changed
     register: IcxCfgStatus
-    failed_when:
-      - IcxCfgStatus.msg is defined
-      - "'MODULE FAILURE' not in IcxCfgStatus.msg"
+    failed_when: IcxCfgStatus.msg is defined and "MODULE FAILURE" not in IcxCfgStatus.msg
 
   - name: Parse Switch Error
     set_fact:
@@ -42,12 +57,8 @@
     when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
 
   - name: Display Switch Error
-    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(newline_var)}}'}
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(NewlineVar)}}'}
     when: ErrMsg is defined
 
-  - name: Get SNMPv3 Config
-    icx_command: {commands: show snmp group}
-    register: SnmpCfg
-
-  - name: Display SNMPv3 Config
-    debug: var=SnmpCfg.stdout_lines[0]
+  - {name: Get SNMP Config, icx_command: {commands: show snmp group}, register: SnmpCfg}
+  - {name: Display SNMPv3 Config, debug: {msg: "{{SnmpCfg.stdout_lines[0]}}"}}
