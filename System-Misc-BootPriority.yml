@@ -1,0 +1,46 @@
+#! Description: Modify boot priority.
+#! Prompt: [{question_name: Flash Partition@colon, question_description: '', required: true, type: multiplechoice, variable: prompt_flash_part, min: null, max: null, default: '', choices: Primary\nSecondary}]
+# =====================
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+    PtnRe: "^([a-z]{3}).*$"
+
+  tasks:
+  - name: Get Current Boot Preference from Switch
+    icx_command: {commands: show boot-preference}
+    register: CurBootPref
+
+  - name: Check if Boot Preference Change is Needed
+    block:
+    - name: Image-Flash-Copy - Remove Boot Statements
+      icx_config: {lines: 'no boot sys fl {{item}}', save_when: changed}
+      register: IcxCfgStatus
+      with_items:
+        - pri
+        - sec
+      when:
+        - '"Use Default" not in FirstPart'
+        - item in FirstPart or item in CurBootPref.stdout_lines[0][2]|lower
+
+    - name: Image-Flash-Copy - Configure Boot Priority
+      icx_config: {lines: 'boot sys fl {{FlPart}}', save_when: changed}
+      when: FlPart != "pri"
+
+    vars:
+      FirstPart: '{{CurBootPref.stdout_lines[0][1]|lower}}'
+      FlPart: '{{prompt_flash_part|lower|default(sec)|regex_replace(PtnRe, "\1")}}'
+    when: ("Use Default" not in FirstPart and FlPart not in FirstPart) or
+          ("Use Default" in FirstPart and FlPart == "sec")
+
+  - name: Get Boot Preference from Switch
+    icx_command: {commands: show boot-preference}
+    register: BootPref
+
+  - name: Display Boot Preference
+    debug: var=BootPref.stdout_lines[0]
