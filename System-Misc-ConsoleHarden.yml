@@ -1,4 +1,5 @@
 #! Description: Secure console access.
+#! Prompt: [{question_name: Console Timeout (In Minutes)@colon, question_description: '', required: true, type: integer, variable: prompt_console_timeout, min: 0, max: 240, default: 10, choices: ''}]
 # =====================
 ---
 - hosts: all
@@ -8,24 +9,24 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
-    newline_var: "\r"
-    error_parse: '^.*ConnectionError: '
+    NewlineVar: "\r"
+    ErrParse: '^.*ConnectionError: '
 
   tasks:
   - name: Secure Console Access
     icx_config:
       lines: |
         enable aaa console
-        console timeout 10
+        console timeout {{prompt_console_timeout}}
       save_when: changed
-    register: icxconfig_status
-    failed_when: icxconfig_status.msg is defined and "MODULE FAILURE" not in icxconfig_status.msg
+    register: IcxCfgStatus
+    failed_when: IcxCfgStatus.msg is defined and "MODULE FAILURE" not in IcxCfgStatus.msg
 
   - name: Parse Switch Error
     set_fact:
-      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"
-    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
+      ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+    when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
 
   - name: Display Switch Error
-    assert: {that: error_msg is not defined, fail_msg: '{{error_msg.split(newline_var)}}'}
-    when: error_msg is defined
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(NewlineVar)}}'}
+    when: ErrMsg is defined
