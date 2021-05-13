@@ -1,0 +1,174 @@
+#! Description: Create or replace IPv4 Access-List.
+#! Prompt: [{question_name: IPv4 Access-List Name or Number@colon, required: true, type: text, variable: prompt_ipv4_acl_name, min: 1, max: 1024}, {question_name: IPv4 Access-List Type@colon, required: true, type: multiplechoice, variable: prompt_ipv4_acl_type, choices: standard\nextended}, {question_name: IPv4 Access-List@colon, required: true, type: textarea, variable: prompt_ipv4_acl, min: 0, max: 4096}]
+# =====================
+# Note: If the ACL already exists, it will be replaced with the access-list entered
+#       into the survey prompt.
+#
+# Note: The 'ssh access-group ###' command will be removed and re-added if it matches
+#       the access-list name or number entered in the prompt.  This is to avoid a
+#       lockout when applying the access-list.
+#
+# Note: Only the ssh access-group will be checked.  A lockout can occur if the
+#       access-list being applied is tied to a router interface.
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+    NewlineVar: "\r"
+    ErrParse: '^.*ConnectionError: '
+    AclRe: '(permit|deny|remark) .*$'
+
+  tasks:
+  - name: Parse ACL
+    set_fact: {Ipv4Acl: '{{Ipv4Acl|default([]) + [item|regex_search(AclRe)]}}'}
+    loop: '{{prompt_ipv4_acl.split(NewlineRe)}}'
+    vars: {NewlineRe: "\n"}
+    when:
+      - item|regex_search(AclRe)|default("null", true) != "null"
+      - item|regex_search("^!")|default("null", true) == "null"
+
+  - name: Get SSH Access-Group
+    icx_command: {commands: show config | include ssh access-group}
+    register: SshAcl
+
+  - name: SSH ACL Block
+    block:
+    - name: Assert
+      assert:
+        that: prompt_ipv4_acl_type != 'extended' and
+              (prompt_ipv4_acl_name|int == 0 or
+              (prompt_ipv4_acl_name|int >= 1 and
+              prommpt_ipv4_acl_name|int <= 99))
+        msg: "ERROR: SSH Access-list must be standard"
+
+    - name: Get List of Connected Users
+      icx_command: {commands: sh who | incl client|you are connecting}
+      register: WhoOut
+
+    - name: Find Index
+      set_fact: {ConnIdx: '{{idx}}'}
+      loop: '{{WhoOut.stdout_lines[0]}}'
+      loop_control: {index_var: idx}
+      when: "'you are connecting' in item"
+
+    - name: Get Client IP
+      set_fact:
+        ClientIp: '{{WhoOut.stdout_lines[0][ConnIdx - 1]|regex_replace(tWhoRe, "\1")}}'
+      vars: {tWhoRe: '^.* client ip address ([0-9a-f:.]*).*$'}
+
+    - name: Get Permit Line
+      set_fact: {PermitIdx: '{{PermitIdx|default(idx, true)}}'}
+      loop: '{{Ipv4Acl}}'
+      loop_control: {index_var: idx}
+      vars:
+        tNet: '{{item.split()[1]|default("null", true)}}'
+        tMask: '{{item.split()[2]|default("null", true)}}'
+      when: ('permit' in item) and
+            ('permit any' in item or
+            'permit host' in item and ClientIp in item or
+            ('host' not in item and tNet == ClientIp and
+            (tMask == "null" or tMask == "log")) or
+            ('host' not in item and tNet != "null" and tMask != "null" and
+            bIp1|int >= tNet.split(".")[0]|int and
+            bIp2|int >= tNet.split(".")[1]|int and
+            bIp3|int >= tNet.split(".")[2]|int and
+            bIp4|int >= tNet.split(".")[3]|int and
+            bIp1|int <= tNet.split(".")[0]|int + tMask.split(".")[0]|int and
+            bIp2|int <= tNet.split(".")[1]|int + tMask.split(".")[1]|int and
+            bIp3|int <= tNet.split(".")[2]|int + tMask.split(".")[2]|int and
+            bIp4|int <= tNet.split(".")[3]|int + tMask.split(".")[3]|int))
+
+    - name: Get Deny Line
+      set_fact: {DenyIdx: '{{DenyIdx|default(idx, true)}}'}
+      loop: '{{Ipv4Acl}}'
+      loop_control: {index_var: idx}
+      vars:
+        tNet: '{{item.split()[1]|default("null", true)}}'
+        tMask: '{{item.split()[2]|default("null", true)}}'
+      when: ('deny' in item) and
+            ('deny any' in item or
+            'deny host' in item and ClientIp in item or
+            ('host' not in item and tNet == ClientIp and
+            (tMask == "null" or tMask == "log")) or
+            ('host' not in item and tNet != "null" and tMask != "null" and
+            bIp1|int >= tNet.split(".")[0]|int and
+            bIp2|int >= tNet.split(".")[1]|int and
+            bIp3|int >= tNet.split(".")[2]|int and
+            bIp4|int >= tNet.split(".")[3]|int and
+            bIp1|int <= tNet.split(".")[0]|int + tMask.split(".")[0]|int and
+            bIp2|int <= tNet.split(".")[1]|int + tMask.split(".")[1]|int and
+            bIp3|int <= tNet.split(".")[2]|int + tMask.split(".")[2]|int and
+            bIp4|int <= tNet.split(".")[3]|int + tMask.split(".")[3]|int))
+
+    - name: Assert Parse Results
+      assert:
+        that:
+          - PermitIdx is defined
+          - PermitIdx|int < DenyIdx|default(PermitIdx|int + 1)|int
+        msg: "ERROR: Your IP is blocked in SSH ACL for switch. Aborting..."
+      vars: {tDenyIdx: '{{DenyIdx|default(PermitIdx|int + 1)}}'}
+
+    - name: Remove SSH Access-Group
+      icx_config: {lines: "no ssh access-group {{prompt_ipv4_acl_name}}"}
+      register: IcxCfgStatus
+
+    - name: Parse Switch Error
+      set_fact:
+        ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+      when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
+
+    - name: Display Switch Error
+      assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(NewlineVar)}}'}
+      when: ErrMsg is defined
+    vars:
+      bIp1: '{{ClientIp.split(".")[0]}}'
+      bIp2: '{{ClientIp.split(".")[1]}}'
+      bIp3: '{{ClientIp.split(".")[2]}}'
+      bIp4: '{{ClientIp.split(".")[3]}}'
+    when: "'ssh access-group '~prompt_ipv4_acl_name in SshAcl.stdout[0]"
+
+  - name: Remove Access-List
+    icx_config:
+      lines: no ip access-list {{prompt_ipv4_acl_type}} {{prompt_ipv4_acl_name}}
+    register: IcxCfgStatus
+    failed_when: IcxCfgStatus.msg is defined and "MODULE FAILURE" not in IcxCfgStatus.msg
+
+  - name: Parse Switch Error
+    set_fact:
+      ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+    when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(NewlineVar)}}'}
+    when: ErrMsg is defined
+
+  - name: Add Access-List
+    icx_config:
+      lines: "{{Ipv4Acl|join('\n')}}"
+      parents: ip access-list {{prompt_ipv4_acl_type}} {{prompt_ipv4_acl_name}}
+      save_when: changed
+    register: IcxCfgStatus
+    failed_when: IcxCfgStatus.msg is defined and "MODULE FAILURE" not in IcxCfgStatus.msg
+
+  - name: Parse Switch Error
+    set_fact:
+      ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+    when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(NewlineVar)}}'}
+    when: ErrMsg is defined
+
+  - name: Reapply SSH Access-Group
+    icx_config: {lines: "ssh access-group {{prompt_ipv4_acl_name}}", save_when: changed}
+    when: "'ssh access-group '~prompt_ipv4_acl_name in SshAcl.stdout[0]"
+
+  - name: Get IPv4 ACL
+    icx_command: {commands: "show ip access-list {{prompt_ipv4_acl_name}}"}
+    register: AclCfg
+
+  - {name: Display IPv4 ACL, debug: {msg: "{{AclCfg.stdout_lines[0]}}"}}
