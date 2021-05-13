@@ -1,4 +1,5 @@
 #! Description: Configure DoS protection on device.
+#! Prompt: [{question_name: ICMP Burst-Normal@colon, question_description: (in kbps) (ICX7XXX only), required: false, type: integer, variable: prompt_dos_icmp_normal, min: 20, max: 10000000, default: 5000}, {question_name: ICMP Burst-Max@colon, question_description: (in kbps) (ICX7XXX only), required: false, type: integer, variable: prompt_dos_icmp_max, min: 20, max: 10000000, default: 10000}, {question_name: ICMP Lockup Time@colon, question_description: (in seconds) (ICX7XXX only), required: false, type: integer, variable: prompt_dos_icmp_lockup, min: 1, max: 10000, default: 300}, {question_name: TCP Burst-Normal@colon, question_description: (in packets), required: false, type: integer, variable: prompt_dos_tcp_normal, min: 30, max: 100000, default: 30}, {question_name: TCP Burst-Max@colon, question_description: (in packets), required: false, type: integer, variable: prompt_dos_tcp_max, min: 30, max: 100000, default: 100}, {question_name: TCP Lockup Time, question_description: (in seconds), required: false, type: integer, variable: prompt_dos_tcp_lockup, min: 1, max: 10000, default: 300}]
 # =====================
 ---
 - hosts: all
@@ -8,42 +9,49 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
-    newline_var: "\r"
-    error_parse: '^.*ConnectionError: '
-    tcp_rate_cmd: ip tcp burst-normal 30 burst-max 100 lockup 300
-    attack_rate_cmd:
+    NewlineVar: "\r"
+    ErrParse: '^.*ConnectionError: '
 
   tasks:
   - name: Gather Hardware Info
     icx_facts: {gather_subset: hardware}
     when: ansible_net_model is not defined
 
-  - name: Set Attack-Rate Command
+  - name: Set ICMP Burst Rate Command
     set_fact:
-      attack_rate_cmd: ip icmp attack-rate burst-normal 5000 burst-max 10000 lockup 300
-    when: "'ICX7' in ansible_net_model"
+      IcmpRate: ip icmp attack-rate burst-normal {{prompt_dos_icmp_normal}}
+                burst-max {{prompt_dos_icmp_max}} lockup {{prompt_dos_icmp_lockup}}
+    when: 
+      - "'ICX7' in ansible_net_model"
+      - prompt_dos_icmp_normal|default("null", true) != "null"
+      - prompt_dos_icmp_max|default("null", true) != "null"
+      - prompt_dos_icmp_lockup|default("null", true) != "null"
 
-  - name: Set TCP Burst Rate Command for ICX7750
+  - name: Set TCP Burst Rate Command
     set_fact:
-      tcp_rate_cmd: ip tcp burst-normal 300 burst-max 3000 lockup 300
-    when: "'ICX7750' in ansible_net_model"
+      TcpRate: ip tcp burst-normal {{prompt_dos_tcp_normal}}
+               burst-max {{prompt_dos_tcp_max}} lockup {{prompt_dos_tcp_lockup}}
+    when:
+      - prompt_dos_tcp_normal|default("null", true) != "null"
+      - prompt_dos_tcp_max|default("null", true) != "null"
+      - prompt_dos_tcp_lockup|default("null", true) != "null"
 
   - name: Configuring DoS Protection
     icx_config:
       lines: |
-        {{attack_rate_cmd}}
-        {{tcp_rate_cmd}}
+        {{IcmpRate|default()}}
+        {{TcpRate|default()}}
         no ip icmp unreachable
         no ip source-route
       save_when: changed
-    register: icxconfig_status
-    failed_when: icxconfig_status.msg is defined and "MODULE FAILURE" not in icxconfig_status.msg
+    register: IcxCfgStatus
+    failed_when: IcxCfgStatus.msg is defined and "MODULE FAILURE" not in IcxCfgStatus.msg
 
   - name: Parse Switch Error
     set_fact:
-      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"
-    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
+      ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+    when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
 
   - name: Display Switch Error
-    assert: {that: error_msg is not defined, fail_msg: '{{error_msg.split(newline_var)}}'}
-    when: error_msg is defined
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(NewlineVar)}}'}
+    when: ErrMsg is defined
