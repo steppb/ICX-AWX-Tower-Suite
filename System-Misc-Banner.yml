@@ -1,10 +1,6 @@
-#! Description: Apply DoD login banner.
-#! Prompt: [{question_name: Banner Connection@colon, question_description: '', required: true, type: multiplechoice, variable: prompt_banner_conn, min: null, max: null, default: '', choices: exec\nincoming\nmotd}]
+#! Description: Apply login banner(s).
+#! Prompt: [{question_name: Banner Connection(s)@colon, required: true, type: multiselect, variable: prompt_banner_conn, default: motd\nexec\nincoming, choices: motd\nexec\nincoming}, {question_name: Banner Text@colon, required: true, type: textarea, variable: prompt_banner_text, min: 1, max: 2556}]
 # =====================
-# Note: Running this template applies the following banner to the specified connection:
-# 
-# You are accessing a U.S. Government (USG) Information System (IS) that is provided for USG authorized use only. By using this IS (which includes any device attached to this IS), you consent to the following conditions: The USG routinely intercepts and monitors communications on this IS for purposes including, but not limited to, penetration testing, COMSEC monitoring, network operations and defense, personnel misconduct (PM), law enforcement (LE), and counterintelligence (CI) investigations. At any time, the USG may inspect and seize data stored on this IS. Communications using, or data stored on, this IS are not private, are subject to routine monitoring, interception, and search, and may be disclosed or used for any USG-authorized purpose. This IS includes security measures (e.g., authentication and access controls) to protect USG interests--not for your personal benefit or privacy.
-# Notwithstanding the above, using this IS does not constitute consent to PM, LE or CI investigative searching or monitoring of the content of privileged communications, or work product, related to personal representation or services by attorneys, psychotherapists, or clergy, and their assistants. Such communications and work product are private and confidential. See User Agreement for details.
 ---
 - hosts: all
   connection: network_cli
@@ -16,8 +12,8 @@
 
   tasks:
   - name: Apply Banner
-    icx_banner:
-      banner: "{{prompt_banner_conn}}"
-      text: |
-        You are accessing a U.S. Government (USG) Information System (IS) that is provided for USG authorized use only. By using this IS (which includes any device attached to this IS), you consent to the following conditions: The USG routinely intercepts and monitors communications on this IS for purposes including, but not limited to, penetration testing, COMSEC monitoring, network operations and defense, personnel misconduct (PM), law enforcement (LE), and counterintelligence (CI) investigations. At any time, the USG may inspect and seize data stored on this IS. Communications using, or data stored on, this IS are not private, are subject to routine monitoring, interception, and search, and may be disclosed or used for any USG-authorized purpose. This IS includes security measures (e.g., authentication and access controls) to protect USG interests--not for your personal benefit or privacy.
-        Notwithstanding the above, using this IS does not constitute consent to PM, LE or CI investigative searching or monitoring of the content of privileged communications, or work product, related to personal representation or services by attorneys, psychotherapists, or clergy, and their assistants. Such communications and work product are private and confidential. See User Agreement for details.
+    icx_banner: {banner: '{{item}}', text: "{{prompt_banner_text}}"}
+    loop: '{{prompt_banner_conn}}'
+
+  - name: Write Memory
+    icx_command: {commands: write memory}
