@@ -9,12 +9,8 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
-    newline_var: "\r"
+    NewlineVar: "\r"
     ErrParse: '^.*ConnectionError: '
-    NtpKeyRmvCmd:
-    NtpKeyCmd:
-    NtpServerRmvCmd:
-    NtpServerCmd:
     NtpKeyId:
 
   tasks:
@@ -52,10 +48,11 @@
   - name: Configure NTP
     icx_config:
       lines: |
-        {{NtpKeyRmvCmd}}
-        {{NtpKeyCmd}}
-        {{NtpServerRmvCmd}}
-        {{NtpServerCmd}}
+        {{NtpKeyRmvCmd|default()}}
+        {{NtpKeyCmd|default()}}
+        {{NtpServerRmvCmd|default()}}
+        {{NtpServerCmd|default()}}
+        authenticate
       parents: ntp
       save_when: changed
       diff_ignore_lines: ^ntp$
@@ -68,7 +65,7 @@
     when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
 
   - name: Display Switch Error
-    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(newline_var)}}'}
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(NewlineVar)}}'}
     when: ErrMsg is defined
 
   - name: Get NTP Associations
