@@ -1,5 +1,5 @@
 #! Description: Configure interfaces as MSTP admin-edge or point-to-point ports.
-#! Prompt: [{question_name: MSTP Point-to-Point Interface, question_description: Enter the MSTP Point-to-Point Interface(s). (e.g. e 1/1/1 or e1/1/1 to 1/1/24), required: false, type: text, variable: template_l2_mstp_pt2pt, min: 0, max: 1024, default: '', choices: '', new_question: true}, {question_name: MSTP Edge Interface, question_description: Enter the MSTP Edge Interface(s). (e.g. e1/1/1 or e1/1/1 to 1/1/24), required: false, type: text, variable: template_l2_mstp_edgeint, min: 0, max: 1024, default: '', choices: '', new_question: true}]
+#! Prompt: [{question_name: MSTP Point-to-Point Interface, question_description: Enter the MSTP Point-to-Point Interface(s). (e.g. e 1/1/1 or e1/1/1 to 1/1/24), required: false, type: text, variable: template_l2_mstp_pt2pt, min: 0, max: 1024}, {question_name: MSTP Edge Interface, question_description: Enter the MSTP Edge Interface(s). (e.g. e1/1/1 or e1/1/1 to 1/1/24), required: false, type: text, variable: template_l2_mstp_edgeint, min: 0, max: 1024}]
 # =====================
 # Note: L2-MSTP-Config template needs to be applied before running this template.
 #       Only interfaces in an MSTP VLAN will be added to config.
@@ -11,11 +11,9 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
-    EthVar: '(e|et|eth|ethe|ether|ethern|etherne|ethernet)'
-    PortVar: '([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2})'
-    RngVar: '^.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*to.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*$'
-    P2pIntCmd:
-    EdgeIntCmd:
+    EthRe: '(ethernet|etherne|ethern|ether|ethe|eth|et|e)'
+    PortRe: '([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2})'
+    RngRe: '^.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*to.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*$'
 
   tasks:
   - {name: Get MSTP Config, icx_command: {commands: show mstp config}, register: MstpCfg}
@@ -28,12 +26,12 @@
   - name: Setup Point-to-Point Interface Command
     block:
       - name: Format Interface List
-        set_fact: {P2pInts: '{{EthInts|regex_replace(PortVar, "e \1")}}'}
-        vars: {EthInts: '{{template_l2_mstp_pt2pt|regex_replace(EthVar)}}'}
+        set_fact: {P2pInts: '{{EthInts|regex_replace(PortRe, "e \1")}}'}
+        vars: {EthInts: '{{template_l2_mstp_pt2pt|regex_replace(EthRe)}}'}
         when: "'to' not in template_l2_mstp_pt2pt"
 
       - name: Format Interface Range
-        set_fact: {P2pInts: '{{EthInts|regex_replace(RngVar, "e \1 to \2")}}'}
+        set_fact: {P2pInts: '{{EthInts|regex_replace(RngRe, "e \1 to \2")}}'}
         vars: {EthInts: '{{template_l2_mstp_pt2pt}}'}
         when: "'to' in template_l2_mstp_pt2pt"
 
@@ -44,12 +42,12 @@
   - name: Setup Edge Interface Command
     block:
       - name: Format Interface List
-        set_fact: {EdgeInts: '{{EthInts|regex_replace(PortVar, "e \1")}}'}
-        vars: {EthInts: '{{template_l2_mstp_edgeint|regex_replace(EthVar)}}'}
+        set_fact: {EdgeInts: '{{EthInts|regex_replace(PortRe, "e \1")}}'}
+        vars: {EthInts: '{{template_l2_mstp_edgeint|regex_replace(EthRe)}}'}
         when: "'to' not in template_l2_mstp_edgeint"
 
       - name: Format Interface Range
-        set_fact: {EdgeInts: '{{EthInts|regex_replace(RngVar, "e \1 to \2")}}'}
+        set_fact: {EdgeInts: '{{EthInts|regex_replace(RngRe, "e \1 to \2")}}'}
         vars: {EthInts: '{{template_l2_mstp_edgeint}}'}
         when: "'to' in template_l2_mstp_edgeint"
 
@@ -60,8 +58,8 @@
   - name: Configuring MSTP Interface(s)
     icx_config:
       lines: |
-        {{P2pIntCmd}}
-        {{EdgeIntCmd}}
+        {{P2pIntCmd|default()}}
+        {{EdgeIntCmd|default()}}
       save_when: changed
     register: IcxCfgStatus
     failed_when: false

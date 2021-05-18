@@ -1,5 +1,5 @@
 #! Description: Enable/Disable SNMP traps for interface state changes.
-#! Prompt: [{question_name: Enable/Disable Link-Change Traps@colon, question_description: '', required: true, type: multiplechoice, variable: prompt_snmp_intchange, min: null, max: null, default: Disable, choices: Enable\nDisable}, {question_name: Interface or Range@colon, question_description: (e.g. eth 1/1/1 or eth 1/1/2 to 1/1/4 for range), required: true, type: text, variable: prompt_snmp_intchange_int, min: 5, max: 1024, default: ''}]
+#! Prompt: [{question_name: Enable/Disable Link-Change Traps@colon, required: true, type: multiplechoice, variable: prompt_snmp_intchange, default: Disable, choices: Enable\nDisable}, {question_name: Interface or Range@colon, question_description: (e.g. eth 1/1/1 or eth 1/1/2 to 1/1/4 for range), required: true, type: text, variable: prompt_snmp_intchange_int, min: 5, max: 1024}]
 # =====================
 ---
 - hosts: all
@@ -11,7 +11,7 @@
     ansible_become_method: enable
     NewlineVar: "\r"
     ErrParse: '^.*ConnectionError: '
-    EthRe: '(e|et|eth|ethe|ether|ethern|etherne|ethernet)'
+    EthRe: '(ethernet|etherne|ethern|ether|ethe|eth|et|e)'
     PortRe: '([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2})'
     RngRe: '^.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*to.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*$'
 

@@ -1,5 +1,5 @@
 #! Description: Add or modify VLAN.
-#! Prompt: [{question_name: VLAN ID@colon, question_description: '', required: true, type: integer, variable: prompt_l2_vid, min: 1, max: 4086, default: '', choices: ''}, {question_name: VLAN Name@colon, question_description: '', required: false, type: text, variable: prompt_l2_vname, min: 1, max: 1024, default: '', choices: ''}, {question_name: VLAN Tagging@colon, question_description: '', required: false, type: multiplechoice, variable: prompt_l2_vtag, min: null, max: null, default: '', choices: tagged\nuntagged}, {question_name: Interface(s)@colon, question_description: Enter single interface or range (e.g. e1/1/1 or e1/1/1 to 1/1/10), required: false, type: text, variable: prompt_l2_vint, min: 5, max: 1024, default: '', choices: ''}, {question_name: Remove Interface(s) From VLAN@question, question_description: '', required: false, type: multiplechoice, variable: prompt_l2_vremove, min: null, max: null, default: 'no', choices: yes\nno}, {question_name: Create Router Interface@question, question_description: '', required: false, type: multiplechoice, variable: prompt_l2_vrtr, min: null, max: null, default: 'no', choices: yes\nno}, {question_name: Spanning-Tree Protocol@colon, question_description: '', required: false, type: multiplechoice, variable: prompt_l2_vstp, min: null, max: null, default: '', choices: Disable\n802.1d\n802.1w}]
+#! Prompt: [{question_name: VLAN ID@colon, required: true, type: integer, variable: prompt_l2_vid, min: 1, max: 4086}, {question_name: VLAN Name@colon, required: false, type: text, variable: prompt_l2_vname, min: 1, max: 1024}, {question_name: VLAN Tagging@colon, required: false, type: multiplechoice, variable: prompt_l2_vtag, choices: tagged\nuntagged}, {question_name: Interface(s)@colon, question_description: Enter single interface or range (e.g. e1/1/1 or e1/1/1 to 1/1/10), required: false, type: text, variable: prompt_l2_vint, min: 5, max: 1024}, {question_name: Remove Interface(s) From VLAN@question, required: false, type: multiplechoice, variable: prompt_l2_vremove, default: 'no', choices: yes\nno}, {question_name: Create Router Interface@question, required: false, type: multiplechoice, variable: prompt_l2_vrtr, default: 'no', choices: yes\nno}, {question_name: Spanning-Tree Protocol@colon, required: false, type: multiplechoice, variable: prompt_l2_vstp, choices: Disable\n802.1d\n802.1w}]
 # =====================
 ---
 - hosts: all
@@ -11,45 +11,35 @@
     ansible_become_method: enable
     NewlineVar: "\r"
     ErrParse: '^.*ConnectionError: '
-    EthRe: '(e|et|eth|ethe|ether|ethern|etherne|ethernet)'
+    EthRe: '(ethernet|etherne|ethern|ether|ethe|eth|et|e)'
     PortRe: '([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2})'
     RngRe: '^.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*to.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*$'
 
   tasks:
   - name: Format Interface List
-    set_fact:
-      VlanInt: '{{prompt_l2_vint|regex_replace(EthRe)|regex_replace(PortRe, "e \1")}}'
-    when:
-      - prompt_l2_vint is defined
-      - prompt_l2_vint != ''
-      - "'to' not in prompt_l2_vint"
+    set_fact: {EthInt: '{{tEthInt|regex_replace(PortRe, "e \1")}}'}
+    vars: {tEthInt: '{{prompt_l2_vint|regex_replace(EthRe)}}'}
+    when: prompt_l2_vint|default("null", true) != "null" and "to" not in prompt_l2_vint
 
   - name: Format Interface Range
-    set_fact: {VlanInt: '{{prompt_l2_vint|regex_replace(RngRe, "e \1 to \2")}}'}
-    when:
-      - prompt_l2_vint is defined
-      - prompt_l2_vint != ''
-      - "'to' in prompt_l2_vint"
+    set_fact: {EthInt: '{{prompt_l2_vint|regex_replace(RngRe, "e \1 to \2")}}'}
+    when: prompt_l2_vint|default("null", true) != "null" and "to" in prompt_l2_vint
 
   - name: Check VLAN Name
     set_fact: {VlanName: 'name {{prompt_l2_vname}}'}
-    when: prompt_l2_vname is defined and prompt_l2_vname != ''
+    when: prompt_l2_vname|default("null", true) != "null"
 
   - name: Setup VLAN Interface Removal
     set_fact: {RemCmd: no}
     when:
       - prompt_l2_vremove is defined
       - prompt_l2_vremove|bool
-      - prompt_l2_vtag is defined
-      - prompt_l2_vtag != ''
-      - VlanInt is defined
+      - prompt_l2_vtag|default("null", true) != "null"
+      - EthInt is defined
 
   - name: Setup VLAN Interface Command
-    set_fact: {VlanIntCmd: '{{RemCmd|default()}} {{prompt_l2_vtag}} {{VlanInt}}'}
-    when:
-      - prompt_l2_vtag is defined
-      - prompt_l2_vtag != ''
-      - VlanInt is defined
+    set_fact: {VlanIntCmd: '{{RemCmd|default()}} {{prompt_l2_vtag}} {{EthInt}}'}
+    when: prompt_l2_vtag|default("null", true) != "null" and EthInt is defined
 
   - name: Setup Router Interface Command
     set_fact: {RtrIntCmd: 'router-interface ve {{prompt_l2_vid}}'}

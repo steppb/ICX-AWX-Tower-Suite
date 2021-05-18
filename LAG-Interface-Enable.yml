@@ -10,50 +10,50 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
-    newline_var: "\r"
-    error_parse: '^.*ConnectionError: '
-    eth_var: '(e|et|eth|ethe|ether|ethern|etherne|ethernet)'
-    port_var: '([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2})'
-    range_var: '^.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*to.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*$'
+    NewlineVar: "\r"
+    ErrParse: '^.*ConnectionError: '
+    EthRe: '(ethernet|etherne|ethern|ether|ethe|eth|et|e)'
+    PortRe: '([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2})'
+    RngRe: '^.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*to.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*$'
 
   tasks:
   - name: Get LAG Config
     icx_command: {commands: 'show run | include lag {{template_lag_name}}'}
-    register: lag_status
+    register: LagStatus
 
   - name: Verify LAG Config
     assert:
-      that: lag_status is defined and lag_status.stdout[0] != ''
+      that: LagStatus is defined and LagStatus.stdout[0] != ''
       fail_msg: "ERROR: LAG-Interface-Add needs to be applied before running this template"
 
   - name: Format Interface List
-    set_fact: {lagports: '{{template_lag_port|regex_replace(eth_var)|regex_replace(port_var, "e \1")}}'}
+    set_fact: {EthInt: '{{tEthInt|regex_replace(PortRe, "e \1")}}'}
+    vars: {tEthInt: '{{template_lag_port|regex_replace(EthRe)}}'}
     when: "'to' not in template_lag_port"
 
   - name: Format Interface Range
-    set_fact: {lagports: '{{template_lag_port|regex_replace(range_var, "e \1 to \2")}}'}
+    set_fact: {EthInt: '{{template_lag_port|regex_replace(RngRe, "e \1 to \2")}}'}
     when: "'to' in template_lag_port"
 
   - name: Enabling LAG Interface
     icx_config:
-      lines: no disable {{lagports}}
+      lines: no disable {{EthInt}}
       parents: lag {{template_lag_name}}
       save_when: changed
-    register: icxconfig_status
+    register: IcxCfgStatus
     failed_when: false
 
   - name: Parse Switch Error
     set_fact:
-      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"
-    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
+      ErrMsg: "{{IcxCfgStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
+    when: IcxCfgStatus.rc is defined and IcxCfgStatus.rc == 1
 
   - name: Display Switch Error
-    assert: {that: error_msg is not defined, fail_msg: '{{error_msg.split(newline_var)}}'}
-    when: error_msg is defined
+    assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(NewlineVar)}}'}
+    when: ErrMsg is defined
 
   - name: Get LAG Config
     icx_command: {commands: 'show lag {{template_lag_name}}'}
-    register: output
+    register: LagCfg
 
-  - name: Display LAG Config
-    debug: var=output.stdout_lines[0]
+  - {name: Display LAG Config, debug: {msg: "{{LagCfg.stdout_lines[0]}}"}}

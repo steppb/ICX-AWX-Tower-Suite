@@ -11,7 +11,7 @@
     ansible_become_method: enable
     NewlineVar: "\r"
     ErrParse: '^.*ConnectionError: '
-    EthRe: '(e|et|eth|ethe|ether|ethern|etherne|ethernet)'
+    EthRe: '(ethernet|etherne|ethern|ether|ethe|eth|et|e)'
     PortRe: '([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2})'
     RngRe: '^.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*to.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*$'
 

@@ -1,5 +1,5 @@
 #! Description: Enable/Disable proxy-arp for an interface.
-#! Prompt: [{question_name: Enable/Disable Proxy-ARP@colon, question_description: '', required: true, type: multiplechoice, variable: prompt_ipv4_pxyarp, min: null, max: null, default: Disable, choices: Enable\nDisable}, {question_name: Interface or Range@colon, question_description: (e.g. eth 1/1/1 or eth 1/1/2 to 1/1/4 for range), required: true, type: text, variable: prompt_ipv4_pxyarp_int, min: 5, max: 1024, default: ''}]
+#! Prompt: [{question_name: Enable/Disable Proxy-ARP@colon, required: true, type: multiplechoice, variable: prompt_ipv4_pxyarp, default: Disable, choices: Enable\nDisable}, {question_name: Interface or Range@colon, question_description: (e.g. eth 1/1/1 or eth 1/1/2 to 1/1/4 for range), required: true, type: text, variable: prompt_ipv4_pxyarp_int, min: 5, max: 1024}]
 # =====================
 ---
 - hosts: all
@@ -11,9 +11,9 @@
     ansible_become_method: enable
     NewlineVar: "\r"
     ErrParse: '^.*ConnectionError: '
-    EthRe: '(e|et|eth|ethe|ether|ethern|etherne|ethernet)'
+    EthRe: '(ethernet|etherne|ethern|ether|ethe|eth|et|e)'
     PortRe: '([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2})'
-    RangeRe: '^.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*to.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*$'
+    RngRe: '^.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*to.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*$'
 
   tasks:
   - name: Format Interface List
@@ -22,7 +22,7 @@
     when: "'to' not in prompt_ipv4_pxyarp_int"
 
   - name: Format Interface Range
-    set_fact: {EthInt: '{{prompt_ipv4_pxyarp_int|regex_replace(RangeRe, "e \1 to \2")}}'}
+    set_fact: {EthInt: '{{prompt_ipv4_pxyarp_int|regex_replace(RngRe, "e \1 to \2")}}'}
     when: "'to' in prompt_ipv4_pxyarp_int"
 
   - name: Apply Proxy-ARP Configuration
