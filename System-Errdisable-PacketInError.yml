@@ -1,0 +1,52 @@
+#! Description:  Configure sampling interval on packet inError count.  Enable auto-recovery from packet inError disable state.
+#! Prompt: [{question_name: InError packet threshold@colon, question_description: '', required: true, type: integer, variable: prompt_inerror_threshold, min: 10, max: 4294967295, default: '', choices: ''}, {question_name: Interface or Range@colon, question_description: (e.g. eth 1/1/1 or eth 1/1/2 to 1/1/4 for range), required: true, type: text, variable: prompt_inerror_int, min: 5, max: 1024, default: ''}] 
+# =====================
+---
+- hosts: all
+  connection: network_cli
+  gather_facts: no
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+    NewlineVar: "\r"
+    ErrParse: '^.*ConnectionError: '
+    EthRe: '(e|et|eth|ethe|ether|ethern|etherne|ethernet)'
+    PortRe: '([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2})'
+    RngRe: '^.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*to.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*$'
+
+  tasks:
+  - name: Format Interface List
+    set_fact: {EthInt: '{{tEthInt|regex_replace(PortRe, "e \1")}}'}
+    vars: {tEthInt: '{{prompt_inerror_int|regex_replace(EthRe)}}'}
+    when: "'to' not in prompt_inerror_int"
+
+  - name: Format Interface Range
+    set_fact: {EthInt: '{{prompt_inerror_int|regex_replace(RngRe, "e \1 to \2")}}'}
+    when: "'to' in prompt_inerror_int"
+
+  - name: Errdisable packet detection and recovery.
+    icx_config:
+      lines: |
+        errdisable packet-inerror-detect 3
+        errdisable recovery cause packet-inerror-detect
+      save_when: changed
+    register: icxconfig_status
+    failed_when: icxconfig_status.msg is defined and "MODULE FAILURE" not in icxconfig_status.msg
+
+  - name: Apply Interface inError Threshold Configuration
+    icx_config:
+      lines: 'packet-inerror-detect {{prompt_inerror_threshold}}'
+      save_when: changed
+      parents: interface {{EthInt}}
+    register: IcxCfgStatus
+    failed_when: IcxCfgStatus.msg is defined and "MODULE FAILURE" not in IcxCfgStatus.msg
+
+  - name: Parse Switch Error
+    set_fact:
+      error_msg: "{{icxconfig_status.module_stderr|regex_replace('\n')|regex_replace(error_parse)}}"
+    when: icxconfig_status.rc is defined and icxconfig_status.rc == 1
+
+  - name: Display Switch Error
+    assert: {that: error_msg is not defined, fail_msg: '{{error_msg.split(newline_var)}}'}
+    when: error_msg is defined
