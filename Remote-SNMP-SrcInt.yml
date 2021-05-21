@@ -25,8 +25,8 @@
 
   tasks:
   - name: Set Source-Interface Variable
-    set_fact: {SrcInt: '{{tSrcInt|default(prompt_srcint, true)}}'}
-    vars: {tSrcInt: '{{host_snmp_srcint|default(host_srcint, true)}}'}
+    set_fact:
+      SrcInt: '{{host_snmp_srcint|default(host_srcint, true)|default(prompt_srcint, true)}}'
 
   - name: Correct Variable Spacing
     set_fact: {SrcInt: '{{SrcInt|regex_replace("^([A-Za-z]*)","\1 ")}}'}
