@@ -1,24 +1,17 @@
 ---
-- name: Store Version from Template
-  set_fact: {TemplateVer: '{{tVerStr|regex_search(tVerRe)|regex_replace(tVerRe, "\2")}}'}
-  vars:
-    tVerStr: '{{ExtraVars|regex_replace("\n")}}'
-    tVerRe: '^.*(playbook|template)_version: ([0-9].[0-9]).*$'
-
 - name: Update Templates
   block:
-  - name: Debug
-    debug: msg="Updating template '{{PbFileName|regex_replace(YamlExt)}}'"
+  - {name: Debug, debug: {msg: "Updating template '{{bJtName}}'"}}
 
   - name: Get Playbook Descriptions
-    shell: grep '{{DescRegex}}' {{PjPath}}/{{PbFileName}} | sed 's/{{DescRegex}}//g'
+    shell: grep '{{DescRegex}}' {{PbFilePath}} | sed 's/{{DescRegex}}//g'
     register: description
     changed_when: false
     failed_when: false
     vars: {DescRegex: '#! Description: '}
 
   - name: Get Playbook Comments
-    shell: cat {{PjPath}}/{{PbFileName}} | grep '^# '
+    shell: cat {{PbFilePath}} | grep '^# '
     changed_when: false
     failed_when: false
     register: PlaybookComments
@@ -32,7 +25,7 @@
       body_format: json
 
   - name: Scrape Playbook Prompts
-    shell: "grep '^#! Prompt' {{PjPath}}/{{PbFileName}} | sed 's/^.*Prompt: //g'"
+    shell: "grep '^#! Prompt' {{PbFilePath}} | sed 's/^.*Prompt: //g'"
     failed_when: false
     changed_when: false
     register: RawPrompts
@@ -89,7 +82,12 @@
 
           {{PlaybookComments.stdout}}
       body_format: json
-  when: TemplateVer == "None" or
-        TemplateVer is version(AwxMgmtVer, "<") or
-        ansible_icx_mgmt_playbooks[prompt_project_name][PbFileName] is not defined or
-        ansible_icx_mgmt_playbooks[prompt_project_name][PbFileName] != PbChecksum
+
+  - name: Add Template to "Created" List
+    set_fact: {CreatedTemplates: '{{CreatedTemplates|default([]) + [bJtName]}}'}
+    when: FromCreate|bool
+
+  - name: Add Template to "Updated" List
+    set_fact: {UpdatedTemplates: '{{UpdatedTemplates|default([]) + [bJtName]}}'}
+    when: not FromCreate|bool
+  vars: {bJtName: '{{PbFileName|regex_replace(YamlExt)}}'}

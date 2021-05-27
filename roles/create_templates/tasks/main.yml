@@ -6,8 +6,13 @@
   register: PjInfo
   failed_when: PjInfo.json.results[0] is not defined
 
-- name: Set Project Variables
+- name: Set Job Variables
   set_fact:
+    CreateJtPbs: []
+    UpdateJtPbs: []
+    UpdateJtTemplates: []
+    UpdateJtVer: []
+    VerRe: '^.*(playbook|template)_version: ([0-9].[0-9]).*$'
     PjId: "{{PjInfo.json.results[0].id}}"
     PjPath: "{{AwxCfg.json.project_base_dir}}/{{PjInfo.json.results[0].local_path}}"
 
@@ -41,46 +46,98 @@
     get_checksum: yes
   register: PbList
 
-- name: Get List of Ignored Playbooks
-  lineinfile:
-    path: '{{PbList.files[idx].path}}'
-    regex: '^#! AwxMgmtIgnore$'
-    line: '#! AwxMgmtIgnore'
-  changed_when: false
-  check_mode: yes
-  loop: '{{range(0, PbList.files|length)|list}}'
-  loop_control: {index_var: idx}
+- name: Get Job Template Count
+  uri: {url: '{{AwxApi}}/job_templates/'}
+  register: JobTemplateCount
+
+- name: Get List of All Templates
+  uri: {url: '{{AwxApi}}/job_templates/?page_size={{JobTemplateCount.json.count}}'}
+  register: AllTemplates
+
+- name: Get List of Existing Job Templates for This Project
+  set_fact: {ExistingTemplates: "{{tJts|selectattr('project', 'equalto', PjId|int)|list}}"}
+  vars: {tJts: '{{AllTemplates.json.results}}'}
+
+- name: Find Ignored Playbooks
+  find:
+    paths: '{{PjPath}}'
+    contains: '^#! AwxMgmtIgnore$'
+    recurse: no
+    patterns: '*.yml'
   register: AwxMgmtIgnored
 
-- name: Get List of Existing Templates
-  uri: {url: '{{AwxApi}}/job_templates/?name={{tBasename|regex_replace(YamlExt)}}'}
-  loop: '{{range(0, PbList.files|length)|list}}'
-  loop_control: {index_var: idx}
-  vars: {tBasename: '{{PbList.files[idx].path|basename}}'}
-  register: ExistingTemplates
+- name: Template Create Block
+  block:
+  - name: Get List of Job Templates to Create
+    set_fact: {CreateJtPbs: '{{CreateJtPbs + [PbList.files[idx]]}}'}
+    loop: '{{range(0, PbList.files|length)|list}}'
+    loop_control: {index_var: idx}
+    vars:
+      tJts: '{{AllTemplates.json.results}}'
+      tJtName: '{{PbList.files[idx].path|basename|regex_replace(YamlExt)}}'
+    when: (tJts|selectattr('name', 'equalto', tJtName)|list)[0].id is not defined
 
-- name: Create Templates
-  include_tasks: create_templates.yml
-  loop: '{{range(0, PbList.files|length)|list}}'
-  loop_control: {loop_var: PbFileEntry, index_var: idx}
-  vars: {PbFileName: '{{PbList.files[idx].path|basename}}'}
-  when:
-    - AwxMgmtIgnored.results[idx].msg != ''
-    - ExistingTemplates.results[idx].json.results[0] is not defined
+  - name: Create Templates
+    include_tasks: create_templates.yml
+    loop: '{{range(0, CreateJtPbs|length)|list}}'
+    loop_control: {loop_var: PbFileEntry, index_var: idx}
+    vars:
+      PbFileName: '{{CreateJtPbs[idx].path|basename}}'
+      PbFilePath: '{{CreateJtPbs[idx].path}}'
+      TemplateVer: "None"
+    when: PbFilePath not in AwxMgmtIgnored.files|map(attribute='path')|list
+  vars: {FromCreate: true}
 
-- name: Update Existing Templates
-  include_tasks: update_template.yml
-  loop: '{{range(0, PbList.files|length)|list}}'
-  loop_control: {loop_var: PbFileEntry, index_var: idx}
-  vars:
-    PbChecksum: '{{PbList.files[idx].checksum}}'
-    PbFileName: '{{PbList.files[idx].path|basename}}'
-    TemplateId: '{{ExistingTemplates.results[idx].json.results[0].id}}'
-    ExtraVars: '{{ExistingTemplates.results[idx].json.results[0].extra_vars}}'
-  when:
-    - AwxMgmtIgnored.results[idx].msg != ''
-    - ExistingTemplates.results[idx].json.results[0] is defined
-    - ExistingTemplates.results[idx].json.results[0].project == PjId|int
+- name: Template Update Block
+  block:
+  - name: Get List of Templates to Update
+    set_fact:
+      UpdateJtPbs: '{{UpdateJtPbs + [tFile[0]]}}'
+      UpdateJtTemplates: '{{UpdateJtTemplates + [bJts[idx]]}}'
+      UpdateJtVer: '{{UpdateJtVer + [tJtVer]}}'
+    loop: '{{range(0, bJts|length)|list}}'
+    loop_control: {index_var: idx}
+    vars:
+      tFile: "{{bFiles|selectattr('path', 'contains', bJts[idx].name~'.yml')|list}}"
+      tPbName: '{{bJts[idx].playbook}}'
+      tJtVer: '{{bJts[idx].extra_vars|regex_replace("\n") |
+                 regex_search(VerRe)|regex_replace(VerRe, "\2")}}'
+    when: tFile[0].checksum is defined and
+          tFile[0].path not in AwxMgmtIgnored.files|map(attribute='path')|list and
+          (tJtVer == "None" or tJtVer is version(AwxMgmtVer, "<") or
+          ansible_icx_mgmt_playbooks[prompt_project_name][tPbName] is not defined or
+          ansible_icx_mgmt_playbooks[prompt_project_name][tPbName] != tFile[0].checksum)
+      
+  - name: Update Existing Templates
+    include_tasks: update_template.yml
+    loop: '{{range(0, UpdateJtPbs|length)|list}}'
+    loop_control: {loop_var: PbFileEntry, index_var: idx}
+    vars:
+      PbChecksum: '{{UpdateJtPbs[idx].checksum}}'
+      PbFileName: '{{UpdateJtPbs[idx].path|basename}}'
+      PbFilePath: '{{UpdateJtPbs[idx].path}}'
+      TemplateId: '{{UpdateJtTemplates[idx].id}}'
+      TemplateVer: '{{UpdateJtVer[idx]}}'
+      ExtraVars: '{{UpdateJtTemplates[idx].extra_vars}}'
+  vars: {bFiles: '{{PbList.files}}', bJts: '{{ExistingTemplates}}', FromCreate: false}
+
+- name: Orphaned Template Removal Block
+  block:
+  - name: Get List of Orphaned Templates
+    set_fact:
+      OrphanedTemplates: '{{OrphanedTemplates|default([]) + [bJts[idx].name]}}'
+      OrphanedTemplateIds: '{{OrphanedTemplateIds|default([]) + [bJts[idx].id]}}'
+    loop: '{{range(0, bJts|length)|list}}'
+    loop_control: {index_var: idx}
+    vars: {bJts: '{{ExistingTemplates}}'}
+    when: PjPath~'/'~bJts[idx].playbook not in PbList.files|map(attribute='path')|list
+
+  - name: Remove Orphaned Templates
+    uri: {url: '{{tUrl}}', method: DELETE, return_content: no, status_code: 204}
+    loop: '{{OrphanedTemplates|default([], true)}}'
+    loop_control: {index_var: idx}
+    vars: {tUrl: '{{AwxApi}}/job_templates/{{OrphanedTemplateIds[idx]}}/'}
+  when: template_remove_orphans|default(true, true)|bool
 
 - name: Create List of Playbook Checksums
   set_fact: {PjPlaybooks: '{{PjPlaybooks|default({})|combine({tBasename:tChecksum})}}'}
@@ -95,3 +152,20 @@
     ansible_icx_mgmt_playbooks: '{{tMgmtFact|combine({prompt_project_name:PjPlaybooks})}}'
     cacheable: yes
   vars: {tMgmtFact: '{{ansible_icx_mgmt_playbooks|default({}, true)}}'}
+
+- name: Debug
+  debug:
+    msg:
+      - "Job Templates Created"
+      - "========================"
+      - "{{CreatedTemplates|default(['none'])}}"
+      - ""
+      - "Job Templates Updated"
+      - "========================"
+      - "{{UpdatedTemplates|default(['none'])}}"
+      - ""
+      - "Job Templates Removed"
+      - "========================"
+      - "{{OrphanedTemplates|default(['none'])}}"
+
+- {name: End Play, meta: end_play}

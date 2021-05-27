@@ -24,4 +24,3 @@
   - {role: self_update}
   - {role: create_templates, when: "'create' in prompt_mgmt_role|lower"}
   - {role: remove_templates, when: "'remove' in prompt_mgmt_role|lower"}
-
