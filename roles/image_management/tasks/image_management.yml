@@ -1,7 +1,9 @@
 - {name: Get Pip Packages, pip_package_info: {clients: ['pip', 'pip3']}, register: PipInfo}
 
 - name: Install 'pexpect' Package
-  pip: {name: pexpect}
+  pip: {name: pexpect, extra_args: --retries 0}
+  failed_when: false
+  register: PexpectStatus
   when: PipInfo.packages.pip.pexpect is not defined
 
 - {name: Get Projects Directory, uri: {url: '{{AwxApi}}/config/'}, register: AwxCfg}
@@ -116,15 +118,9 @@
       set_fact: {ImgFlCpTemplateInfo: '{{NewImgFlCpTemplate.json}}'}
     when: ImgFlCpTemplate.json.count == 0
 
-  - name: Create 'Image-Flash-Copy' Survey Prompt
-    uri:
-      url: '{{AwxApi}}/job_templates/{{ImgFlCpTemplateInfo.id}}/survey_spec/'
-      method: POST
-      headers: {Content-Type: 'application/json'}
-      body:
-        name: ''
-        description: ''
-        spec:
+  - name: Prepare Initial 'Image-Flash-Copy' Survey Prompt
+    set_fact:
+      SurveySpec:
         - question_name: 'Select the Image File to Flash:'
           required: true
           type: multiplechoice
@@ -160,6 +156,34 @@
             Yes
             No
           default: "No"
+
+  - name: Add Survey Prompts for AWX SSH Credential Input
+    set_fact: {SurveySpec: '{{SurveySpec + tSshCredSurvey}}'}
+    vars:
+      tSshCredSurvey:
+        - question_name: "AWX Server SSH Login - Username:"
+          required: true
+          type: text
+          variable: prompt_awxssh_user
+          min: 1
+          max: 32
+        - question_name: "AWX Server SSH Login - Password:"
+          required: true
+          type: password
+          variable: prompt_awxssh_pass
+          min: 1
+          max: 1024
+    when: not PexpectStatus.changed|bool and PexpectStatus.skipped is not defined
+
+  - name: Create 'Image-Flash-Copy' Survey Prompt
+    uri:
+      url: '{{AwxApi}}/job_templates/{{ImgFlCpTemplateInfo.id}}/survey_spec/'
+      method: POST
+      headers: {Content-Type: 'application/json'}
+      body:
+        name: ''
+        description: ''
+        spec: '{{SurveySpec}}'
       body_format: json
 
   - name: Enable Survey Prompt

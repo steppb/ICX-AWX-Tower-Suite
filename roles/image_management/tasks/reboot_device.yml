@@ -14,4 +14,4 @@
       set_fact: {ReloadSuccess: true}
       when: '"Error" not in ReloadResult.stdout[0]'
     when: ReloadResult.stdout[0] is defined
-  when: ReloadSuccess is not defined or not ReloadSuccess|bool 
+  when: ReloadSuccess is not defined or not ReloadSuccess|bool

@@ -1,10 +1,7 @@
 - name: Image-Flash-Copy - Get Switch Information
   icx_facts: {gather_subset: hardware}
   connection: network_cli
-  vars:
-    ansible_network_os: icx
-    ansible_become: true
-    ansible_become_method: enable
+  vars: {ansible_network_os: icx, ansible_become: true, ansible_become_method: enable}
 
 - name: Check Bootrom for Compatibility
   block:
@@ -14,10 +11,7 @@
     icx_command: {commands: show flash | include Boot}
     register: IcxShFlash
     connection: network_cli
-    vars:
-      ansible_network_os: icx
-      ansible_become: true
-      ansible_become_method: enable
+    vars: {ansible_network_os: icx, ansible_become: true, ansible_become_method: enable}
 
   - name: Store Current Boot Version
     set_fact: {CurBootVer: '{{IcxShFlash.stdout_lines[0][0]|regex_search(tBootVerRe)}}'}
@@ -47,7 +41,7 @@
   - name: Image-Flash-Copy - Check if Boot Preference Change is Needed
     block:
     - name: Image-Flash-Copy - Remove Boot Statements
-      icx_config: {lines: 'no boot sys fl {{item}}', save_when: changed}
+      icx_config: {lines: 'no boot system flash {{item}}', save_when: changed}
       with_items:
         - pri
         - sec
@@ -56,41 +50,78 @@
         - item in FirstPart or item in CurBootPref.stdout_lines[0][2]|lower
 
     - name: Image-Flash-Copy - Configure Boot Priority
-      icx_config: {lines: 'boot sys fl {{FlPart}}', save_when: changed}
-      when: FlPart != "pri"
+      icx_config: {lines: 'boot sys fl {{BootPart}}', save_when: changed}
+      when: '"pri" in BootPart'
 
     vars: {FirstPart: '{{CurBootPref.stdout_lines[0][1]|lower}}'}
-    when: ("Use Default" not in FirstPart and FlPart not in FirstPart) or
-          ("Use Default" in FirstPart and FlPart == "sec")
+    when: ("Use Default" not in FirstPart and BootPart not in FirstPart) or
+          ("Use Default" in FirstPart and "sec" in BootPart)
   connection: network_cli
-  vars:
-    ansible_network_os: icx
-    ansible_become: true
-    ansible_become_method: enable
+  vars: {ansible_network_os: icx, ansible_become: true, ansible_become_method: enable}
   when: BootPrefChange|bool
 
 - name: Image-Flash-Copy - Save SSH Username
   set_fact: {RemUser: '{{ansible_user}}'}
   connection: ssh
 
-- name: Image-Flash-Copy - Copy Image to Switch Flash
-  expect:
-    command: scp {{tOpts}} {{tKex}} {{item.Src}} {{item.Dest}}
-    echo: yes
-    timeout: '{{ScpTimeout}}'
-    responses:
-      'Password:': "{{ansible_password}}"
-  no_log: true
-  loop: '{{tCpFiles}}'
-  vars:
-    tOpts: "-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
-    tKex: "-o KexAlgorithms=+diffie-hellman-group1-sha1"
-    tCpFiles:
-      - Src: '{{ScpBootPath}}'
-        Dest: "{{RemUser}}@{{ansible_host}}:flash:bootrom"
-      - Src: "{{ScpFileEntry.path}}"
-        Dest: "{{RemUser}}@{{ansible_host}}:flash:{{BootPart}}:{{ScpFileEntry.filename}}"
-  when: item.Src != "null"
+- name: Image-Flash-Copy - pexpect Block
+  block:
+  - name: Image-Flash-Copy - Copy Image(s) to Switch Flash Using pexpect
+    expect:
+      command: scp {{tOpts}} {{tKex}} {{item.src}} {{item.dest}}
+      echo: yes
+      timeout: '{{ScpTimeout}}'
+      responses:
+        'Password:': "{{ansible_password}}"
+    no_log: true
+    loop: '{{tCpFiles}}'
+    vars:
+      tOpts: "-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
+      tKex: "-o KexAlgorithms=+diffie-hellman-group1-sha1"
+      tCpFiles:
+      - src: "{{ScpBootPath}}"
+        dest: "{{RemUser}}@{{ansible_host}}:flash:bootrom"
+      - src: "{{ScpFileEntry.path}}"
+        dest: "{{RemUser}}@{{ansible_host}}:flash:{{BootPart}}:{{ScpFileEntry.filename}}"
+    when: item.src != "null"
+  when: not UseIcxCopy|bool
+
+- name: Image-Flash-Copy - icx_copy Block
+  block:
+  - name: Get List of Connected Users
+    icx_command: {commands: sh who | incl client|you are connecting}
+    register: ShWho
+
+  - name: Find Index
+    set_fact: {ConnIdx: '{{idx}}'}
+    loop: '{{ShWho.stdout_lines[0]}}'
+    loop_control: {index_var: idx}
+    when: "'you are connecting' in item"
+
+  - name: Get Connecting IP
+    set_fact: {MyIp: '{{ShWho.stdout_lines[0][ConnIdx - 1]|regex_replace(tWhoRe, "\1")}}'}
+    vars: {tWhoRe: '^.* client ip address ([0-9a-f:.]*).*$'}
+
+  - name: Image-Flash-Copy - Copy Image(s) to Switch Flash Using icx_copy
+    icx_copy:
+      download: "{{item.dest}}"
+      protocol: scp
+      remote_server: "{{MyIp}}"
+      remote_filename: "{{item.src}}"
+      remote_user: "{{prompt_awxssh_user}}"
+      remote_pass: "{{prompt_awxssh_pass}}"
+    loop: '{{tCpFiles}}'
+    vars:
+      ansible_command_timeout: '{{ScpTimeout}}'
+      tCpFiles:
+      - src: "{{ScpBootPath}}"
+        dest: bootrom
+      - src: "{{ScpFileEntry.path}}"
+        dest: "flash_{{BootPart}}"
+    when: item.src != "null"
+  connection: network_cli
+  vars: {ansible_network_os: icx, ansible_become: yes, ansible_become_method: enable}
+  when: UseIcxCopy|bool
 
 - name: Image-Flash-Copy - Reload Device
   block:
@@ -100,15 +131,10 @@
     when: ReloadSuccess|default('null', true) == 'null'
 
   - name: Image-Flash-Copy - Wait For Device to Finish Boot
-    wait_for:
-      host: '{{ansible_host}}'
-      port: 22
-      delay: 30
-      timeout: '{{ReloadTimeout}}'
+    wait_for: {host: '{{ansible_host}}', port: 22, delay: 30, timeout: '{{RldTimeout}}'}
     delegate_to: localhost
 
-  - name: Image-Flash-Copy - Post-Boot Info
-    icx_facts: {gather_subset: hardware}
+  - {name: Image-Flash-Copy - Post-Boot Info, icx_facts: {gather_subset: hardware}}
 
   - name: Image-Flash-Copy Ensure Successful Image Update
     assert:
@@ -120,9 +146,6 @@
 
   - name: Reset Reload Return Variable
     set_fact: {ReloadSuccess: }
-  connection: network_cli 
-  vars:
-    ansible_network_os: icx
-    ansible_become: true
-    ansible_become_method: enable
+  connection: network_cli
+  vars: {ansible_network_os: icx, ansible_become: true, ansible_become_method: enable}
   when: ReloadDevice|bool

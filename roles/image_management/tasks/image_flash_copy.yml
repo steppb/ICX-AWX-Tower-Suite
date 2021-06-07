@@ -1,18 +1,12 @@
 ---
 - name: Image-Flash-Copy - Verify Connectivity to Device
-  wait_for:
-    host: '{{ansible_host}}'
-    port: 22
-    timeout: 30
+  wait_for: {host: '{{ansible_host}}', port: 22, timeout: 30}
   delegate_to: localhost
 
 - name: Image-Flash-Copy - Gather Switch Info
   icx_facts: {gather_subset: hardware}
   connection: network_cli
-  vars:
-    ansible_network_os: icx
-    ansible_become: true
-    ansible_become_method: enable
+  vars: {ansible_network_os: icx, ansible_become: true, ansible_become_method: enable}
 
 - name: Image-Flash-Copy - Assert Switch Access
   assert:
@@ -67,6 +61,7 @@
 - name: Image-Flash-Copy - Set Partition
   set_fact: {FlPart: '{{tFlPart|regex_replace("^([a-z]{3}).*$", "\1")}}'}
   vars: {tFlPart: '{{prompt_flash_part|lower|default(sec)}}'}
+  when: not AltCopy|bool
 
 - name: Image-Flash-Copy - Get Current Switch Version - ansible_net_image
   set_fact: {CurSwVer: '{{ansible_net_image|regex_replace(BinVerRe, "\1.\2.\3")}}'}
@@ -83,7 +78,7 @@
   - name: Image-Flash-Copy - Assert Existence of Intermediate Image
     assert:
       that: FileEntry.intermediate_image|default("null", true) != "null"
-      fail_msg: 
+      fail_msg:
         - "ERROR: Cannot update to {{FileEntry.software_version}} from {{CurSwVer}}"
         - "without an intermediate version."
         - "Non-UFI 8.0.80 {{FileEntry.image_type}} image needs to be installed in image repo"
@@ -115,28 +110,42 @@
     - CurSwVer is version('8.0.80', '<')
     - FileEntry.software_version is version('8.0.90', '>=')
 
-- name: Image-Flash-Copy - Image Config
+- name: Image-Flash-Copy - Image Config (Downgrade from 08.0.90)
   set_fact:
-    ScpCpCfg: '{{ScpCpCfg|default([])}} + {{tVar}}'
+    UfiDowngrade: true
+    ScpCpCfg:
+      - ScpFileEntry: '{{FileEntry}}'
+        ScpBootPath: "null"
+      - ScpFileEntry: '{{FileEntry}}'
+        ScpBootPath: '{{BootEntry.path}}'
+  when:
+    - CurSwVer is version('8.0.90', '>=')
+    - not FileEntry.is_ufi|bool
+    - BootEntry.path|default("null", true) != "null"
+
+- name: Image-Flash-Copy - Image Config
+  set_fact: {ScpCpCfg: '{{ScpCpCfg|default([])}} + {{tVar}}'}
   vars:
     tVar:
       - ScpFileEntry: '{{FileEntry}}'
         ScpBootPath: '{{BootEntry.path|default("null", true)}}'
+  when: not UfiDowngrade|default(false, true)|bool
 
 - name: Image-Flash-Copy - SCP Copy to Switch Tasks
   include_tasks: scp_copy_to_switch.yml
   loop: '{{ScpCpCfg}}'
   loop_control: {loop_var: ScpCpEntry}
   vars:
-    BootPart: '{{FlPart}}'
+    BootPart: '{{FlPart|default(prompt_flash_part|lower, true)}}'
     BootPrefChange: '{{prompt_flash_change_boot}}'
     ReloadDevice: '{{prompt_flash_reload}}'
-    ReloadTimeout: '{{template_flash_reload_timeout|default(600)}}'
+    RldTimeout: '{{template_flash_reload_timeout|default(600)}}'
     ScpBootPath: '{{ScpCpEntry.ScpBootPath}}'
     ScpFileEntry: '{{ScpCpEntry.ScpFileEntry}}'
     ScpTimeout: "{{template_flash_copy_timeout|default(300)}}"
+    UseIcxCopy: '{{AltCopy}}'
 
-- name: Image-Flash-Copy - Reload Device
+- name: Image-Flash-Copy - Post Boot Info
   block:
   - name: Image-Flash-Copy - Get Post-Boot Version Information
     icx_command: {commands: show version}
@@ -145,8 +154,5 @@
   - name: Image-Flash-Copy - Show Version
     debug: {msg: '{{IcxVersion.stdout_lines[0]}}'}
   connection: network_cli
-  vars:
-    ansible_network_os: icx
-    ansible_become: true
-    ansible_become_method: enable
+  vars: {ansible_network_os: icx, ansible_become: true, ansible_become_method: enable}
   when: prompt_flash_reload|bool
