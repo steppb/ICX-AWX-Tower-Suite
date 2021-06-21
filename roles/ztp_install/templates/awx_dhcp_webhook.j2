@@ -47,6 +47,7 @@ if [[ $InitLoginTemplateId =~ $number_re ]] ; then
   echo "Launching Provisioning-Init-Login on $ClientName"
   curl -s -k -H "Authorization: Bearer $AuthToken" \
              -H "Content-Type: application/json" -X POST -d '{
-                "inventory":"'$InventoryID'"
+                "inventory":"'$InventoryID'",
+                "limit":"'$ClientIP'"
             }' https://localhost/api/v2/job_templates/$InitLoginTemplateId/launch/
 fi
