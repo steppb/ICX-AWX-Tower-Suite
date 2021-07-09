@@ -1,5 +1,5 @@
 #! Description: Enable/Disable Spanning-tree designated-protect on an interface.
-#! Prompt: [{question_name: Enable/Disable STP Designated-Protect@colon, required: true, type: multiplechoice, variable: prompt_stp_dp_enable, default: Enable, choices: Enable\nDisable}, {question_name: Interface or Range@colon, question_description: (e.g. eth 1/1/1 or eth 1/1/2 to 1/1/4 for range), required: true, type: text, variable: prompt_stp_dp_int, min: 5, max: 1024}]
+#! Prompt: [{question_name: Enable/Disable STP Designated-Protect@colon, required: true, type: multiplechoice, variable: prompt_stp_dp_enable, default: Enable, choices: Enable\nDisable}, {question_name: Interface or Range@colon, question_description: (e.g. eth 1/1/1 or eth 1/1/2 to 1/1/4 for range), required: true, type: text, variable: prompt_stp_dp_int, min: 3, max: 1024}]
 # =====================
 ---
 - hosts: all
@@ -12,22 +12,21 @@
     NewlineVar: "\r"
     ErrParse: '^.*ConnectionError: '
     EthRe: '(ethernet|etherne|ethern|ether|ethe|eth|et|e)'
-    PortRe: '([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2})'
-    RngRe: '^.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*to.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*$'
+    RngRe: 'to[ e]*([0-9])'
+    IntRe: '[ e]*([0-9]{1,2}/[0-9])'
 
   tasks:
   - name: Setup for Spanning-Tree Designated Protect Disable
     set_fact: {NoStpDp: "no spanning-tree"}
     when: "'Disable' in prompt_stp_dp_enable"
 
-  - name: Format Interface List
-    set_fact: {EthInt: '{{tEthInt|regex_replace(PortRe, "e \1")}}'}
-    vars: {tEthInt: '{{prompt_stp_dp_int|regex_replace(EthRe)}}'}
-    when: "'to' not in prompt_stp_dp_int"
+  - name: Correct Interface Format
+    set_fact: {EthInt: '{{tEthInt|regex_replace(IntRe, " e \1")}}'}
+    vars: {tEthInt: '{{prompt_stp_dp_int|lower|regex_replace(EthRe, "e ")}}'}
 
-  - name: Format Interface Range
-    set_fact: {EthInt: '{{prompt_stp_dp_int|regex_replace(RngRe, "e \1 to \2")}}'}
-    when: "'to' in prompt_stp_dp_int"
+  - name: Correct Range Format
+    set_fact: {EthInt: '{{EthInt|regex_replace(RngRe, " to \1")}}'}
+    when: "'to' in prompt_stp_dp_int and 'lag' not in prompt_stp_dp_int"
 
   - name: Apply Spanning-Tree Designated-Protect Configuration
     icx_config:

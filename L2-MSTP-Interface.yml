@@ -1,5 +1,5 @@
 #! Description: Configure interfaces as MSTP admin-edge or point-to-point ports.
-#! Prompt: [{question_name: MSTP Point-to-Point Interface, question_description: Enter the MSTP Point-to-Point Interface(s). (e.g. e 1/1/1 or e1/1/1 to 1/1/24), required: false, type: text, variable: template_l2_mstp_pt2pt, min: 0, max: 1024}, {question_name: MSTP Edge Interface, question_description: Enter the MSTP Edge Interface(s). (e.g. e1/1/1 or e1/1/1 to 1/1/24), required: false, type: text, variable: template_l2_mstp_edgeint, min: 0, max: 1024}]
+#! Prompt: [{question_name: MSTP Point-to-Point Interface(s), question_description: Enter the MSTP Point-to-Point Interface(s). (e.g. e 1/1/1 or e1/1/1 to 1/1/24), required: false, type: text, variable: prompt_mstp_p2pint, min: 3, max: 1024}, {question_name: MSTP Edge Interface(s), question_description: Enter the MSTP Edge Interface(s). (e.g. e1/1/1 or e1/1/1 to 1/1/24), required: false, type: text, variable: prompt_mstp_edgeint, min: 3, max: 1024}]
 # =====================
 # Note: L2-MSTP-Config template needs to be applied before running this template.
 #       Only interfaces in an MSTP VLAN will be added to config.
@@ -11,9 +11,10 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
+    NewlineVar: "\r"
     EthRe: '(ethernet|etherne|ethern|ether|ethe|eth|et|e)'
-    PortRe: '([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2})'
-    RngRe: '^.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*to.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*$'
+    RngRe: 'to[ e]*([0-9])'
+    IntRe: '[ e]*([0-9]{1,2}/[0-9])'
 
   tasks:
   - {name: Get MSTP Config, icx_command: {commands: show mstp config}, register: MstpCfg}
@@ -25,35 +26,31 @@
 
   - name: Setup Point-to-Point Interface Command
     block:
-      - name: Format Interface List
-        set_fact: {P2pInts: '{{EthInts|regex_replace(PortRe, "e \1")}}'}
-        vars: {EthInts: '{{template_l2_mstp_pt2pt|regex_replace(EthRe)}}'}
-        when: "'to' not in template_l2_mstp_pt2pt"
+      - name: Correct Interface Format
+        set_fact: {P2pInt: '{{tP2pInt|regex_replace(IntRe, " e \1")}}'}
+        vars: {tP2pInt: '{{prompt_mstp_p2pint|lower|regex_replace(EthRe, "e ")}}'}
 
-      - name: Format Interface Range
-        set_fact: {P2pInts: '{{EthInts|regex_replace(RngRe, "e \1 to \2")}}'}
-        vars: {EthInts: '{{template_l2_mstp_pt2pt}}'}
-        when: "'to' in template_l2_mstp_pt2pt"
+      - name: Correct Range Format
+        set_fact: {P2pInt: '{{P2pInt|regex_replace(RngRe, " to \1")}}'}
+        when: "'to' in prompt_mstp_p2pint and 'lag' not in prompt_mstp_p2pint"
 
       - name: Set MSTP Point-to-Point Interface Command
-        set_fact: {P2pIntCmd: "mstp admin-pt2pt-mac {{P2pInts}}"}
-    when: template_l2_mstp_pt2pt is defined and template_l2_mstp_pt2pt != ''
+        set_fact: {P2pIntCmd: "mstp admin-pt2pt-mac {{P2pInt}}"}
+    when: prompt_mstp_p2pint|default("null", true) != "null"
 
   - name: Setup Edge Interface Command
     block:
-      - name: Format Interface List
-        set_fact: {EdgeInts: '{{EthInts|regex_replace(PortRe, "e \1")}}'}
-        vars: {EthInts: '{{template_l2_mstp_edgeint|regex_replace(EthRe)}}'}
-        when: "'to' not in template_l2_mstp_edgeint"
+      - name: Correct Interface Format
+        set_fact: {EdgeInt: '{{tEdgeInt|regex_replace(IntRe, " e \1")}}'}
+        vars: {tEdgeInt: '{{prompt_mstp_edgeint|lower|regex_replace(EthRe, "e ")}}'}
 
-      - name: Format Interface Range
-        set_fact: {EdgeInts: '{{EthInts|regex_replace(RngRe, "e \1 to \2")}}'}
-        vars: {EthInts: '{{template_l2_mstp_edgeint}}'}
-        when: "'to' in template_l2_mstp_edgeint"
+      - name: Correct Range Format
+        set_fact: {EdgeInt: '{{EdgeInt|regex_replace(RngRe, " to \1")}}'}
+        when: "'to' in prompt_mstp_edgeint and 'lag' not in prompt_mstp_edgeint"
 
       - name: Set MSTP Edge Interface Command
-        set_fact: {EdgeIntCmd: "mstp admin-edge-port {{EdgeInts}}"}
-    when: template_l2_mstp_edgeint is defined and template_l2_mstp_edgeint != ''
+        set_fact: {EdgeIntCmd: "mstp admin-edge-port {{EdgeInt}}"}
+    when: prompt_mstp_edgeint|default("null", true) != "null"
 
   - name: Configuring MSTP Interface(s)
     icx_config:
@@ -71,7 +68,6 @@
 
   - name: Display Switch Error
     assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(NewlineVar)}}'}
-    vars: {NewlineVar: "\r"}
     when: ErrMsg is defined
 
   - name: Get MSTP Config

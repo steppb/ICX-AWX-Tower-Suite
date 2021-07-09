@@ -1,5 +1,5 @@
 #! Description: Apply Sticky-MAC Port security to interface.
-#! Prompt: [{question_name: Sticky-MAC Interface or Range@colon, question_description: (e.g. e 1/1/2 to 1/1/4 for range), required: true, type: text, variable: prompt_portsec_int, min: 5, max: 1024}, {question_name: Max MAC Addresess@comma, question_description: Enter the maximum number of restricted MAC addresses on the interface, required: false, type: integer, variable: prompt_portsec_max, min: 1, max: 64, default: 1}, {question_name: Auto-Save Interval (In Minutes)@colon, required: false, type: integer, variable: prompt_portsec_autosave, min: 15, max: 1440}]
+#! Prompt: [{question_name: Interface(s)@colon, question_description: (e.g. e 1/1/2 to 1/1/4 for range), required: true, type: text, variable: prompt_portsec_int, min: 3, max: 1024}, {question_name: Max MAC Addresess@comma, question_description: Enter the maximum number of restricted MAC addresses on the interface, required: false, type: integer, variable: prompt_portsec_max, min: 1, max: 64, default: 1}, {question_name: Auto-Save Interval (In Minutes)@colon, required: false, type: integer, variable: prompt_portsec_autosave, min: 15, max: 1440}]
 # =====================
 ---
 - hosts: all
@@ -11,14 +11,17 @@
     ansible_become_method: enable
     ErrParse: '^.*ConnectionError: '
     EthRe: '(ethernet|etherne|ethern|ether|ethe|eth|et|e)'
-    PortRe: '([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2})'
-    RngRe: '^.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*to.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*$'
+    RngRe: 'to[ e]*([0-9])'
+    IntRe: '[ e]*([0-9]{1,2}/[0-9])'
 
   tasks:
-  - name: Format Interface List
-    set_fact: {EthInt: '{{tEthInt|regex_replace(PortRe, "e \1")}}'}
-    vars: {tEthInt: '{{prompt_portsec_int|regex_replace(EthRe)}}'}
-    when: "'to' not in prompt_portsec_int"
+  - name: Correct Interface Format
+    set_fact: {EthInt: '{{tEthInt|regex_replace(IntRe, " e \1")}}'}
+    vars: {tEthInt: '{{prompt_portsec_int|lower|regex_replace(EthRe, "e ")}}'}
+
+  - name: Correct Range Format
+    set_fact: {EthInt: '{{EthInt|regex_replace(RngRe, " to \1")}}'}
+    when: "'to' in prompt_portsec_int and 'lag' not in prompt_portsec_int"
 
   - name: Format Interface Range
     set_fact: {EthInt: '{{prompt_portsec_int|regex_replace(RngRe, "e \1 to \2")}}'}

@@ -1,5 +1,5 @@
 #! Description: Create and deploy a new LAG.
-#! Prompt: [{question_name: New LAG Name, question_description: Enter a name for the new LAG@colon, required: true, type: text, variable: template_lag_name, min: 1, max: 64}, {question_name: LAG Mode, question_description: Select the LAG Mode@colon, required: true, type: multiplechoice, variable: template_lag_mode, choices: dynamic\nstatic\nkeep-alive}, {question_name: LAG ID, question_description: Enter the LAG ID@colon (Optional), required: false, type: integer, variable: template_lag_id, min: 0, max: 2047}, {question_name: LAG Ports, question_description: Enter the LAG ports@colon (e.g. e 1/1/1 e 1/1/2), required: true, type: text, variable: template_lag_port, min: 5, max: 1024}]
+#! Prompt: [{question_name: New LAG Name, question_description: Enter a name for the new LAG@colon, required: true, type: text, variable: prompt_lag_name, min: 1, max: 64}, {question_name: LAG Mode, question_description: Select the LAG Mode@colon, required: true, type: multiplechoice, variable: prompt_lag_mode, choices: dynamic\nstatic\nkeep-alive}, {question_name: LAG ID, question_description: Enter the LAG ID@colon (Optional), required: false, type: integer, variable: prompt_lag_id, min: 0, max: 2047}, {question_name: LAG Interface(s), question_description: (e.g. e 1/1/1 e 1/1/2), required: true, type: text, variable: prompt_lag_int, min: 3, max: 1024}]
 # =====================
 ---
 - hosts: all
@@ -12,9 +12,9 @@
     NewlineVar: "\r"
     ErrParse: '^.*ConnectionError: '
     EthRe: '(ethernet|etherne|ethern|ether|ethe|eth|et|e)'
-    PortRe: '([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2})'
-    RngRe: '^.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*to.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*$'
-    PrimaryPortRe: '^e ([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*$'
+    RngRe: 'to[ e]*([0-9])'
+    IntRe: '[ e]*([0-9]{1,2}/[0-9])'
+    PrimaryPortRe: '^[ e]*([0-9]{1,2}/[0-9]{1,2}[0-9/]*).*$'
 
   tasks:
   - name: Gather Hardware Info
@@ -25,21 +25,20 @@
     set_fact: {SwVer: '{{ansible_net_image|regex_replace("^.*([0-9]{5}).*$", "\1")}}'}
 
   - name: Set LAG ID
-    set_fact: {LagId: 'id {{template_lag_id}}'}
-    when: "template_lag_id is defined and 'keep-alive' not in template_lag_mode"
+    set_fact: {LagId: 'id {{prompt_lag_id}}'}
+    when: "prompt_lag_id is defined and 'keep-alive' not in prompt_lag_mode"
 
   - name: Set Automatic LAG ID
     set_fact: {LagId: id auto}
-    when: template_lag_id is not defined and SwVer|int >= 8061
+    when: prompt_lag_id is not defined and SwVer|int >= 8061
 
-  - name: Format Interface List
-    set_fact: {EthInt: '{{tEthInt|regex_replace(PortRe, "e \1")}}'}
-    vars: {tEthInt: '{{template_lag_port|regex_replace(EthRe)}}'}
-    when: "'to' not in template_lag_port"
+  - name: Correct Interface Format
+    set_fact: {EthInt: '{{tEthInt|regex_replace(IntRe, " e \1")}}'}
+    vars: {tEthInt: '{{prompt_lag_int|lower|regex_replace(EthRe, "e ")}}'}
 
-  - name: Format Interface Range
-    set_fact: {EthInt: '{{template_lag_port|regex_replace(RngRe, "e \1 to \2")}}'}
-    when: "'to' in template_lag_port"
+  - name: Correct Range Format
+    set_fact: {EthInt: '{{EthInt|regex_replace(RngRe, " to \1")}}'}
+    when: "'to' in prompt_lag_int"
 
   - name: Set Legacy LAG Commands
     set_fact:
@@ -50,7 +49,7 @@
   - name: Adding Ports to Lag
     icx_config:
       lines: |
-        lag {{template_lag_name}} {{template_lag_mode}} {{LagId|default()}}
+        lag {{prompt_lag_name}} {{prompt_lag_mode}} {{LagId|default()}}
         ports {{EthInt}}
         {{PrimaryPortCmd|default()}}
         {{DeployCmd|default()}}
@@ -68,7 +67,7 @@
     when: ErrMsg is defined
 
   - name: Get LAG Config
-    icx_command: {commands: 'show lag {{template_lag_name}}'}
+    icx_command: {commands: 'show lag {{prompt_lag_name}}'}
     register: LagCfg
 
   - name: Display LAG Config

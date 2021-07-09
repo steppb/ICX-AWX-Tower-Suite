@@ -1,5 +1,5 @@
 #! Description: Enable a disabled LAG interface.
-#! Prompt: [{question_name: LAG Name, question_description: Enter LAG name@colon, required: true, type: text, variable: template_lag_name, min: 1, max: 64, default: '', choices: '', new_question: true}, {question_name: LAG Ports, question_description: Enter the LAG ports (e.g. e 1/1/1 e 1/1/2), required: true, type: text, variable: template_lag_port, min: 5, max: 1024, default: '', choices: '', new_question: true}]
+#! Prompt: [{question_name: LAG Name, required: true, type: text, variable: prompt_lag_name, min: 1, max: 64}, {question_name: LAG Interface(s), question_description: (e.g. e 1/1/1 e 1/1/2 or e 1/1/3 to 1/1/4 for range), required: true, type: text, variable: prompt_lag_int, min: 3, max: 1024}]
 # =====================
 # Note: LAG-Interface-Add needs to be applied before running this template.
 ---
@@ -13,12 +13,12 @@
     NewlineVar: "\r"
     ErrParse: '^.*ConnectionError: '
     EthRe: '(ethernet|etherne|ethern|ether|ethe|eth|et|e)'
-    PortRe: '([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2})'
-    RngRe: '^.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*to.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*$'
+    RngRe: 'to[ e]*([0-9])'
+    IntRe: '[ e]*([0-9]{1,2}/[0-9])'
 
   tasks:
   - name: Get LAG Config
-    icx_command: {commands: 'show run | include lag {{template_lag_name}}'}
+    icx_command: {commands: 'show run | include lag {{prompt_lag_name}}'}
     register: LagStatus
 
   - name: Verify LAG Config
@@ -26,19 +26,18 @@
       that: LagStatus is defined and LagStatus.stdout[0] != ''
       fail_msg: "ERROR: LAG-Interface-Add needs to be applied before running this template"
 
-  - name: Format Interface List
-    set_fact: {EthInt: '{{tEthInt|regex_replace(PortRe, "e \1")}}'}
-    vars: {tEthInt: '{{template_lag_port|regex_replace(EthRe)}}'}
-    when: "'to' not in template_lag_port"
+  - name: Correct Interface Format
+    set_fact: {EthInt: '{{tEthInt|regex_replace(IntRe, " e \1")}}'}
+    vars: {tEthInt: '{{prompt_lag_int|lower|regex_replace(EthRe, "e ")}}'}
 
-  - name: Format Interface Range
-    set_fact: {EthInt: '{{template_lag_port|regex_replace(RngRe, "e \1 to \2")}}'}
-    when: "'to' in template_lag_port"
+  - name: Correct Range Format
+    set_fact: {EthInt: '{{EthInt|regex_replace(RngRe, " to \1")}}'}
+    when: "'to' in prompt_lag_int"
 
   - name: Enabling LAG Interface
     icx_config:
       lines: no disable {{EthInt}}
-      parents: lag {{template_lag_name}}
+      parents: lag {{prompt_lag_name}}
       save_when: changed
     register: IcxCfgStatus
     failed_when: false
@@ -53,7 +52,7 @@
     when: ErrMsg is defined
 
   - name: Get LAG Config
-    icx_command: {commands: 'show lag {{template_lag_name}}'}
+    icx_command: {commands: 'show lag {{prompt_lag_name}}'}
     register: LagCfg
 
   - {name: Display LAG Config, debug: {msg: "{{LagCfg.stdout_lines[0]}}"}}

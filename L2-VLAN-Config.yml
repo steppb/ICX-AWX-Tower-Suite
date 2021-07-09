@@ -1,5 +1,5 @@
 #! Description: Add or modify VLAN.
-#! Prompt: [{question_name: VLAN ID@colon, required: true, type: integer, variable: prompt_l2_vid, min: 1, max: 4086}, {question_name: VLAN Name@colon, required: false, type: text, variable: prompt_l2_vname, min: 1, max: 1024}, {question_name: VLAN Tagging@colon, required: false, type: multiplechoice, variable: prompt_l2_vtag, choices: tagged\nuntagged}, {question_name: Interface(s)@colon, question_description: Enter single interface or range (e.g. e1/1/1 or e1/1/1 to 1/1/10), required: false, type: text, variable: prompt_l2_vint, min: 5, max: 1024}, {question_name: Remove Interface(s) From VLAN@question, required: false, type: multiplechoice, variable: prompt_l2_vremove, default: 'no', choices: yes\nno}, {question_name: Create Router Interface@question, required: false, type: multiplechoice, variable: prompt_l2_vrtr, default: 'no', choices: yes\nno}, {question_name: Spanning-Tree Protocol@colon, required: false, type: multiplechoice, variable: prompt_l2_vstp, choices: Disable\n802.1d\n802.1w}]
+#! Prompt: [{question_name: VLAN ID@colon, required: true, type: integer, variable: prompt_l2_vid, min: 1, max: 4086}, {question_name: VLAN Name@colon, required: false, type: text, variable: prompt_l2_vname, min: 1, max: 1024}, {question_name: Tagged Interface(s)@colon, question_description: (e.g. e1/1/1 or e1/1/1 to 1/1/10), required: false, type: text, variable: prompt_l2_vinttag, min: 3, max: 1024}, {question_name: Untagged Interface(s)@colon, question_description: (e.g. e1/1/1 or e1/1/1 to 1/1/10), required: false, type: text, variable: prompt_l2_vintuntag, min: 3, max: 1024}, {question_name: Remove Interface(s) From VLAN@question, required: false, type: multiplechoice, variable: prompt_l2_vremove, default: 'no', choices: yes\nno}, {question_name: Create Router Interface@question, required: false, type: multiplechoice, variable: prompt_l2_vrtr, default: 'no', choices: yes\nno}, {question_name: Spanning-Tree Protocol@colon, required: false, type: multiplechoice, variable: prompt_l2_vstp, choices: Disable\n802.1d\n802.1w}]
 # =====================
 ---
 - hosts: all
@@ -12,18 +12,31 @@
     NewlineVar: "\r"
     ErrParse: '^.*ConnectionError: '
     EthRe: '(ethernet|etherne|ethern|ether|ethe|eth|et|e)'
-    PortRe: '([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2})'
-    RngRe: '^.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*to.*([0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}).*$'
+    RngRe: 'to[ e]*([0-9])'
+    IntRe: '[ e]*([0-9]{1,2}/[0-9])'
 
   tasks:
-  - name: Format Interface List
-    set_fact: {EthInt: '{{tEthInt|regex_replace(PortRe, "e \1")}}'}
-    vars: {tEthInt: '{{prompt_l2_vint|regex_replace(EthRe)}}'}
-    when: prompt_l2_vint|default("null", true) != "null" and "to" not in prompt_l2_vint
+  - name: Tagged Interface Correction Block
+    block:
+    - name: Correct Interface Format
+      set_fact: {TagInt: '{{tTagInt|regex_replace(IntRe, " e \1")}}'}
+      vars: {tTagInt: '{{prompt_l2_vinttag|lower|regex_replace(EthRe, "e ")}}'}
 
-  - name: Format Interface Range
-    set_fact: {EthInt: '{{prompt_l2_vint|regex_replace(RngRe, "e \1 to \2")}}'}
-    when: prompt_l2_vint|default("null", true) != "null" and "to" in prompt_l2_vint
+    - name: Correct Range Format
+      set_fact: {TagInt: '{{TagInt|regex_replace(RngRe, " to \1")}}'}
+      when: "'to' in prompt_l2_vinttag and 'lag' not in prompt_l2_vinttag"
+    when: prompt_l2_vinttag|default("null", true) != "null"
+
+  - name: Untagged Interface Correction Block
+    block:
+    - name: Correct Interface Format
+      set_fact: {UntagInt: '{{tUntagInt|regex_replace(IntRe, " e \1")}}'}
+      vars: {tUntagInt: '{{prompt_l2_vintuntag|lower|regex_replace(EthRe, "e ")}}'}
+
+    - name: Correct Range Format
+      set_fact: {UntagInt: '{{UntagInt|regex_replace(RngRe, " to \1")}}'}
+      when: "'to' in prompt_l2_vintuntag and 'lag' not in prompt_l2_vintuntag"
+    when: prompt_l2_vintuntag|default("null", true) != "null"
 
   - name: Check VLAN Name
     set_fact: {VlanName: 'name {{prompt_l2_vname}}'}
@@ -34,12 +47,15 @@
     when:
       - prompt_l2_vremove is defined
       - prompt_l2_vremove|bool
-      - prompt_l2_vtag|default("null", true) != "null"
-      - EthInt is defined
+      - TagInt is defined or UntagInt is defined
 
-  - name: Setup VLAN Interface Command
-    set_fact: {VlanIntCmd: '{{RemCmd|default()}} {{prompt_l2_vtag}} {{EthInt}}'}
-    when: prompt_l2_vtag|default("null", true) != "null" and EthInt is defined
+  - name: Setup VLAN Tagged Interface Command
+    set_fact: {VlanTagIntCmd: '{{RemCmd|default()}} tagged {{TagInt}}'}
+    when: TagInt|default("null", true) != "null"
+
+  - name: Setup VLAN Untagged Interface Command
+    set_fact: {VlanUntagIntCmd: '{{RemCmd|default()}} untagged {{UntagInt}}'}
+    when: UntagInt|default("null", true) != "null"
 
   - name: Setup Router Interface Command
     set_fact: {RtrIntCmd: 'router-interface ve {{prompt_l2_vid}}'}
@@ -78,7 +94,8 @@
     icx_config:
       lines: |
         vlan {{prompt_l2_vid}} {{VlanName|default()}}
-         {{VlanIntCmd|default()}}
+         {{VlanTagIntCmd|default()}}
+         {{VlanUntagIntCmd|default()}}
          {{RtrIntCmd|default()}}
          {{DisableRstpCmd|default()}}
          {{DisableStpCmd|default()}}
