@@ -25,15 +25,15 @@
       - "Run the 'Image-Management' template to rebuild variable file"
 
 - name: Image-Flash-Copy - Find File Entry
-  set_fact: {FileEntry: '{{ansible_image_repo_files[idx]}}'}
-  loop: '{{ansible_image_repo_files}}'
-  loop_control: {index_var: idx}
-  when: item.filename == prompt_flash_copy_filename
+  set_fact:
+    FileEntry: '{{(tFL|selectattr("filename", "equalto", tImg)|list)[0]|default()}}'
+  vars: {tFL: '{{ansible_image_repo_files}}', tImg: '{{prompt_flash_copy_filename}}'}
 
 - name: Image-Flash-Copy - Verify Valid File
   assert:
-    that: FileEntry is defined
+    that: FileEntry|default("null", true) != "null"
     fail_msg: "ERROR: File named {{prompt_flash_copy_filename}} not found."
+    success_msg: "{{prompt_flash_copy_filename}} found."
 
 - name: Image-Flash-Copy - Assert Image Compatibility
   assert:
@@ -41,22 +41,28 @@
     fail_msg: "ERROR: {{IcxImg}} not compatible with {{ansible_net_model}}"
   vars: {IcxImg: '{{prompt_flash_copy_filename}}'}
 
-- name: Image-Flash-Copy - Auto Select Boot Image Entry
+- name: Image-Flash-Copy - Auto Select Boot Image
   set_fact: {BootEntry: '{{item}}'}
-  loop: '{{ansible_image_repo_boot_files}}'
+  loop: '{{tBootList}}'
+  vars: {tBootList: '{{(ansible_image_repo_boot_files|selectattr("software_version",
+                        "equalto", FileEntry.supported_bootrom_ver)|list)}}'}
   when:
     - prompt_bootflash_copy_filename|default() == "Auto Select"
     - not FileEntry.is_ufi|bool
-    - FileEntry.supported_bootrom_ver == item.software_version
+    - tBootList[0]|default("null", true) != "null"
     - ansible_net_model|regex_search("ICX[0-9]*") in item.supported_platforms
 
 - name: Image-Flash-Copy - User Selected Boot Image Entry
-  set_fact: {BootEntry: '{{item}}'}
-  loop: '{{ansible_image_repo_boot_files}}'
+  set_fact: {BootEntry: '{{tBootList[0]}}'}
+  vars: {tBootList: '{{(ansible_image_repo_boot_files|selectattr("filename",
+                    "equalto", prompt_bootflash_copy_filename)|list)}}'}
   when:
-    - prompt_bootflash_copy_filename|default() == item.filename
+    - prompt_bootflash_copy_filename|default("null", true) != "null"
+    - prompt_bootflash_copy_filename != "Auto Select"
+    - prompt_bootflash_copy_filename != "None"
     - not FileEntry.is_ufi|bool
-    - ansible_net_model in item.supported_platforms
+    - tBootList[0]|default("null", true) != "null"
+    - ansible_net_model in tBootEntry[0].supported_platforms
 
 - name: Image-Flash-Copy - Set Partition
   set_fact: {FlPart: '{{tFlPart|regex_replace("^([a-z]{3}).*$", "\1")}}'}
@@ -84,20 +90,22 @@
         - "Non-UFI 8.0.80 {{FileEntry.image_type}} image needs to be installed in image repo"
 
   - name: Image-Flash-Copy - Find File Entry
-    set_fact: {ImdFileEntry: '{{item}}'}
-    loop: '{{ansible_image_repo_files}}'
-    when: item.path == FileEntry.intermediate_image
+    set_fact:
+      ImdFileEntry: '{{(tFL|selectattr("path", "equalto", tPath)|list)[0]|default()}}'
+    vars: {tFL: '{{ansible_image_repo_files}}', tPath: '{{FileEntry.intermediate_image}}'}
 
   - name: Image-Flash-Copy - Get Intermediate Boot Image Entry
     set_fact: {ImdBootEntry: '{{item}}'}
-    loop: '{{ansible_image_repo_boot_files}}'
+    loop: '{{tBootList}}'
+    vars: {tBootList: '{{(ansible_image_repo_boot_files|selectattr("software_version",
+                          "equalto", "10.1.14")|list)}}'}
     when:
-      - item.software_version == "10.1.14"
+      - tBootList[0]|default("null", true) != "null"
       - ansible_net_model|regex_search("ICX[0-9]*") in item.supported_platforms
 
   - name: Image-Flash-Copy - Warn on no Bootrom
     debug: {msg: '{{ansible_net_model}} bootrom for 8.0.80 not found'}
-    when: ImdBootEntry is not defined
+    when: ImdBootEntry|default("null", true) == "null"
 
   - name: Image-Flash-Copy - Intermediate Image Config
     set_fact: {ScpCpCfg: "{{tVar}}"}
