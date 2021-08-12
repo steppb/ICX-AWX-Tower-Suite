@@ -56,12 +56,15 @@ BootToImageVer:
   - boot_version: 10.1.04
     image_ver_min: 8.0.20
     image_ver_max: 8.0.20d
+    max_comp_ver: 8.0.30u
   - boot_version: 10.1.05
     image_ver_min: 8.0.30
     image_ver_max: 8.0.30g
+    max_comp_ver: 8.0.30u
   - boot_version: 10.1.06
     image_ver_min: 8.0.30h
     image_ver_max: 8.0.40c
+    max_comp_ver: 8.0.50
   - boot_version: 10.1.08b005
     image_ver_min: 8.0.50
     image_ver_max: 8.0.50
