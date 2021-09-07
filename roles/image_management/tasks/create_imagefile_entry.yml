@@ -36,7 +36,7 @@
     loop: "{{PlatSupportByCode[PlatCode]}}"
     when:
       - item[ImgType~'_min_ver'] is defined
-      - BinImgVersion is version(item[ImgType~'_min_ver'], '>')
+      - BinImgVersion is version(item[ImgType~'_min_ver'], '>=')
       - (item.ufi_only|bool and IsUfi|bool) or not item.ufi_only|bool
 
   - name: Create and Add File Entry to List
