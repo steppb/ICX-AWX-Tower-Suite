@@ -82,6 +82,8 @@
         dest: "{{RemUser}}@{{ansible_host}}:flash:bootrom"
       - src: "{{ScpFileEntry.path}}"
         dest: "{{RemUser}}@{{ansible_host}}:flash:{{BootPart}}:{{ScpFileEntry.filename}}"
+    register: CpStatus
+    failed_when: CpStatus.rc != 0 and CpStatus.rc != 1
     when: item.src != "null"
   when: not UseIcxCopy|bool
 
