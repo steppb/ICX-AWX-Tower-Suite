@@ -51,7 +51,7 @@
 
     - name: Image-Flash-Copy - Configure Boot Priority
       icx_config: {lines: 'boot sys fl {{BootPart}}', save_when: changed}
-      when: '"pri" in BootPart'
+      when: '"pri" not in BootPart'
     vars: {FirstPart: '{{CurBootPref.stdout_lines[0][1]|lower}}'}
     when: ("use default" not in FirstPart and BootPart not in FirstPart) or
           ("use default" in FirstPart and "sec" in BootPart)
