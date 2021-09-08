@@ -83,28 +83,54 @@
       dest: '{{ImgRepoProjectDir.path}}/host_vars/all.yml'
       mode: 0644
 
+  - name: Get This Template Info
+    uri: {url: '{{AwxApi}}/job_templates/{{awx_job_template_id}}/'}
+    register: ThisTemplate
+
   - name: Check For Existing 'Image-Flash-Copy' Template
     uri: {url: '{{AwxApi}}/job_templates/?name=Image-Flash-Copy'}
     register: ImgFlCpTemplate
 
+  - name: Check For Existing 'Image-Flash-Copy-File' Template
+    uri: {url: '{{AwxApi}}/job_templates/?name=Image-Flash-Copy-File'}
+    register: ImgFlCpFileTemplate
+
+  - name: Check For Existing 'Image-Flash-Copy-Version' Template
+    uri: {url: '{{AwxApi}}/job_templates/?name=Image-Flash-Copy-Version'}
+    register: ImgFlCpVerTemplate
+
+  - name: Rename 'Image-Flash-Copy' Template
+    uri:
+      url: '{{AwxApi}}/job_templates/{{ImgFlCpTemplate.json.results[0].id}}/'
+      method: PATCH
+      headers: {Content-Type: "application/json"}
+      body: {name: "Image-Flash-Copy-File"}
+      body_format: json
+    when: ImgFlCpTemplate.json.count > 0 and
+          ImgFlCpFileTemplate.json.count == 0
+
   - name: Store 'Image-Flash-Copy' Template Info
-    set_fact: {ImgFlCpTemplateInfo: '{{ImgFlCpTemplate.json.results[0]}}'}
+    set_fact: {CopyFileTemplateInfo: '{{ImgFlCpTemplate.json.results[0]}}'}
     when: ImgFlCpTemplate.json.count > 0
 
-  - name: Create 'Image-Flash-Copy' Template
-    block:
-    - name: Get This Template Info
-      uri: {url: '{{AwxApi}}/job_templates/{{awx_job_template_id}}/'}
-      register: ThisTemplate
+  - name: Store 'Image-Flash-Copy-File' Template Info
+    set_fact: {CopyFileTemplateInfo: '{{ImgFlCpFileTemplate.json.results[0]}}'}
+    when: ImgFlCpFileTemplate.json.count > 0
 
-    - name: Create 'Image-Flash-Copy' Template
+  - name: Store 'Image-Flash-Copy-Version' Template Info
+    set_fact: {CopyVerTemplateInfo: '{{ImgFlCpVerTemplate.json.results[0]}}'}
+    when: ImgFlCpVerTemplate.json.count > 0
+
+  - name: Create 'Image-Flash-Copy-File' Template
+    block:
+    - name: Create 'Image-Flash-Copy-File' Template
       uri:
         url: '{{AwxApi}}/job_templates/'
         method: POST
         headers: {Content-Type: "application/json"}
         body:
-          name: Image-Flash-Copy
-          description: "Copy File(s) to Switch"
+          name: Image-Flash-Copy-File
+          description: "Copy file(s) to switch"
           project: '{{ThisTemplate.json.project}}'
           playbook: Image-Management.yml
           ask_limit_on_launch: true
@@ -112,83 +138,83 @@
           ask_credential_on_launch: true
         body_format: json
         status_code: 201
-      register: NewImgFlCpTemplate
+      register: NewImgFlCpFileTemplate
 
-    - name: Store 'Image-Flash-Copy' Template Info
-      set_fact: {ImgFlCpTemplateInfo: '{{NewImgFlCpTemplate.json}}'}
-    when: ImgFlCpTemplate.json.count == 0
+    - name: Store 'Image-Flash-Copy-File' Template Info
+      set_fact: {CopyFileTemplateInfo: '{{NewImgFlCpFileTemplate.json}}'}
+    when: ImgFlCpTemplate.json.count == 0 and
+          ImgFlCpFileTemplate.json.count == 0
 
-  - name: Prepare Initial 'Image-Flash-Copy' Survey Prompt
-    set_fact:
-      SurveySpec:
-        - question_name: 'Select the Image File to Flash:'
-          required: true
-          type: multiplechoice
-          variable: prompt_flash_copy_filename
-          choices: '{{SwImgFileList}}'
-        - question_name: 'Flash Partition:'
-          required: true
-          type: multiplechoice
-          variable: prompt_flash_part
-          choices: |-
-            Primary
-            Secondary
-          default: Secondary
-        - question_name: 'Configure Selected Flash Partition as First in Boot Order?'
-          required: true
-          type: multiplechoice
-          variable: prompt_flash_change_boot
-          choices: |-
-            Yes
-            No
-          default: "Yes"
-        - question_name: 'Select Boot Image to Flash:'
-          required: true
-          type: multiplechoice
-          variable: prompt_bootflash_copy_filename
-          choices: '{{BootImgFileList|default("None\nAuto Select")}}'
-          default: "Auto Select"
-        - question_name: 'Reboot Into New Image After Deployment?'
-          required: true
-          type: multiplechoice
-          variable: prompt_flash_reload
-          choices: |-
-            Yes
-            No
-          default: "No"
+  - name: Create 'Image-Flash-Copy-Version' Template
+    block:
+    - name: Create 'Image-Flash-Copy-Version' Template
+      uri:
+        url: '{{AwxApi}}/job_templates/'
+        method: POST
+        headers: {Content-Type: "application/json"}
+        body:
+          name: Image-Flash-Copy-Version
+          description: "Update switch(es) to selected version"
+          project: '{{ThisTemplate.json.project}}'
+          playbook: Image-Management.yml
+          ask_limit_on_launch: true
+          ask_inventory_on_launch: true
+          ask_credential_on_launch: true
+        body_format: json
+        status_code: 201
+      register: NewImgFlCpVerTemplate
+
+    - name: Store 'Image-Flash-Copy-Version' Template Info
+      set_fact: {CopyVerTemplateInfo: '{{NewImgFlCpVerTemplate.json}}'}
+    when: ImgFlCpVerTemplate.json.count == 0
+
+  - {name: Load Survey Spec Variables, include_vars: img_fl_cp_surveys.yml}
 
   - name: Add Survey Prompts for AWX SSH Credential Input
-    set_fact: {SurveySpec: '{{SurveySpec + tSshCredSurvey}}'}
-    vars:
-      tSshCredSurvey:
-        - question_name: "AWX Server SSH Login - Username:"
-          required: true
-          type: text
-          variable: prompt_awxssh_user
-          min: 1
-          max: 32
-        - question_name: "AWX Server SSH Login - Password:"
-          required: true
-          type: password
-          variable: prompt_awxssh_pass
-          min: 1
-          max: 1024
+    set_fact:
+      SurveyCpByFile: '{{SurveyCpByFile + SshCredSurvey}}'
+      SurveyCpByVer: '{{SurveyCpByVer + SshCredSurvey}}'
     when: not PexpectStatus.changed|bool and PexpectStatus.skipped is not defined
 
-  - name: Create 'Image-Flash-Copy' Survey Prompt
+  - name: Set Fact
+    set_fact: {SwImgVerList: "{{SwImgVerList|unique|sort|join('\n')}}"}
+
+  - name: Create 'Image-Flash-Copy-File' Survey Prompt
     uri:
-      url: '{{AwxApi}}/job_templates/{{ImgFlCpTemplateInfo.id}}/survey_spec/'
+      url: '{{AwxApi}}/job_templates/{{CopyFileTemplateInfo.id}}/survey_spec/'
       method: POST
       headers: {Content-Type: 'application/json'}
       body:
         name: ''
         description: ''
-        spec: '{{SurveySpec}}'
+        spec: '{{SurveyCpByFile}}'
       body_format: json
 
-  - name: Enable Survey Prompt
+  - name: Create 'Image-Flash-Copy-Ver' Survey Prompt
     uri:
-      url: '{{AwxApi}}/job_templates/{{ImgFlCpTemplateInfo.id}}/'
+      url: '{{AwxApi}}/job_templates/{{CopyVerTemplateInfo.id}}/survey_spec/'
+      method: POST
+      headers: {Content-Type: 'application/json'}
+      body:
+        name: ''
+        description: ''
+        spec: '{{SurveyCpByVer}}'
+      body_format: json
+
+  - name: Enable 'Image-Flash-Copy-File' Survey Prompt
+    uri:
+      url: '{{AwxApi}}/job_templates/{{CopyFileTemplateInfo.id}}/'
+      method: PATCH
+      headers: {Content-Type: "application/json"}
+      body:
+        survey_enabled: true
+        extra_vars: >-
+          template_image_repo_dir: {{ImgRepoProjectDir.path}}
+      body_format: json
+
+  - name: Enable 'Image-Flash-Copy-Ver' Survey Prompt
+    uri:
+      url: '{{AwxApi}}/job_templates/{{CopyVerTemplateInfo.id}}/'
       method: PATCH
       headers: {Content-Type: "application/json"}
       body:

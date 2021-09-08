@@ -1,0 +1,97 @@
+SurveyCpByFile:
+  - question_name: 'Select the Image File to Flash:'
+    required: true
+    type: multiplechoice
+    variable: prompt_flash_copy_filename
+    choices: '{{SwImgFileList}}'
+  - question_name: 'Flash Partition:'
+    required: true
+    type: multiplechoice
+    variable: prompt_flash_part
+    choices: |-
+      Primary
+      Secondary
+    default: Secondary
+  - question_name: 'Configure Selected Flash Partition as First in Boot Order?'
+    required: true
+    type: multiplechoice
+    variable: prompt_flash_change_boot
+    choices: |-
+      Yes
+      No
+    default: "Yes"
+  - question_name: 'Select Boot Image to Flash:'
+    required: true
+    type: multiplechoice
+    variable: prompt_bootflash_copy_filename
+    choices: '{{BootFileNames|default("None\nAuto Select")}}'
+    default: Auto Select
+  - question_name: 'Reboot Into New Image After Deployment?'
+    required: true
+    type: multiplechoice
+    variable: prompt_flash_reload
+    choices: |-
+      Yes
+      No
+    default: "No"
+
+SurveyCpByVer:
+  - question_name: 'FastIron Version:'
+    required: true
+    type: multiplechoice
+    variable: prompt_flash_copy_version
+    choices: '{{SwImgVerList}}'
+  - question_name: 'Switch or Router mode:'
+    required: true
+    type: multiplechoice
+    variable: prompt_image_mode
+    choices: |-
+      Switch
+      Router
+    default: Router
+  - question_name: 'Flash Partition:'
+    required: true
+    type: multiplechoice
+    variable: prompt_flash_part
+    choices: |-
+      Primary
+      Secondary
+    default: Secondary
+  - question_name: 'Configure Selected Flash Partition as First in Boot Order?'
+    required: true
+    type: multiplechoice
+    variable: prompt_flash_change_boot
+    choices: |-
+      Yes
+      No
+    default: "Yes"
+  - question_name: 'Boot Image Selection Method:'
+    required: true
+    type: multiplechoice
+    variable: prompt_bootflash_copy_filename
+    choices: |-
+      None
+      Auto Select
+    default: Auto Select
+  - question_name: 'Reboot Into New Image After Deployment?'
+    required: true
+    type: multiplechoice
+    variable: prompt_flash_reload
+    choices: |-
+      Yes
+      No
+    default: "No"
+
+SshCredSurvey:
+  - question_name: "AWX Server SSH Login - Username:"
+    required: true
+    type: text
+    variable: prompt_awxssh_user
+    min: 1
+    max: 32
+  - question_name: "AWX Server SSH Login - Password:"
+    required: true
+    type: password
+    variable: prompt_awxssh_pass
+    min: 1
+    max: 1024

@@ -21,4 +21,4 @@
 - name: Perform "Image-Flash-Copy" Tasks
   include_tasks: image_flash_copy.yml
   vars: {AltCopy: '{{prompt_awxssh_user is defined and prompt_awxssh_pass is defined}}'}
-  when: awx_job_template_name == "Image-Flash-Copy"
+  when: '"Image-Flash-Copy" in awx_job_template_name'

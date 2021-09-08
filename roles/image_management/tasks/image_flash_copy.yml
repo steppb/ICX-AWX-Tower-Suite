@@ -24,22 +24,44 @@
       - "Error loading {{template_image_repo_dir}}/host_vars/all.yml"
       - "Run the 'Image-Management' template to rebuild variable file"
 
-- name: Image-Flash-Copy - Find File Entry
-  set_fact:
-    FileEntry: '{{(tFL|selectattr("filename", "equalto", tImg)|list)[0]|default()}}'
-  vars: {tFL: '{{ansible_image_repo_files}}', tImg: '{{prompt_flash_copy_filename}}'}
+- name: Image-Flash-Copy - Get Image From Version
+  block:
+  - name: Image-Flash-Copy - Find Image File
+    set_fact: {FileEntry: '{{tImgList[idx]}}'}
+    loop: '{{range(0, tImgList|length|int)|list}}'
+    loop_control: {index_var: idx}
+    vars: {tImgList: '{{ansible_image_repo_files|selectattr("software_version",
+                        "equalto", prompt_flash_copy_version)|list|selectattr("image_type",
+                        "equalto", prompt_image_mode|lower)|list}}'}
+    when: ansible_net_model|regex_search("ICX[0-9]*") in tImgList[idx].supported_platforms
 
-- name: Image-Flash-Copy - Verify Valid File
-  assert:
-    that: FileEntry|default("null", true) != "null"
-    fail_msg: "ERROR: File named {{prompt_flash_copy_filename}} not found."
-    success_msg: "{{prompt_flash_copy_filename}} found."
+  - name: Image-Flash-Copy - Verify Valid File Entry
+    assert:
+      that: FileEntry|default("null", true) != "null"
+      fail_msg: 'ERROR: Could not find {{prompt_flash_copy_version}} {{prompt_image_mode}}
+                 image for {{ansible_net_model|regex_search("ICX[0-9]*")}}'
+      success_msg: "{{FileEntry.filename|default()}} found."
+  when: prompt_flash_copy_version|default("null", true) != "null" and
+        prompt_image_mode|default("null", true) != "null"
 
-- name: Image-Flash-Copy - Assert Image Compatibility
-  assert:
-    that: ansible_net_model|regex_search("ICX[0-9]*") in FileEntry.supported_platforms
-    fail_msg: "ERROR: {{IcxImg}} not compatible with {{ansible_net_model}}"
-  vars: {IcxImg: '{{prompt_flash_copy_filename}}'}
+- name: Image-Flash-Copy - Get Image From Filename
+  block:
+  - name: Image-Flash-Copy - Find File Entry
+    set_fact:
+      FileEntry: '{{(tFL|selectattr("filename", "equalto", bImg)|list)[0]|default()}}'
+
+  - name: Image-Flash-Copy - Verify Valid File
+    assert:
+      that: FileEntry|default("null", true) != "null"
+      fail_msg: "ERROR: File named {{bImg}} not found."
+      success_msg: "{{bImg}} found."
+
+  - name: Image-Flash-Copy - Assert Image Compatibility
+    assert:
+      that: ansible_net_model|regex_search("ICX[0-9]*") in FileEntry.supported_platforms
+      fail_msg: "ERROR: {{bImg}} not compatible with {{ansible_net_model}}"
+  vars: {bImg: '{{prompt_flash_copy_filename}}', bFL: '{{ansible_image_repo_files}}'}
+  when: FileEntry is not defined
 
 - name: Image-Flash-Copy - Auto Select Boot Image
   set_fact: {BootEntry: '{{item}}'}

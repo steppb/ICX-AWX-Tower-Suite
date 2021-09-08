@@ -1,12 +1,14 @@
 ---
-- {name: Init Variables, set_fact: {SupportedPlatforms: [], BootVer: , IsSupported: no, ImgType: }}
-
-- name: Parse Filename for Image Info
+- name: Set Initial Variables
   set_fact:
     BinImgVersion: '{{ImgRepoFileName|regex_replace(BinVerRe, "\1.\2.\3")}}'
     ImageType: '{{ImgRepoFileName|regex_replace("^.*([RrSsZzUu])[0-9].*", "\1")|upper}}'
     PlatCode: '{{ImgRepoFileName|regex_replace("^([A-Za-z]{2,3})[RrSsZzUu].*", "\1")|upper}}'
     IsUfi: "{{'ufi' in ImgRepoFileName|lower}}"
+    SupportedPlatforms: []
+    BootVer:
+    IsSupported: no
+    ImgType:
 
 - {name: Flag as Router Image, set_fact: {ImgType: router}, when: ImageType == "R"}
 - {name: Flag as Switch Image, set_fact: {ImgType: switch}, when: ImageType == "S"}
@@ -16,7 +18,7 @@
 - name: Create Boot File Info List
   set_fact:
     BootImgList: '{{BootImgList|default([])}} + {{tBootFileInfo}}'
-    BootImgFileList: "{{BootImgFileList|default('None\nAuto Select\n')}}{{ImgRepoFileName}}\n"
+    BootFileNames: "{{BootFileNames|default('None\nAuto Select\n')}}{{ImgRepoFileName}}\n"
   vars:
     tBootFileInfo:
       - filename: '{{ImgRepoFileName}}'
@@ -75,6 +77,8 @@
       set_fact: {SwImgList: '{{SwImgList|default([])}} + {{SwImgInfo}}'}
 
     - name: Add Filename to Survey Prompt List
-      set_fact: {SwImgFileList: "{{SwImgFileList|default()}}{{ImgRepoFileName}}\n"}
+      set_fact:
+        SwImgFileList: "{{SwImgFileList|default()}}{{ImgRepoFileName}}\n"
+        SwImgVerList: "{{SwImgVerList|default([])}} + {{[BinImgVersion]}}"
     when: IsSupported|bool
   when: ImgType == "router" or ImgType == "switch"
