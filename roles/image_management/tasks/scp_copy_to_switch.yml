@@ -46,16 +46,15 @@
         - pri
         - sec
       when:
-        - '"Use Default" not in FirstPart'
+        - '"use default" not in FirstPart'
         - item in FirstPart or item in CurBootPref.stdout_lines[0][2]|lower
 
     - name: Image-Flash-Copy - Configure Boot Priority
       icx_config: {lines: 'boot sys fl {{BootPart}}', save_when: changed}
       when: '"pri" in BootPart'
-
     vars: {FirstPart: '{{CurBootPref.stdout_lines[0][1]|lower}}'}
-    when: ("Use Default" not in FirstPart and BootPart not in FirstPart) or
-          ("Use Default" in FirstPart and "sec" in BootPart)
+    when: ("use default" not in FirstPart and BootPart not in FirstPart) or
+          ("use default" in FirstPart and "sec" in BootPart)
   connection: network_cli
   vars: {ansible_network_os: icx, ansible_become: true, ansible_become_method: enable}
   when: BootPrefChange|bool
