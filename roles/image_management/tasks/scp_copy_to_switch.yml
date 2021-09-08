@@ -137,7 +137,7 @@
 
   - name: Image-Flash-Copy Ensure Successful Image Update
     assert:
-      that: ImageName in ScpFileEntry.filename
+      that: ImageName|lower in ScpFileEntry.filename|lower
       msg:
         - "ERROR: Failed to boot into {{ScpFileEntry.filename}}"
         - "Current image: {{ansible_net_image}}"
