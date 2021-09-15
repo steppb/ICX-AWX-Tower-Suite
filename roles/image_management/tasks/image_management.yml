@@ -168,6 +168,7 @@
       set_fact: {CopyVerTemplateInfo: '{{NewImgFlCpVerTemplate.json}}'}
     when: ImgFlCpVerTemplate.json.count == 0
 
+  - {name: Sort List, set_fact: {SwImgVerList: "{{SwImgVerList|unique|sort|join('\n')}}"}}
   - {name: Load Survey Spec Variables, include_vars: img_fl_cp_surveys.yml}
 
   - name: Add Survey Prompts for AWX SSH Credential Input
@@ -175,9 +176,6 @@
       SurveyCpByFile: '{{SurveyCpByFile + SshCredSurvey}}'
       SurveyCpByVer: '{{SurveyCpByVer + SshCredSurvey}}'
     when: not PexpectStatus.changed|bool and PexpectStatus.skipped is not defined
-
-  - name: Set Fact
-    set_fact: {SwImgVerList: "{{SwImgVerList|unique|sort|join('\n')}}"}
 
   - name: Create 'Image-Flash-Copy-File' Survey Prompt
     uri:
