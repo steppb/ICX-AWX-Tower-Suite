@@ -48,7 +48,7 @@
   block:
   - name: Image-Flash-Copy - Find File Entry
     set_fact:
-      FileEntry: '{{(tFL|selectattr("filename", "equalto", bImg)|list)[0]|default()}}'
+      FileEntry: '{{(bFL|selectattr("filename", "equalto", bImg)|list)[0]|default()}}'
 
   - name: Image-Flash-Copy - Verify Valid File
     assert:
