@@ -39,7 +39,7 @@
 
 - name: Get List of Playbooks
   find:
-    paths: '{{PjPath}}'
+    paths: '{{PjPath}}/icx_config_playbooks'
     recurse: no
     patterns: '*.yml'
     get_checksum: yes
