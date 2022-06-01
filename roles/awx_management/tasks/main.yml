@@ -1,4 +1,6 @@
 ---
+- {name: Common Tasks, include_tasks: am_common.yml}
+
 - name: Remove ICX Config Templates
   block:
   - name: Remove ICX Config Templates
@@ -8,32 +10,6 @@
 - name: Manually set path to Python Interpreter
   set_fact: {discovered_interpreter_python: /usr/bin/python3, cacheable: true}
   when: discovered_interpreter_python is not defined or "'platform-python' in discovered_interpreter_python"
-
-- name: Get This Template Info
-  uri: {url: '{{AwxApi}}/job_templates/{{awx_job_template_id}}/'}
-  register: ThisTemplate
-
-- name: Get List of Projects
-  uri: {url: '{{AwxApi}}/projects/'}
-  register: PjInfo
-
-- name: Add First Project to List
-  set_fact: {ProjectList: '{{PjInfo.json.results[idx].name}}', FirstPjIdx: '{{idx}}'}
-  loop: '{{range(0, PjInfo.json.count)|list}}'
-  loop_control: {index_var: idx}
-  when:
-    - PjInfo.json.count > 1
-    - PjInfo.json.results[idx].id != ThisTemplate.json.project
-    - ProjectList is not defined
-
-- name: Add Remaining Projects to List
-  set_fact: {ProjectList: '{{ProjectList}}@NL@{{PjInfo.json.results[idx].name}}'}
-  loop: '{{range(0, PjInfo.json.count)|list}}'
-  loop_control: {index_var: idx}
-  when:
-    - ProjectList is defined
-    - PjInfo.json.results[idx].id != ThisTemplate.json.project
-    - idx != FirstPjIdx
 
 - name: Check For Existing 'Image-Management' Template
   uri: {url: '{{AwxApi}}/job_templates/?name=Image-Management'}
@@ -53,10 +29,10 @@
       body:
         name: Image-Management
         description: Create image repo, import images and create/update file list.
-        project: '{{ThisTemplate.json.project}}'
+        project: '{{rThisTemplate.json.project}}'
         inventory: '{{awx_inventory_id}}'
         playbook: Image-Management.yml
-        ask_credential_on_launch: '{{ThisTemplate.json.ask_credential_on_launch}}'
+        ask_credential_on_launch: '{{rThisTemplate.json.ask_credential_on_launch}}'
         use_fact_cache: true
       body_format: json
       status_code: 201
@@ -68,7 +44,7 @@
   - name: Copy Saved Credentials
     block:
     - name: Get Credentials for This Template
-      uri: {url: '{{AwxApi}}/job_templates/{{ThisTemplate.json.id}}/credentials/'}
+      uri: {url: '{{AwxApi}}/job_templates/{{rThisTemplate.json.id}}/credentials/'}
       register: ThisTemplateCreds
 
     - name: Store Credentials from This Template
@@ -87,7 +63,7 @@
         status_code: 204
       loop: '{{range(0, TemplateCreds.results|length)|list}}'
       loop_control: {index_var: idx}
-    when: not ThisTemplate.json.ask_credential_on_launch|bool
+    when: not rThisTemplate.json.ask_credential_on_launch|bool
   when: ImageTemplate.json.count == 0
 
 - name: Create New Survey Prompt Payload
@@ -105,11 +81,6 @@
           choices: |-
             Create/Update Templates
             Remove Templates
-        - question_name: 'Project:'
-          required: false
-          type: multiplechoice
-          variable: prompt_project_name
-          choices: '{{ProjectList|regex_replace("@NL@","\n")|default("")}}'
     - JobId: '{{ImageTemplateInfo.id}}'
       SurveyPrompt:
         name: ''
@@ -165,8 +136,7 @@
     - {name: Ending Play, meta: end_play}
   vars:
     NoMgmtPrompt: '{{prompt_mgmt_role is not defined}}'
-    NoPjPrompt: '{{prompt_project_name is not defined}}'
     TemplateUpdate: '{{ServerVersion is version(AwxMgmtVer, "<")}}'
-  when: TemplateUpdate|bool or NoMgmtPrompt|bool or NoPjPrompt|bool
+  when: TemplateUpdate|bool or NoMgmtPrompt|bool
 
 - {name: Template Management, include_tasks: template_management.yml}

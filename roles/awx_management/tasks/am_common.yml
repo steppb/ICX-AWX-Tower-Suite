@@ -1,0 +1,4 @@
+---
+- name: Get This Template Info
+  uri: {url: '{{AwxApi}}/job_templates/{{awx_job_template_id}}/'}
+  register: rThisTemplate

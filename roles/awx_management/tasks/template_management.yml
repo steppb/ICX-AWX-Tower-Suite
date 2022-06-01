@@ -2,9 +2,8 @@
 - {name: Get Project Directory, uri: {url: '{{AwxApi}}/config/'}, register: AwxCfg}
 
 - name: Get Project Info
-  uri: {url: '{{AwxApi}}/projects/?name={{prompt_project_name|urlencode}}'}
-  register: PjInfo
-  failed_when: PjInfo.json.results[0] is not defined
+  uri: {url: '{{AwxApi}}/projects/{{rThisTemplate.json.project}}/'}
+  register: rPjInfo
 
 - name: Set Job Variables
   set_fact:
@@ -13,8 +12,8 @@
     UpdateJtTemplates: []
     UpdateJtVer: []
     VerRe: '^.*(playbook|template)_version: ([0-9].[0-9]).*$'
-    PjId: "{{PjInfo.json.results[0].id}}"
-    PjPath: "{{AwxCfg.json.project_base_dir}}/{{PjInfo.json.results[0].local_path}}"
+    PjId: "{{rThisTemplate.json.project}}"
+    PjPath: "{{AwxCfg.json.project_base_dir}}/{{rPjInfo.json.local_path}}"
 
 - name: Check if Project Can Be Updated
   uri: {url: '{{AwxApi}}/projects/{{PjId}}/update/'}
@@ -105,8 +104,8 @@
     when: tFile[0].checksum is defined and
           tFile[0].path not in AwxMgmtIgnored.files|map(attribute='path')|list and
           (tJtVer == "None" or tJtVer is version(AwxMgmtVer, "<") or
-          ansible_icx_mgmt_playbooks[prompt_project_name][tPbName] is not defined or
-          ansible_icx_mgmt_playbooks[prompt_project_name][tPbName] != tFile[0].checksum)
+          ansible_icx_mgmt_playbooks[tPbName] is not defined or
+          ansible_icx_mgmt_playbooks[tPbName] != tFile[0].checksum)
       
   - name: Update Existing Templates
     include_tasks: update_template.yml
@@ -149,7 +148,7 @@
 
 - name: Add Checksums to AWX Server Facts
   set_fact:
-    ansible_icx_mgmt_playbooks: '{{tMgmtFact|combine({prompt_project_name:PjPlaybooks})}}'
+    ansible_icx_mgmt_playbooks: '{{PjPlaybooks}}'
     cacheable: yes
   vars: {tMgmtFact: '{{ansible_icx_mgmt_playbooks|default({}, true)}}'}
 

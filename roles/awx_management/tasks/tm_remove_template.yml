@@ -1,10 +1,6 @@
 ---
-- name: Get Project Info
-  uri: {url: '{{AwxApi}}/projects/?name={{prompt_project_name|urlencode}}'}
-  register: PjInfo
-
 - name: Get Playbook List
-  uri: {url: '{{AwxApi}}/projects/{{PjInfo.json.results[0].id}}/playbooks/'}
+  uri: {url: '{{AwxApi}}/projects/{{rThisTemplate.json.project}}/playbooks/'}
   register: PbList
 
 - name: Get Template List
@@ -22,4 +18,4 @@
   loop_control: {index_var: idx}
   when:
     - JobTemplates.results[idx].json.results[0] is defined
-    - JobTemplates.results[idx].json.results[0].project == PjInfo.json.results[0].id
+    - JobTemplates.results[idx].json.results[0].project == rThisTemplate.json.project

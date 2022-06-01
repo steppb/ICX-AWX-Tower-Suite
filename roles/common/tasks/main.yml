@@ -1,8 +1,4 @@
 ---
-- name: Get Info for This Template
-  uri: {url: '{{AwxApi}}/job_templates/{{awx_job_template_id}}'}
-  register: ThisTemplate
-
 - name: Get Inventory Info
   uri: {url: '{{AwxApi}}/inventories/{{awx_inventory_id}}/'}
   register: InvInfo
