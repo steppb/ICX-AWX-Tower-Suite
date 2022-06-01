@@ -18,7 +18,7 @@
 
   - name: Add Description to Template
     uri:
-      url: '{{AwxApi}}/job_templates/{{TemplateId}}/'
+      url: '{{AwxApi}}/job_templates/{{bJtId}}/'
       method: PATCH
       headers: {Content-Type: "application/json"}
       body: {description: '{{description.stdout_lines[0]|default("")}}'}
@@ -42,7 +42,7 @@
 
       - name: Add Survey Prompts
         uri:
-          url: '{{AwxApi}}/job_templates/{{TemplateId}}/survey_spec/'
+          url: '{{AwxApi}}/job_templates/{{bJtId}}/survey_spec/'
           method: POST
           headers: {Content-Type: "application/json"}
           body: "{{tPayload|regex_replace('@question','?')|regex_replace('@comma',',')}}"
@@ -52,7 +52,7 @@
 
       - name: Enable Survey Prompts
         uri:
-          url: '{{AwxApi}}/job_templates/{{TemplateId}}/'
+          url: '{{AwxApi}}/job_templates/{{bJtId}}/'
           method: PATCH
           headers: {Content-Type: "application/json"}
           body: {survey_enabled: true}
@@ -62,18 +62,9 @@
           - PromptStatus.status == 200
     when: RawPrompts.stdout_lines[0] is defined
 
-  - name: Add Prompt for Limit (v1.4 Update)
-    uri:
-      url: '{{AwxApi}}/job_templates/{{TemplateId}}/'
-      method: PATCH
-      headers: {Content-Type: "application/json"}
-      body: {ask_limit_on_launch: true}
-      body_format: json
-    when: TemplateVer == "None" or TemplateVer is version("1.4", "<")
-
   - name: Add Comments and Version to Template
     uri:
-      url: '{{AwxApi}}/job_templates/{{TemplateId}}/'
+      url: '{{AwxApi}}/job_templates/{{bJtId}}/'
       method: PATCH
       headers: {Content-Type: "application/json"}
       body:
@@ -83,11 +74,8 @@
           {{PlaybookComments.stdout}}
       body_format: json
 
-  - name: Add Template to "Created" List
-    set_fact: {CreatedTemplates: '{{CreatedTemplates|default([]) + [bJtName]}}'}
-    when: FromCreate|bool
-
   - name: Add Template to "Updated" List
     set_fact: {UpdatedTemplates: '{{UpdatedTemplates|default([]) + [bJtName]}}'}
-    when: not FromCreate|bool
   vars: {bJtName: '{{PbFileName}}'}
+
+- {name: Reset Var, set_fact: {rNewJt: }}

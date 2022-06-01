@@ -10,16 +10,16 @@
     body: "{{tTemplateStruct}}"
     body_format: json
     status_code: 201
-  register: NewJobTemplate
+  register: rNewJt
   vars:
     tTemplateStruct:
-      name: '{{PbFileName}}'
+      name: '{{bJtSpec.name}}'
       project: '{{PjId}}'
       playbook: '{{PbFilePath}}'
       ask_credential_on_launch: true
       ask_inventory_on_launch: '{{prompt_ask_inventory_on_launch|default(true)}}'
       ask_limit_on_launch: true
 
-- name: Update Templates
-  include_tasks: tm_sts_update_template.yml
-  vars: {TemplateId: '{{NewJobTemplate.json.id}}', ExtraVars: 'template_version: 0.0'}
+- name: Add Template to "Created" List
+  set_fact:
+    CreatedTemplates: '{{CreatedTemplates|default([]) + [bJtSpec.name]}}'

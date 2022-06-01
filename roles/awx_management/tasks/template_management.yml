@@ -7,30 +7,31 @@
 
 - name: Set Job Variables
   set_fact:
-    CreateJtPbs: []
-    UpdateJtPbs: []
-    UpdateJtTemplates: []
-    UpdateJtVer: []
     VerRe: '^.*(playbook|template)_version: ([0-9].[0-9]).*$'
     PjId: "{{rThisTemplate.json.project}}"
     PjPath: "{{AwxCfg.json.project_base_dir}}/{{rPjInfo.json.local_path}}"
 
 - name: Get Job Template Count
   uri: {url: '{{AwxApi}}/job_templates/'}
-  register: JobTemplateCount
+  register: rJtNum
 
 - name: Get List of All Templates
-  uri: {url: '{{AwxApi}}/job_templates/?page_size={{JobTemplateCount.json.count}}'}
-  register: AllTemplates
-
-- name: Get List of Existing Job Templates for This Project
-  set_fact: {ExistingTemplates: "{{tJts|selectattr('project', 'equalto', PjId|int)|list}}"}
-  vars: {tJts: '{{AllTemplates.json.results}}'}
+  uri: {url: '{{AwxApi}}/job_templates/?page_size={{rJtNum.json.count}}'}
+  register: rJts
 
 - name: Create/Update ICX Config Templates
   block:
+  - name: Set Template List
+    set_fact: {UpdateTemplateList: '{{icx_config_templates}}'}
+
   - name: Create/Update ICX Config Templates
     include_tasks: tm_sync_template_spec.yml
+    loop: '{{UpdateTemplateList}}'
+    loop_control: {loop_var: bJtSpec}
+    vars:
+      bJt: "{{rJts.json.results|selectattr('name', '==', bJtSpec.name)|list}}"
+  when: "'create' in MgmtFunc|lower"
+
 
 - name: Debug
   debug:

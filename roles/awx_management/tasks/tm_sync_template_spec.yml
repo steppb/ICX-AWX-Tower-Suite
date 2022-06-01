@@ -1,51 +1,19 @@
 ---
 - name: Template Create Block
   block:
-  - name: Get List of Job Templates to Create
-    set_fact: {CreateJtPbs: '{{CreateJtPbs + [icx_config_templates[idx]]}}'}
-    loop: '{{range(0, icx_config_templates|length)|list}}'
-    loop_control: {index_var: idx}
-    vars:
-      tJts: '{{AllTemplates.json.results}}'
-      tJtName: '{{icx_config_templates[idx].name}}'
-    when: (tJts|selectattr('name', 'equalto', tJtName)|list)[0].id is not defined
-
   - name: Create Templates
     include_tasks: tm_sts_create_template.yml
-    loop: '{{range(0, CreateJtPbs|length)|list}}'
-    loop_control: {loop_var: PbFileEntry, index_var: idx}
     vars:
-      PbFileName: '{{CreateJtPbs[idx].name}}'
-      PbFilePath: '{{CreateJtPbs[idx].playbook}}'
-      TemplateVer: "None"
-  vars: {FromCreate: true}
+      PbFileName: '{{bJtSpec.name}}'
+      PbFilePath: '{{bJtSpec.playbook}}'
+    when: bJt[0].id is not defined
 
 - name: Template Update Block
   block:
-  - name: Get List of Templates to Update
-    set_fact:
-      UpdateJtPbs: '{{UpdateJtPbs + [tFile[0]]}}'
-      UpdateJtTemplates: '{{UpdateJtTemplates + [bJts[idx]]}}'
-      UpdateJtVer: '{{UpdateJtVer + [tJtVer]}}'
-    loop: '{{range(0, bJts|length)|list}}'
-    loop_control: {index_var: idx}
-    vars:
-      tFile: "{{bFiles|selectattr('name', '==', bJts[idx].name)|list}}"
-      tPbName: '{{bJts[idx].playbook}}'
-      tJtVer: '{{bJts[idx].extra_vars|regex_replace("\n") |
-                 regex_search(VerRe)|regex_replace(VerRe, "\2")}}'
-
   - name: Update Existing Templates
     include_tasks: tm_sts_update_template.yml
-    loop: '{{range(0, UpdateJtPbs|length)|list}}'
-    loop_control: {loop_var: PbFileEntry, index_var: idx}
     vars:
-      PbFileName: '{{UpdateJtPbs[idx].name}}'
-      PbFilePath: '{{PjPath}}/{{UpdateJtPbs[idx].playbook}}'
-      TemplateId: '{{UpdateJtTemplates[idx].id}}'
-      TemplateVer: '{{UpdateJtVer[idx]}}'
-      ExtraVars: '{{UpdateJtTemplates[idx].extra_vars}}'
-  vars:
-    bFiles: '{{icx_config_templates}}'
-    bJts: '{{ExistingTemplates}}'
-    FromCreate: false
+      PbFileName: '{{bJtSpec.name}}'
+      PbFilePath: '{{PjPath}}/{{bJtSpec.playbook}}'
+      bJtId: '{{rNewJt.json.id|default(bJt[0].id)}}'
+      bEV: '{{bJt[0].extra_vars|default("playbook_rev: 0.0.0", true)}}'
