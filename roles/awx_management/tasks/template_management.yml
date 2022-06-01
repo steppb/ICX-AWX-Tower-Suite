@@ -15,28 +15,6 @@
     PjId: "{{rThisTemplate.json.project}}"
     PjPath: "{{AwxCfg.json.project_base_dir}}/{{rPjInfo.json.local_path}}"
 
-- name: Check if Project Can Be Updated
-  uri: {url: '{{AwxApi}}/projects/{{PjId}}/update/'}
-  register: PjUpdateInfo
-
-- name: Update Project
-  block:
-  - name: Trigger Project Update
-    uri:
-      url: '{{AwxApi}}/projects/{{PjId}}/update/'
-      method: POST
-      headers: {Content-Type: "application/json"}
-      status_code: 202
-    register: PjUpdateRet
-
-  - name: Wait For Project Update Completion
-    uri: {url: '{{AwxApi}}/project_updates/{{PjUpdateRet.json.id}}/'}
-    register: PjUpdateStatus
-    until: PjUpdateStatus.json.status != "running"
-    retries: 5
-    delay: 10
-  when: PjUpdateInfo.json.can_update|bool
-
 - name: Get Job Template Count
   uri: {url: '{{AwxApi}}/job_templates/'}
   register: JobTemplateCount
