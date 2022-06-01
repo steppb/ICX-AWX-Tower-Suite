@@ -1,171 +1,166 @@
 ---
-- {name: Get Project Directory, uri: {url: '{{AwxApi}}/config/'}, register: AwxCfg}
+- name: Manually set path to Python Interpreter
+  set_fact: {discovered_interpreter_python: /usr/bin/python3, cacheable: true}
+  when: discovered_interpreter_python is not defined or "'platform-python' in discovered_interpreter_python"
 
-- name: Get Project Info
-  uri: {url: '{{AwxApi}}/projects/?name={{prompt_project_name|urlencode}}'}
+- name: Get This Template Info
+  uri: {url: '{{AwxApi}}/job_templates/{{awx_job_template_id}}/'}
+  register: ThisTemplate
+
+- name: Get List of Projects
+  uri: {url: '{{AwxApi}}/projects/'}
   register: PjInfo
-  failed_when: PjInfo.json.results[0] is not defined
 
-- name: Set Job Variables
-  set_fact:
-    CreateJtPbs: []
-    UpdateJtPbs: []
-    UpdateJtTemplates: []
-    UpdateJtVer: []
-    VerRe: '^.*(playbook|template)_version: ([0-9].[0-9]).*$'
-    PjId: "{{PjInfo.json.results[0].id}}"
-    PjPath: "{{AwxCfg.json.project_base_dir}}/{{PjInfo.json.results[0].local_path}}"
+- name: Add First Project to List
+  set_fact: {ProjectList: '{{PjInfo.json.results[idx].name}}', FirstPjIdx: '{{idx}}'}
+  loop: '{{range(0, PjInfo.json.count)|list}}'
+  loop_control: {index_var: idx}
+  when:
+    - PjInfo.json.count > 1
+    - PjInfo.json.results[idx].id != ThisTemplate.json.project
+    - ProjectList is not defined
 
-- name: Check if Project Can Be Updated
-  uri: {url: '{{AwxApi}}/projects/{{PjId}}/update/'}
-  register: PjUpdateInfo
+- name: Add Remaining Projects to List
+  set_fact: {ProjectList: '{{ProjectList}}@NL@{{PjInfo.json.results[idx].name}}'}
+  loop: '{{range(0, PjInfo.json.count)|list}}'
+  loop_control: {index_var: idx}
+  when:
+    - ProjectList is defined
+    - PjInfo.json.results[idx].id != ThisTemplate.json.project
+    - idx != FirstPjIdx
 
-- name: Update Project
+- name: Check For Existing 'Image-Management' Template
+  uri: {url: '{{AwxApi}}/job_templates/?name=Image-Management'}
+  register: ImageTemplate
+
+- name: Store 'Image-Management' Template Info
+  set_fact: {ImageTemplateInfo: '{{ImageTemplate.json.results[0]}}'}
+  when: ImageTemplate.json.count > 0
+
+- name: Create 'Image-Management' Template
   block:
-  - name: Trigger Project Update
+  - name: Create Template
     uri:
-      url: '{{AwxApi}}/projects/{{PjId}}/update/'
+      url: '{{AwxApi}}/job_templates/'
       method: POST
       headers: {Content-Type: "application/json"}
-      status_code: 202
-    register: PjUpdateRet
+      body:
+        name: Image-Management
+        description: Create image repo, import images and create/update file list.
+        project: '{{ThisTemplate.json.project}}'
+        inventory: '{{awx_inventory_id}}'
+        playbook: Image-Management.yml
+        ask_credential_on_launch: '{{ThisTemplate.json.ask_credential_on_launch}}'
+        use_fact_cache: true
+      body_format: json
+      status_code: 201
+    register: NewImageTemplate
 
-  - name: Wait For Project Update Completion
-    uri: {url: '{{AwxApi}}/project_updates/{{PjUpdateRet.json.id}}/'}
-    register: PjUpdateStatus
-    until: PjUpdateStatus.json.status != "running"
-    retries: 5
-    delay: 10
-  when: PjUpdateInfo.json.can_update|bool
+  - name: Store 'Image-Management'  Template Info
+    set_fact: {ImageTemplateInfo: '{{NewImageTemplate.json}}'}
 
-- name: Get List of Playbooks
-  find:
-    paths: '{{PjPath}}'
-    recurse: no
-    patterns: '*.yml'
-    get_checksum: yes
-  register: PbList
+  - name: Copy Saved Credentials
+    block:
+    - name: Get Credentials for This Template
+      uri: {url: '{{AwxApi}}/job_templates/{{ThisTemplate.json.id}}/credentials/'}
+      register: ThisTemplateCreds
 
-- name: Get Job Template Count
-  uri: {url: '{{AwxApi}}/job_templates/'}
-  register: JobTemplateCount
+    - name: Store Credentials from This Template
+      set_fact: {Credential: "id: {{ThisTemplateCreds.json.results[idx].id}}"}
+      loop: "{{range(0, ThisTemplateCreds.json.results|length)|list}}"
+      loop_control: {index_var: idx}
+      register: TemplateCreds
 
-- name: Get List of All Templates
-  uri: {url: '{{AwxApi}}/job_templates/?page_size={{JobTemplateCount.json.count}}'}
-  register: AllTemplates
+    - name: Add Credentials to 'Image-Management' Template
+      uri:
+        url: '{{AwxApi}}/job_templates/{{ImageTemplateInfo.id}}/credentials/'
+        method: POST
+        headers: {Content-Type: "application/json"}
+        body: '{{TemplateCreds.results[idx].ansible_facts.Credential|from_yaml}}'
+        body_format: json
+        status_code: 204
+      loop: '{{range(0, TemplateCreds.results|length)|list}}'
+      loop_control: {index_var: idx}
+    when: not ThisTemplate.json.ask_credential_on_launch|bool
+  when: ImageTemplate.json.count == 0
 
-- name: Get List of Existing Job Templates for This Project
-  set_fact: {ExistingTemplates: "{{tJts|selectattr('project', 'equalto', PjId|int)|list}}"}
-  vars: {tJts: '{{AllTemplates.json.results}}'}
-
-- name: Find Ignored Playbooks
-  find:
-    paths: '{{PjPath}}'
-    contains: '^#! AwxMgmtIgnore$'
-    recurse: no
-    patterns: '*.yml'
-  register: AwxMgmtIgnored
-
-- name: Template Create Block
-  block:
-  - name: Get List of Job Templates to Create
-    set_fact: {CreateJtPbs: '{{CreateJtPbs + [PbList.files[idx]]}}'}
-    loop: '{{range(0, PbList.files|length)|list}}'
-    loop_control: {index_var: idx}
-    vars:
-      tJts: '{{AllTemplates.json.results}}'
-      tJtName: '{{PbList.files[idx].path|basename|regex_replace(YamlExt)}}'
-    when: (tJts|selectattr('name', 'equalto', tJtName)|list)[0].id is not defined
-
-  - name: Create Templates
-    include_tasks: create_templates.yml
-    loop: '{{range(0, CreateJtPbs|length)|list}}'
-    loop_control: {loop_var: PbFileEntry, index_var: idx}
-    vars:
-      PbFileName: '{{CreateJtPbs[idx].path|basename}}'
-      PbFilePath: '{{CreateJtPbs[idx].path}}'
-      TemplateVer: "None"
-    when: PbFilePath not in AwxMgmtIgnored.files|map(attribute='path')|list
-  vars: {FromCreate: true}
-
-- name: Template Update Block
-  block:
-  - name: Get List of Templates to Update
-    set_fact:
-      UpdateJtPbs: '{{UpdateJtPbs + [tFile[0]]}}'
-      UpdateJtTemplates: '{{UpdateJtTemplates + [bJts[idx]]}}'
-      UpdateJtVer: '{{UpdateJtVer + [tJtVer]}}'
-    loop: '{{range(0, bJts|length)|list}}'
-    loop_control: {index_var: idx}
-    vars:
-      tFile: "{{bFiles|selectattr('path', 'contains', bJts[idx].name~'.yml')|list}}"
-      tPbName: '{{bJts[idx].playbook}}'
-      tJtVer: '{{bJts[idx].extra_vars|regex_replace("\n") |
-                 regex_search(VerRe)|regex_replace(VerRe, "\2")}}'
-    when: tFile[0].checksum is defined and
-          tFile[0].path not in AwxMgmtIgnored.files|map(attribute='path')|list and
-          (tJtVer == "None" or tJtVer is version(AwxMgmtVer, "<") or
-          ansible_icx_mgmt_playbooks[prompt_project_name][tPbName] is not defined or
-          ansible_icx_mgmt_playbooks[prompt_project_name][tPbName] != tFile[0].checksum)
-      
-  - name: Update Existing Templates
-    include_tasks: update_template.yml
-    loop: '{{range(0, UpdateJtPbs|length)|list}}'
-    loop_control: {loop_var: PbFileEntry, index_var: idx}
-    vars:
-      PbChecksum: '{{UpdateJtPbs[idx].checksum}}'
-      PbFileName: '{{UpdateJtPbs[idx].path|basename}}'
-      PbFilePath: '{{UpdateJtPbs[idx].path}}'
-      TemplateId: '{{UpdateJtTemplates[idx].id}}'
-      TemplateVer: '{{UpdateJtVer[idx]}}'
-      ExtraVars: '{{UpdateJtTemplates[idx].extra_vars}}'
-  vars: {bFiles: '{{PbList.files}}', bJts: '{{ExistingTemplates}}', FromCreate: false}
-
-- name: Orphaned Template Removal Block
-  block:
-  - name: Get List of Orphaned Templates
-    set_fact:
-      OrphanedTemplates: '{{OrphanedTemplates|default([]) + [bJts[idx].name]}}'
-      OrphanedTemplateIds: '{{OrphanedTemplateIds|default([]) + [bJts[idx].id]}}'
-    loop: '{{range(0, bJts|length)|list}}'
-    loop_control: {index_var: idx}
-    vars: {bJts: '{{ExistingTemplates}}'}
-    when: PjPath~'/'~bJts[idx].playbook not in PbList.files|map(attribute='path')|list
-
-  - name: Remove Orphaned Templates
-    uri: {url: '{{tUrl}}', method: DELETE, return_content: no, status_code: 204}
-    loop: '{{OrphanedTemplates|default([], true)}}'
-    loop_control: {index_var: idx}
-    vars: {tUrl: '{{AwxApi}}/job_templates/{{OrphanedTemplateIds[idx]}}/'}
-  when: template_remove_orphans|default(true, true)|bool
-
-- name: Create List of Playbook Checksums
-  set_fact: {PjPlaybooks: '{{PjPlaybooks|default({})|combine({tBasename:tChecksum})}}'}
-  loop: '{{range(0, PbList.files|length)|list}}'
-  loop_control: {index_var: idx}
-  vars:
-    tBasename: '{{PbList.files[idx].path|basename}}'
-    tChecksum: '{{PbList.files[idx].checksum}}'
-
-- name: Add Checksums to AWX Server Facts
+- name: Create New Survey Prompt Payload
   set_fact:
-    ansible_icx_mgmt_playbooks: '{{tMgmtFact|combine({prompt_project_name:PjPlaybooks})}}'
-    cacheable: yes
-  vars: {tMgmtFact: '{{ansible_icx_mgmt_playbooks|default({}, true)}}'}
+    PromptPayloads:
+    - JobId: '{{awx_job_template_id}}'
+      SurveyPrompt:
+        name: ''
+        description: ''
+        spec:
+        - question_name: 'Template management function:'
+          required: false
+          type: multiplechoice
+          variable: prompt_mgmt_role
+          choices: |-
+            Create/Update Templates
+            Remove Templates
+        - question_name: 'Project:'
+          required: false
+          type: multiplechoice
+          variable: prompt_project_name
+          choices: '{{ProjectList|regex_replace("@NL@","\n")|default("")}}'
+    - JobId: '{{ImageTemplateInfo.id}}'
+      SurveyPrompt:
+        name: ''
+        description: ''
+        spec:
+        - question_name: 'Image Repository Name:'
+          required: true
+          type: text
+          variable: prompt_project_name
+          min: 1
+          max: 50
+          default: Images
+        - question_name: 'TFTP Server IPv4 Address:'
+          required: false
+          type: text
+          variable: prompt_tftp_srv_ip
+          min: 7
+          max: 15
+        - question_name: 'TFTP Image File Path:'
+          required: false
+          type: text
+          variable: prompt_tftp_filepath
 
-- name: Debug
-  debug:
-    msg:
-      - "Job Templates Created"
-      - "========================"
-      - "{{CreatedTemplates|default(['none'])}}"
-      - ""
-      - "Job Templates Updated"
-      - "========================"
-      - "{{UpdatedTemplates|default(['none'])}}"
-      - ""
-      - "Job Templates Removed"
-      - "========================"
-      - "{{OrphanedTemplates|default(['none'])}}"
+- name: Create Survey Prompt
+  uri:
+    url: '{{AwxApi}}/job_templates/{{item.JobId}}/survey_spec/'
+    method: POST
+    headers: {Content-Type: 'application/json'}
+    body: '{{item.SurveyPrompt}}'
+    body_format: json
+  loop: '{{PromptPayloads}}'
 
-- {name: End Play, meta: end_play}
+- name: Update Template
+  uri:
+    url: '{{AwxApi}}/job_templates/{{item.JobId}}/'
+    method: PATCH
+    headers: {Content-Type: "application/json"}
+    body: {extra_vars: , survey_enabled: true, use_fact_cache: true}
+    body_format: json
+  loop: '{{PromptPayloads}}'
+
+- name: Display Update Message and Exit
+  block:
+    - name: Set AWX Management Version
+      set_fact: {ansible_icx_mgmt_ver: '{{AwxMgmtVer}}', cacheable: yes}
+
+    - name: Update Message
+      debug:
+        msg:
+          - "Template updated to version {{AwxMgmtVer}}."
+          - "Relaunch template to continue."
+
+    - {name: Ending Play, meta: end_play}
+  vars:
+    NoMgmtPrompt: '{{prompt_mgmt_role is not defined}}'
+    NoPjPrompt: '{{prompt_project_name is not defined}}'
+    TemplateUpdate: '{{ServerVersion is version(AwxMgmtVer, "<")}}'
+  when: TemplateUpdate|bool or NoMgmtPrompt|bool or NoPjPrompt|bool
+
+- {name: Template Management, include_tasks: template_management.yml}

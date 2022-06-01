@@ -21,6 +21,5 @@
     template_validate_certs: no
 
   roles:
-  - {role: self_update}
   - {role: awx_management, when: "'create' in prompt_mgmt_role|lower"}
   - {role: remove_templates, when: "'remove' in prompt_mgmt_role|lower"}
