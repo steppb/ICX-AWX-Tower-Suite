@@ -1,4 +1,10 @@
 ---
+- name: Remove ICX Config Templates
+  block:
+  - name: Remove ICX Config Templates
+    include_tasks: tm_remove_template.yml
+  when: "'remove' in MgmtFunc|lower"
+
 - name: Manually set path to Python Interpreter
   set_fact: {discovered_interpreter_python: /usr/bin/python3, cacheable: true}
   when: discovered_interpreter_python is not defined or "'platform-python' in discovered_interpreter_python"
