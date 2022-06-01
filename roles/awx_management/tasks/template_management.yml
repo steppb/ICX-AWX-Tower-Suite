@@ -108,24 +108,6 @@
     bJts: '{{ExistingTemplates}}'
     FromCreate: false
 
-- name: Orphaned Template Removal Block
-  block:
-  - name: Get List of Orphaned Templates
-    set_fact:
-      OrphanedTemplates: '{{OrphanedTemplates|default([]) + [bJts[idx].name]}}'
-      OrphanedTemplateIds: '{{OrphanedTemplateIds|default([]) + [bJts[idx].id]}}'
-    loop: '{{range(0, bJts|length)|list}}'
-    loop_control: {index_var: idx}
-    vars: {bJts: '{{ExistingTemplates}}'}
-    when: PjPath~'/'~bJts[idx].playbook not in PbList.files|map(attribute='path')|list
-
-  - name: Remove Orphaned Templates
-    uri: {url: '{{tUrl}}', method: DELETE, return_content: no, status_code: 204}
-    loop: '{{OrphanedTemplates|default([], true)}}'
-    loop_control: {index_var: idx}
-    vars: {tUrl: '{{AwxApi}}/job_templates/{{OrphanedTemplateIds[idx]}}/'}
-  when: template_remove_orphans|default(true, true)|bool
-
 - name: Create List of Playbook Checksums
   set_fact: {PjPlaybooks: '{{PjPlaybooks|default({})|combine({tBasename:tChecksum})}}'}
   loop: '{{range(0, PbList.files|length)|list}}'
@@ -151,8 +133,5 @@
       - "========================"
       - "{{UpdatedTemplates|default(['none'])}}"
       - ""
-      - "Job Templates Removed"
-      - "========================"
-      - "{{OrphanedTemplates|default(['none'])}}"
 
 - {name: End Play, meta: end_play}
