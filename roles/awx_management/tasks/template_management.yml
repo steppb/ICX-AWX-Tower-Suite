@@ -49,56 +49,10 @@
   set_fact: {ExistingTemplates: "{{tJts|selectattr('project', 'equalto', PjId|int)|list}}"}
   vars: {tJts: '{{AllTemplates.json.results}}'}
 
-- name: Template Create Block
+- name: Create/Update ICX Config Templates
   block:
-  - name: Get List of Job Templates to Create
-    set_fact: {CreateJtPbs: '{{CreateJtPbs + [icx_config_templates[idx]]}}'}
-    loop: '{{range(0, icx_config_templates|length)|list}}'
-    loop_control: {index_var: idx}
-    vars:
-      tJts: '{{AllTemplates.json.results}}'
-      tJtName: '{{icx_config_templates[idx].name}}'
-    when: (tJts|selectattr('name', 'equalto', tJtName)|list)[0].id is not defined
-
-  - name: Create Templates
-    include_tasks: create_templates.yml
-    loop: '{{range(0, CreateJtPbs|length)|list}}'
-    loop_control: {loop_var: PbFileEntry, index_var: idx}
-    vars:
-      PbFileName: '{{CreateJtPbs[idx].name}}'
-      PbFilePath: '{{CreateJtPbs[idx].playbook}}'
-      TemplateVer: "None"
-  vars: {FromCreate: true}
-
-- name: Template Update Block
-  block:
-  - name: Get List of Templates to Update
-    set_fact:
-      UpdateJtPbs: '{{UpdateJtPbs + [tFile[0]]}}'
-      UpdateJtTemplates: '{{UpdateJtTemplates + [bJts[idx]]}}'
-      UpdateJtVer: '{{UpdateJtVer + [tJtVer]}}'
-    loop: '{{range(0, bJts|length)|list}}'
-    loop_control: {index_var: idx}
-    vars:
-      tFile: "{{bFiles|selectattr('name', '==', bJts[idx].name)|list}}"
-      tPbName: '{{bJts[idx].playbook}}'
-      tJtVer: '{{bJts[idx].extra_vars|regex_replace("\n") |
-                 regex_search(VerRe)|regex_replace(VerRe, "\2")}}'
-      
-  - name: Update Existing Templates
-    include_tasks: update_template.yml
-    loop: '{{range(0, UpdateJtPbs|length)|list}}'
-    loop_control: {loop_var: PbFileEntry, index_var: idx}
-    vars:
-      PbFileName: '{{UpdateJtPbs[idx].name}}'
-      PbFilePath: '{{PjPath}}/{{UpdateJtPbs[idx].playbook}}'
-      TemplateId: '{{UpdateJtTemplates[idx].id}}'
-      TemplateVer: '{{UpdateJtVer[idx]}}'
-      ExtraVars: '{{UpdateJtTemplates[idx].extra_vars}}'
-  vars:
-    bFiles: '{{icx_config_templates}}'
-    bJts: '{{ExistingTemplates}}'
-    FromCreate: false
+  - name: Create/Update ICX Config Templates
+    include_tasks: tm_sync_template_spec.yml
 
 - name: Debug
   debug:

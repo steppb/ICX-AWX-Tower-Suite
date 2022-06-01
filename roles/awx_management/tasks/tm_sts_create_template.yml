@@ -21,5 +21,5 @@
       ask_limit_on_launch: true
 
 - name: Update Templates
-  include_tasks: update_template.yml
+  include_tasks: tm_sts_update_template.yml
   vars: {TemplateId: '{{NewJobTemplate.json.id}}', ExtraVars: 'template_version: 0.0'}
