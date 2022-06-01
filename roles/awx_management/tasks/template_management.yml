@@ -57,23 +57,15 @@
   set_fact: {ExistingTemplates: "{{tJts|selectattr('project', 'equalto', PjId|int)|list}}"}
   vars: {tJts: '{{AllTemplates.json.results}}'}
 
-- name: Find Ignored Playbooks
-  find:
-    paths: '{{PjPath}}'
-    contains: '^#! AwxMgmtIgnore$'
-    recurse: no
-    patterns: '*.yml'
-  register: AwxMgmtIgnored
-
 - name: Template Create Block
   block:
   - name: Get List of Job Templates to Create
-    set_fact: {CreateJtPbs: '{{CreateJtPbs + [PbList.files[idx]]}}'}
-    loop: '{{range(0, PbList.files|length)|list}}'
+    set_fact: {CreateJtPbs: '{{CreateJtPbs + [icx_config_templates[idx]]}}'}
+    loop: '{{range(0, icx_config_templates|length)|list}}'
     loop_control: {index_var: idx}
     vars:
       tJts: '{{AllTemplates.json.results}}'
-      tJtName: '{{PbList.files[idx].path|basename|regex_replace(YamlExt)}}'
+      tJtName: '{{icx_config_templates[idx].name}}'
     when: (tJts|selectattr('name', 'equalto', tJtName)|list)[0].id is not defined
 
   - name: Create Templates
@@ -81,10 +73,9 @@
     loop: '{{range(0, CreateJtPbs|length)|list}}'
     loop_control: {loop_var: PbFileEntry, index_var: idx}
     vars:
-      PbFileName: '{{CreateJtPbs[idx].path|basename}}'
-      PbFilePath: '{{CreateJtPbs[idx].path}}'
+      PbFileName: '{{CreateJtPbs[idx].name}}'
+      PbFilePath: '{{CreateJtPbs[idx].playbook}}'
       TemplateVer: "None"
-    when: PbFilePath not in AwxMgmtIgnored.files|map(attribute='path')|list
   vars: {FromCreate: true}
 
 - name: Template Update Block
@@ -97,28 +88,25 @@
     loop: '{{range(0, bJts|length)|list}}'
     loop_control: {index_var: idx}
     vars:
-      tFile: "{{bFiles|selectattr('path', 'contains', bJts[idx].name~'.yml')|list}}"
+      tFile: "{{bFiles|selectattr('name', '==', bJts[idx].name)|list}}"
       tPbName: '{{bJts[idx].playbook}}'
       tJtVer: '{{bJts[idx].extra_vars|regex_replace("\n") |
                  regex_search(VerRe)|regex_replace(VerRe, "\2")}}'
-    when: tFile[0].checksum is defined and
-          tFile[0].path not in AwxMgmtIgnored.files|map(attribute='path')|list and
-          (tJtVer == "None" or tJtVer is version(AwxMgmtVer, "<") or
-          ansible_icx_mgmt_playbooks[tPbName] is not defined or
-          ansible_icx_mgmt_playbooks[tPbName] != tFile[0].checksum)
       
   - name: Update Existing Templates
     include_tasks: update_template.yml
     loop: '{{range(0, UpdateJtPbs|length)|list}}'
     loop_control: {loop_var: PbFileEntry, index_var: idx}
     vars:
-      PbChecksum: '{{UpdateJtPbs[idx].checksum}}'
-      PbFileName: '{{UpdateJtPbs[idx].path|basename}}'
-      PbFilePath: '{{UpdateJtPbs[idx].path}}'
+      PbFileName: '{{UpdateJtPbs[idx].name}}'
+      PbFilePath: '{{PjPath}}/{{UpdateJtPbs[idx].playbook}}'
       TemplateId: '{{UpdateJtTemplates[idx].id}}'
       TemplateVer: '{{UpdateJtVer[idx]}}'
       ExtraVars: '{{UpdateJtTemplates[idx].extra_vars}}'
-  vars: {bFiles: '{{PbList.files}}', bJts: '{{ExistingTemplates}}', FromCreate: false}
+  vars:
+    bFiles: '{{icx_config_templates}}'
+    bJts: '{{ExistingTemplates}}'
+    FromCreate: false
 
 - name: Orphaned Template Removal Block
   block:

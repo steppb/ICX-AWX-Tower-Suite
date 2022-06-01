@@ -1,11 +1,7 @@
 ---
-- name: Get Playbook List
-  uri: {url: '{{AwxApi}}/projects/{{rThisTemplate.json.project}}/playbooks/'}
-  register: PbList
-
 - name: Get Template List
-  uri: {url: '{{AwxApi}}/job_templates/?name={{item|regex_replace(YamlExt)}}'}
-  loop: '{{PbList.json}}'
+  uri: {url: '{{AwxApi}}/job_templates/?name={{item}}'}
+  loop: '{{icx_config_templates}}'
   register: JobTemplates
 
 - name: Remove Templates
@@ -14,7 +10,7 @@
     method: DELETE
     return_content: no
     status_code: 204
-  loop: '{{PbList.json}}'
+  loop: '{{icx_config_templates}}'
   loop_control: {index_var: idx}
   when:
     - JobTemplates.results[idx].json.results[0] is defined

@@ -1,6 +1,6 @@
 ---
 - name: Debug
-  debug: msg="Creating template '{{PbFileName|regex_replace(YamlExt)}}'"
+  debug: msg="Creating template '{{PbFileName}}'"
 
 - name: Create Template
   uri:
@@ -13,9 +13,9 @@
   register: NewJobTemplate
   vars:
     tTemplateStruct:
-      name: '{{PbFileName|regex_replace(YamlExt)}}'
+      name: '{{PbFileName}}'
       project: '{{PjId}}'
-      playbook: '{{PbFileName}}'
+      playbook: '{{PbFilePath}}'
       ask_credential_on_launch: true
       ask_inventory_on_launch: '{{prompt_ask_inventory_on_launch|default(true)}}'
       ask_limit_on_launch: true

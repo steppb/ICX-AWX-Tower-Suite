@@ -1,0 +1,275 @@
+icx_config_templates:
+- name: Hardware-Interface-100FX
+  playbook: icx_config_playbooks/Hardware-Interface-100FX.yml
+
+- name: L2-MSTP-Config
+  playbook: icx_config_playbooks/L2-MSTP-Config.yml
+
+- name: L2-MSTP-Instance
+  playbook: icx_config_playbooks/L2-MSTP-Instance.yml
+
+- name: L2-MSTP-Interface
+  playbook: icx_config_playbooks/L2-MSTP-Interface.yml
+
+- name: L2-MSTP-VLAN
+  playbook: icx_config_playbooks/L2-MSTP-VLAN.yml
+
+- name: L2-STP-BPDUGuard
+  playbook: icx_config_playbooks/L2-STP-BPDUGuard.yml
+
+- name: L2-STP-DesignatedProtect
+  playbook: icx_config_playbooks/L2-STP-DesignatedProtect.yml
+
+- name: L2-STP-FastUplinkSpan
+  playbook: icx_config_playbooks/L2-STP-FastUplinkSpan.yml
+
+- name: L2-VLAN-Config
+  playbook: icx_config_playbooks/L2-VLAN-Config.yml
+
+- name: L2-VLAN-Default
+  playbook: icx_config_playbooks/L2-VLAN-Default.yml
+
+- name: L2-VLAN-DefaultDisablePorts
+  playbook: icx_config_playbooks/L2-VLAN-DefaultDisablePorts.yml
+
+- name: L3-IPv4-ACL
+  playbook: icx_config_playbooks/L3-IPv4-ACL.yml
+
+- name: L3-IPv4-DefaultRoute
+  playbook: icx_config_playbooks/L3-IPv4-DefaultRoute.yml
+
+- name: L3-IPv4-Interface
+  playbook: icx_config_playbooks/L3-IPv4-Interface.yml
+
+- name: L3-IPv4-MCastPIM
+  playbook: icx_config_playbooks/L3-IPv4-MCastPIM.yml
+
+- name: L3-IPv4-MCastPIMFilter
+  playbook: icx_config_playbooks/L3-IPv4-MCastPIMFilter.yml
+
+- name: L3-IPv4-MCastPIMInterface
+  playbook: icx_config_playbooks/L3-IPv4-MCastPIMInterface.yml
+
+- name: L3-IPv4-OSPFGlobal
+  playbook: icx_config_playbooks/L3-IPv4-OSPFGlobal.yml
+
+- name: L3-IPv4-OSPFInt
+  playbook: icx_config_playbooks/L3-IPv4-OSPFInt.yml
+
+- name: L3-IPv4-ProxyArp
+  playbook: icx_config_playbooks/L3-IPv4-ProxyArp.yml
+
+- name: L3-IPv4-Redirects
+  playbook: icx_config_playbooks/L3-IPv4-Redirects.yml
+
+- name: L3-IPv4-VRRP
+  playbook: icx_config_playbooks/L3-IPv4-VRRP.yml
+
+- name: L3-IPv6-CacheLifetime
+  playbook: icx_config_playbooks/L3-IPv6-CacheLifetime.yml
+
+- name: L3-IPv6-DefaultRoute
+  playbook: icx_config_playbooks/L3-IPv6-DefaultRoute.yml
+
+- name: L3-IPv6-Interface
+  playbook: icx_config_playbooks/L3-IPv6-Interface.yml
+
+- name: L3-IPv6-MCastPIM
+  playbook: icx_config_playbooks/L3-IPv6-MCastPIM.yml
+
+- name: L3-IPv6-MCastPIMFilter
+  playbook: icx_config_playbooks/L3-IPv6-MCastPIMFilter.yml
+
+- name: L3-IPv6-MCastPIMInterface
+  playbook: icx_config_playbooks/L3-IPv6-MCastPIMInterface.yml
+- name: L3-IPv6-OSPFGlobal
+  playbook: icx_config_playbooks/L3-IPv6-OSPFGlobal.yml
+
+- name: L3-IPv6-OSPFInt
+  playbook: icx_config_playbooks/L3-IPv6-OSPFInt.yml
+
+- name: L3-IPv6-Redirects
+  playbook: icx_config_playbooks/L3-IPv6-Redirects.yml
+
+- name: L3-IPv6-VRRP
+  playbook: icx_config_playbooks/L3-IPv6-VRRP.yml
+
+- name: LAG-Interface-Add
+  playbook: icx_config_playbooks/LAG-Interface-Add.yml
+
+- name: LAG-Interface-Enable
+  playbook: icx_config_playbooks/LAG-Interface-Enable.yml
+
+- name: LAG-Interface-Name
+  playbook: icx_config_playbooks/LAG-Interface-Name.yml
+
+- name: PortSec-FlexAuth-Global
+  playbook: icx_config_playbooks/PortSec-FlexAuth-Global.yml
+
+- name: PortSec-FlexAuth-Int
+  playbook: icx_config_playbooks/PortSec-FlexAuth-Int.yml
+
+- name: PortSec-StickyMac
+  playbook: icx_config_playbooks/PortSec-StickyMac.yml
+
+- name: Remote-AAA-Accounting
+  playbook: icx_config_playbooks/Remote-AAA-Accounting.yml
+
+- name: Remote-AAA-Authentication
+  playbook: icx_config_playbooks/Remote-AAA-Authentication.yml
+
+- name: Remote-AAA-Authorization
+  playbook: icx_config_playbooks/Remote-AAA-Authorization.yml
+
+- name: Remote-HTTP-Disable
+  playbook: icx_config_playbooks/Remote-HTTP-Disable.yml
+
+- name: Remote-LLDP-Advertise
+  playbook: icx_config_playbooks/Remote-LLDP-Advertise.yml
+
+- name: Remote-LLDP-EnableInt
+  playbook: icx_config_playbooks/Remote-LLDP-EnableInt.yml
+
+- name: Remote-LLDP-Run
+  playbook: icx_config_playbooks/Remote-LLDP-Run.yml
+
+- name: Remote-MGMT-ACLDenyCreate
+  playbook: icx_config_playbooks/Remote-MGMT-ACLDenyCreate.yml
+
+- name: Remote-MGMT-ACLPermit
+  playbook: icx_config_playbooks/Remote-MGMT-ACLPermit.yml
+
+- name: Remote-MGMT-ClientList
+  playbook: icx_config_playbooks/Remote-MGMT-ClientList.yml
+
+- name: Remote-Radius-Host
+  playbook: icx_config_playbooks/Remote-Radius-Host.yml
+
+- name: Remote-Radius-SrcInt
+  playbook: icx_config_playbooks/Remote-Radius-SrcInt.yml
+
+- name: Remote-Radius-Timeout
+  playbook: icx_config_playbooks/Remote-Radius-Timeout.yml
+
+- name: Remote-SNMP-ConfigTacacs
+  playbook: icx_config_playbooks/Remote-SNMP-ConfigTacacs.yml
+
+- name: Remote-SNMP-LinkChange
+  playbook: icx_config_playbooks/Remote-SNMP-LinkChange.yml
+
+- name: Remote-SNMP-Location
+  playbook: icx_config_playbooks/Remote-SNMP-Location.yml
+
+- name: Remote-SNMP-SrcInt
+  playbook: icx_config_playbooks/Remote-SNMP-SrcInt.yml
+
+- name: Remote-SNMPv2
+  playbook: icx_config_playbooks/Remote-SNMPv2.yml
+
+- name: Remote-SNMPv3-Group
+  playbook: icx_config_playbooks/Remote-SNMPv3-Group.yml
+
+- name: Remote-SNMPv3-Host
+  playbook: icx_config_playbooks/Remote-SNMPv3-Host.yml
+
+- name: Remote-SNMPv3-User
+  playbook: icx_config_playbooks/Remote-SNMPv3-User.yml
+
+- name: Remote-SNMPv3-View
+  playbook: icx_config_playbooks/Remote-SNMPv3-View.yml
+
+- name: Remote-SSH-ACLPermit
+  playbook: icx_config_playbooks/Remote-SSH-ACLPermit.yml
+
+- name: Remote-SSH-Harden
+  playbook: icx_config_playbooks/Remote-SSH-Harden.yml
+
+- name: Remote-SSH-KeyClient
+  playbook: icx_config_playbooks/Remote-SSH-KeyClient.yml
+
+- name: Remote-SSH-KeyServer
+  playbook: icx_config_playbooks/Remote-SSH-KeyServer.yml
+
+- name: Remote-Tacacs-Host
+  playbook: icx_config_playbooks/Remote-Tacacs-Host.yml
+
+- name: Remote-Tacacs-SrcInt
+  playbook: icx_config_playbooks/Remote-Tacacs-SrcInt.yml
+
+- name: Remote-Telnet-Disable
+  playbook: icx_config_playbooks/Remote-Telnet-Disable.yml
+
+- name: Remote-User-EnablePW
+  playbook: icx_config_playbooks/Remote-User-EnablePW.yml
+
+- name: Remote-User-LocalAcct
+  playbook: icx_config_playbooks/Remote-User-LocalAcct.yml
+
+- name: Remote-User-StrictMode
+  playbook: icx_config_playbooks/Remote-User-StrictMode.yml
+
+- name: System-Errdisable-PacketInError
+  playbook: icx_config_playbooks/System-Errdisable-PacketInError.yml
+
+- name: System-Misc-Banner
+  playbook: icx_config_playbooks/System-Misc-Banner.yml
+
+- name: System-Misc-BootPriority
+  playbook: icx_config_playbooks/System-Misc-BootPriority.yml
+
+- name: System-Misc-ConsoleHarden
+  playbook: icx_config_playbooks/System-Misc-ConsoleHarden.yml
+
+- name: System-Misc-DHCPClient
+  playbook: icx_config_playbooks/System-Misc-DHCPClient.yml
+
+- name: System-Misc-DNS
+  playbook: icx_config_playbooks/System-Misc-DNS.yml
+
+- name: System-Misc-DoS
+  playbook: icx_config_playbooks/System-Misc-DoS.yml
+
+- name: System-Misc-Hostname
+  playbook: icx_config_playbooks/System-Misc-Hostname.yml
+
+- name: System-QoS-Profiles
+  playbook: icx_config_playbooks/System-QoS-Profiles.yml
+
+- name: System-QoS-RLimitOutput
+  playbook: icx_config_playbooks/System-QoS-RLimitOutput.yml
+
+- name: System-QoS-StoreAndForward
+  playbook: icx_config_playbooks/System-QoS-StoreAndForward.yml
+
+- name: System-QoS-Trust
+  playbook: icx_config_playbooks/System-QoS-Trust.yml
+
+- name: System-Syslog-Buffer
+  playbook: icx_config_playbooks/System-Syslog-Buffer.yml
+
+- name: System-Syslog-Console
+  playbook: icx_config_playbooks/System-Syslog-Console.yml
+
+- name: System-Syslog-Facility
+  playbook: icx_config_playbooks/System-Syslog-Facility.yml
+
+- name: System-Syslog-Host
+  playbook: icx_config_playbooks/System-Syslog-Host.yml
+
+- name: System-Syslog-Severity
+  playbook: icx_config_playbooks/System-Syslog-Severity.yml
+
+- name: System-Syslog-SrcInt
+  playbook: icx_config_playbooks/System-Syslog-SrcInt.yml
+
+- name: System-Time-NTPDisableMD5
+  playbook: icx_config_playbooks/System-Time-NTPDisableMD5.yml
+
+- name: System-Time-NTPServer
+  playbook: icx_config_playbooks/System-Time-NTPServer.yml
+
+- name: System-Time-NTPSrcInt
+  playbook: icx_config_playbooks/System-Time-NTPSrcInt.yml
+
+- name: System-Time-TimeZone
+  playbook: icx_config_playbooks/System-Time-TimeZone.yml

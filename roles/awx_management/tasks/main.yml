@@ -1,10 +1,15 @@
 ---
 - {name: Common Tasks, include_tasks: am_common.yml}
 
+- name: Load Management Template Vars
+  include_vars: tm_spec_mgmt_templates.yml
+
 - name: Remove ICX Config Templates
   block:
   - name: Remove ICX Config Templates
     include_tasks: tm_remove_template.yml
+
+  - {name: End Play, meta: end_play}
   when: "'remove' in MgmtFunc|lower"
 
 - name: Manually set path to Python Interpreter

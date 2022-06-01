@@ -90,4 +90,4 @@
   - name: Add Template to "Updated" List
     set_fact: {UpdatedTemplates: '{{UpdatedTemplates|default([]) + [bJtName]}}'}
     when: not FromCreate|bool
-  vars: {bJtName: '{{PbFileName|regex_replace(YamlExt)}}'}
+  vars: {bJtName: '{{PbFileName}}'}
