@@ -37,14 +37,6 @@
     delay: 10
   when: PjUpdateInfo.json.can_update|bool
 
-- name: Get List of Playbooks
-  find:
-    paths: '{{PjPath}}/icx_config_playbooks'
-    recurse: no
-    patterns: '*.yml'
-    get_checksum: yes
-  register: PbList
-
 - name: Get Job Template Count
   uri: {url: '{{AwxApi}}/job_templates/'}
   register: JobTemplateCount
@@ -107,20 +99,6 @@
     bFiles: '{{icx_config_templates}}'
     bJts: '{{ExistingTemplates}}'
     FromCreate: false
-
-- name: Create List of Playbook Checksums
-  set_fact: {PjPlaybooks: '{{PjPlaybooks|default({})|combine({tBasename:tChecksum})}}'}
-  loop: '{{range(0, PbList.files|length)|list}}'
-  loop_control: {index_var: idx}
-  vars:
-    tBasename: '{{PbList.files[idx].path|basename}}'
-    tChecksum: '{{PbList.files[idx].checksum}}'
-
-- name: Add Checksums to AWX Server Facts
-  set_fact:
-    ansible_icx_mgmt_playbooks: '{{PjPlaybooks}}'
-    cacheable: yes
-  vars: {tMgmtFact: '{{ansible_icx_mgmt_playbooks|default({}, true)}}'}
 
 - name: Debug
   debug:
