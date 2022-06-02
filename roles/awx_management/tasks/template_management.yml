@@ -3,11 +3,28 @@
   uri: {url: '{{AwxApi}}/job_templates/'}
   register: rJtNum
 
-- name: Get List of All Templates
+- name: Load Management Template Specs
+  include_vars: tm_spec_mgmt_templates.yml
+
+- name: Get Job Templates
   uri: {url: '{{AwxApi}}/job_templates/?page_size={{rJtNum.json.count}}'}
   register: rJts
 
-- name: Load ICX Config Template Vars
+- name: Create/Update Management Templates
+  block:
+  - name: Create/Update Management Templates
+    include_tasks: tm_sync_template_spec.yml
+    loop: '{{mgmt_templates}}'
+    loop_control: {loop_var: bJtSpec}
+    vars:
+      bJt: "{{rJts.json.results|selectattr('name', '==', bJtSpec.name)|list}}"
+    when: bJtSpec.name is defined
+  vars:
+    bCreds: '{{rTemplateCreds|default("null", true)}}'
+    bHaveCreds: '{{bCreds.results is defined}}'
+    bAskCreds: '{{bJtSpec.ask_credential_on_launch|default(true)}}'
+
+- name: Load ICX Config Template Specs
   include_vars: tm_spec_icx_config_templates.yml
 
 - name: Create/Update ICX Config Templates

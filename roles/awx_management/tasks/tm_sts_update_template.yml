@@ -25,6 +25,8 @@
     headers: {Content-Type: "application/json"}
     body:
       description: '{{bJtSpec.description|default("", true)}}'
+      ask_credential_on_launch: '{{not bHaveCreds or bAskCreds}}'
+      use_fact_cache: '{{bJtSpec.use_fact_cache|default(false)}}'
       survey_enabled: '{{rPromptStatus.status|default(0, true) == 200}}'
       extra_vars: >-
         playbook_rev: 0.0.1

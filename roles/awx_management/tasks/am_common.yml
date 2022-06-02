@@ -2,3 +2,17 @@
 - name: Get This Template Info
   uri: {url: '{{AwxApi}}/job_templates/{{awx_job_template_id}}/'}
   register: rThisTemplate
+
+- name: Store Credentials
+  block:
+  - name: Get Credentials
+    uri:
+      url: '{{AwxApi}}/job_templates/{{rThisTemplate.json.id}}/credentials/'
+    register: rThisTemplateCreds
+
+  - name: Store Credentials
+    set_fact: {Credential: "id: {{rThisTemplateCreds.json.results[idx].id}}"}
+    loop: "{{range(0, rThisTemplateCreds.json.results|length)|list}}"
+    loop_control: {index_var: idx}
+    register: rTemplateCreds
+  when: not rThisTemplate.json.ask_credential_on_launch

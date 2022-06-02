@@ -7,18 +7,29 @@
     url: '{{AwxApi}}/job_templates/'
     method: POST
     headers: {Content-Type: "application/json"}
-    body: "{{tTemplateStruct}}"
+    body:
+      name: '{{bJtSpec.name}}'
+      project: '{{rThisTemplate.json.project}}'
+      inventory: '{{bJtSpec.inventory|default("")}}'
+      playbook: '{{bJtSpec.playbook}}'
+      ask_inventory_on_launch: '{{tAskInv}}'
+      ask_limit_on_launch: '{{bJtSpec.ask_limit_on_launch|default(true)}}'
     body_format: json
     status_code: 201
   register: rNewJt
-  vars:
-    tTemplateStruct:
-      name: '{{bJtSpec.name}}'
-      project: '{{rThisTemplate.json.project}}'
-      playbook: '{{bJtSpec.playbook}}'
-      ask_credential_on_launch: true
-      ask_inventory_on_launch: '{{prompt_ask_inventory_on_launch|default(true)}}'
-      ask_limit_on_launch: true
+  vars: {tAskInv: '{{bJtSpec.inventory|default("null", true) == "null"}}'}
+
+- name: Copy Credentials
+  uri:
+    url: '{{AwxApi}}/job_templates/{{rNewJt.json.id}}/credentials/'
+    method: POST
+    headers: {Content-Type: "application/json"}
+    body: '{{bCreds.results[idx].ansible_facts.Credential|from_yaml}}'
+    body_format: json
+    status_code: 204
+  loop: '{{range(0, bCreds.results|length)|list}}'
+  loop_control: {index_var: idx}
+  when: bHaveCreds
 
 - name: Add Template to "Created" List
   set_fact:

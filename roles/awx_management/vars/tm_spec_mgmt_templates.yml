@@ -1,0 +1,38 @@
+awx_tmplt_mgmt_survey:
+- question_name: 'Template management function:'
+  required: false
+  type: multiplechoice
+  variable: prompt_mgmt_role
+  choices: |-
+    Create/Update Templates
+    Remove ICX Config Templates
+
+
+img_mgmt_survey:
+- question_name: 'Image Repository Path:'
+  required: true
+  type: text
+  variable: prompt_imgrepo_path
+  default: '/opt/Images'
+
+
+mgmt_template_specs:
+- name: AWX-Template-Management
+  description: Create/update or remove templates.
+  playbook: AWX-Template-Management.yml
+  inventory: '{{awx_inventory_id}}'
+  ask_credential_on_launch: false
+  ask_limit_on_launch: false
+  use_fact_cache: true
+  survey_spec: '{{awx_tmplt_mgmt_survey}}'
+
+- name: Image-Management
+  description: Create image repo, import images and create/update file list.
+  playbook: Image-Management.yml
+  inventory: '{{awx_inventory_id}}'
+  ask_credential_on_launch: false
+  ask_limit_on_launch: false
+  use_fact_cache: true
+  survey_spec: '{{img_mgmt_survey}}'
+
+mgmt_templates: '{{mgmt_template_specs}}'
