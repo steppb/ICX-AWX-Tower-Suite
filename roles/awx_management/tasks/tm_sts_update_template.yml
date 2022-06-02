@@ -16,6 +16,7 @@
     body: {name: '', description: '', spec: '{{bJtSpec.survey_spec}}'}
     body_format: json
   register: rPromptStatus
+  when: bJtSpec.survey_spec|default("null", true) != "null"
 
 - name: Update Template Options
   uri:
