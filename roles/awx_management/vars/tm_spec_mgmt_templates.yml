@@ -18,6 +18,7 @@ img_mgmt_survey:
 
 mgmt_template_specs:
 - name: AWX-Template-Management
+  playbook_rev: 0.1.0
   description: Create/update or remove templates.
   playbook: AWX-Template-Management.yml
   inventory: '{{awx_inventory_id}}'
@@ -27,6 +28,7 @@ mgmt_template_specs:
   survey_spec: '{{awx_tmplt_mgmt_survey}}'
 
 - name: Image-Management
+  playbook_rev: 0.1.0
   description: Create image repo, import images and create/update file list.
   playbook: Image-Management.yml
   inventory: '{{awx_inventory_id}}'
