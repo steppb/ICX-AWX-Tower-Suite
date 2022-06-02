@@ -1,166 +1,1227 @@
+icx_config_templates:
 - name: Hardware-Interface-100FX
   description: Enable/Disable 100BaseFX support on a fiber port.
   playbook: icx_config_playbooks/Hardware-Interface-100FX.yml
+  survey_spec:
+  - question_name: 'Enable/Disable 100BaseFX support:'
+    required: true
+    type: multiplechoice
+    variable: prompt_100fx_enable
+    default: Enable
+    choices: |-
+      Enable
+      Disable
+  - question_name: 'Interface or Range:'
+    question_description: (e.g. eth 1/1/1 or eth 1/1/2 to 1/1/4 for range)
+    required: true
+    type: text
+    variable: prompt_100fx_int
+    min: 3
+    max: 1024
 
 - name: L2-MSTP-Config
   description: Setup and start initial MSTP configuration.
+  comments: |
+    # =====================
+    # Note: This template needs to be run before running other L2-MSTP templates.
   playbook: icx_config_playbooks/L2-MSTP-Config.yml
+  survey_spec:
+  - question_name: 'MSTP Name:'
+    question_description: Enter the MSTP configuration name
+    required: true
+    type: text
+    variable: prompt_l2_mstpname
+    min: 0
+    max: 1024
+  - question_name: 'MSTP Revision:'
+    question_description: Enter the MSTP revision level
+    required: true
+    type: integer
+    variable: prompt_l2_mstprev
+    min: 0
+    max: 65535
+    default: 0
+  - question_name: 'MSTP Instance ID:'
+    question_description: Enter the MSTP Instance ID
+    required: true
+    type: integer
+    variable: prompt_inst
+    min: 0
+    max: 4094
+    default: 0
+  - question_name: 'MSTP VLAN Range:'
+    question_description: Single VLAN or range to add to the MSTP instance.
+    required: true
+    type: text
+    variable: prompt_vlans
+    min: 0
+    max: 1024
+    default: 1-4000
 
 - name: L2-MSTP-Instance
   description: Configure MSTP instance priority.
+  comments: |
+    # =====================
+    # Note: L2-MSTP-Config template needs to be applied before running this template.
   playbook: icx_config_playbooks/L2-MSTP-Instance.yml
+  survey_spec:
+  - question_name: 'MSTI ID:'
+    question_description: 'Enter the MSTP Instance ID:'
+    required: true
+    type: integer
+    variable: prompt_l2_mstpinst
+    min: 0
+    max: 4094
+  - question_name: 'MSTI Priority:'
+    question_description: Enter the MSTP Instance Priority (0 to 61440 in increments of 4096)
+    required: true
+    type: integer
+    variable: prompt_l2_mstppri
+    min: 0
+    max: 61440
 
 - name: L2-MSTP-Interface
   description: Configure interfaces as MSTP admin-edge or point-to-point ports.
+  comments: |
+    # =====================
+    # Note: L2-MSTP-Config template needs to be applied before running this template.
+    #       Only interfaces in an MSTP VLAN will be added to config.
   playbook: icx_config_playbooks/L2-MSTP-Interface.yml
+  survey_spec:
+  - question_name: 'MSTP Point-to-Point Interface(s):'
+    question_description: (e.g. e 1/1/1 or e1/1/1 to 1/1/24)
+    required: false
+    type: text
+    variable: prompt_mstp_p2pint
+    min: 3
+    max: 1024
+  - question_name: 'MSTP Edge Interface(s):'
+    question_description: (e.g. e1/1/1 or e1/1/1 to 1/1/24)
+    required: false
+    type: text
+    variable: prompt_mstp_edgeint
+    min: 3
+    max: 1024
 
 - name: L2-MSTP-VLAN
   description: Add VLAN(s) to MSTP Instance.
+  comments: |
+    # =====================
+    # Note: L2-MSTP-Config template needs to be applied before running this template.
   playbook: icx_config_playbooks/L2-MSTP-VLAN.yml
+  survey_spec:
+  - question_name: 'MSTI ID:'
+    question_description: Enter the MSTP Instance ID
+    required: true
+    type: integer
+    variable: prompt_l2_mstpinst
+    min: 0
+    max: 4094
+  - question_name: 'MSTP VLAN ID:'
+    question_description: Enter a single VLAN or a VLAN range to add to MSTI. (e.g. 1 to 100)
+    required: true
+    type: text
+    variable: prompt_l2_mstpvlan
+    min: 0
+    max: 1024
 
 - name: L2-STP-BPDUGuard
   description: Enable/Disable STP BPDU guard on an interface.
   playbook: icx_config_playbooks/L2-STP-BPDUGuard.yml
+  survey_spec:
+  - question_name: 'Enable/Disable STP BPDU Guard:'
+    required: true
+    type: multiplechoice
+    variable: prompt_stp_bpduguard_enable
+    default: Enable
+    choices: |-
+      Enable
+      Disable
+  - question_name: 'Interface or Range:'
+    question_description: (e.g. eth 1/1/1 or eth 1/1/2 to 1/1/4 for range)
+    required: true
+    type: text
+    variable: prompt_stp_bpduguard_int
+    min: 3
+    max: 1024
 
 - name: L2-STP-DesignatedProtect
   description: Enable/Disable Spanning-tree designated-protect on an interface.
   playbook: icx_config_playbooks/L2-STP-DesignatedProtect.yml
+  survey_spec:
+  - question_name: 'Enable/Disable STP Designated-Protect:'
+    required: true
+    type: multiplechoice
+    variable: prompt_stp_dp_enable
+    default: Enable
+    choices: |-
+      Enable
+      Disable
+  - question_name: 'Interface or Range:'
+    question_description: (e.g. eth 1/1/1 or eth 1/1/2 to 1/1/4 for range)
+    required: true
+    type: text
+    variable: prompt_stp_dp_int
+    min: 3
+    max: 1024
 
 - name: L2-STP-FastUplinkSpan
   description: Enable/Disable Fast Uplink Span for interface(s).
   playbook: icx_config_playbooks/L2-STP-FastUplinkSpan.yml
+  survey_spec:
+  - question_name: 'Enable/Disable Fast Uplink Span:'
+    required: true
+    type: multiplechoice
+    variable: prompt_stp_fastuplink
+    default: Enable
+    choices: |-
+      Enable
+      Disable
+  - question_name: 'Ethernet or LAG interface(s):'
+    question_description: (e.g. e 1/1/1, e 1/1/2 to 1/1/5, lag 10, lag 11 to 15)
+    required: true
+    type: text
+    variable: prompt_stp_fastuplink_int
+    min: 3
+    max: 1024
 
 - name: L2-VLAN-Config
   description: Add or modify VLAN.
   playbook: icx_config_playbooks/L2-VLAN-Config.yml
+  survey_spec:
+  - question_name: 'VLAN ID:'
+    required: true
+    type: integer
+    variable: prompt_l2_vid
+    min: 1
+    max: 4086
+  - question_name: 'VLAN Name:'
+    required: false
+    type: text
+    variable: prompt_l2_vname
+    min: 1
+    max: 1024
+  - question_name: 'Tagged Interface(s):'
+    question_description: (e.g. e1/1/1 or e1/1/1 to 1/1/10)
+    required: false
+    type: text
+    variable: prompt_l2_vinttag
+    min: 3
+    max: 1024
+  - question_name: 'Untagged Interface(s):'
+    question_description: (e.g. e1/1/1 or e1/1/1 to 1/1/10)
+    required: false
+    type: text
+    variable: prompt_l2_vintuntag
+    min: 3
+    max: 1024
+  - question_name: 'Remove Interface(s) From VLAN?'
+    required: false
+    type: multiplechoice
+    variable: prompt_l2_vremove
+    default: 'no'
+    choices: |-
+      yes
+      no
+  - question_name: 'Create Router Interface?'
+    required: false
+    type: multiplechoice
+    variable: prompt_l2_vrtr
+    default: 'no'
+    choices: |-
+      yes
+      no
+  - question_name: 'Spanning-Tree Protocol:'
+    required: false
+    type: multiplechoice
+    variable: prompt_l2_vstp
+    choices: |-
+      Disable
+      802.1d
+      802.1w
 
 - name: L2-VLAN-Default
   description: Configure default VLAN.
+  comments: |
+    # =====================
+    # Note: If using MSTP, both the old default VLAN and the new default VLAN will need
+    #       to either be in the same MSTP instance or not in any MSTP instance.
   playbook: icx_config_playbooks/L2-VLAN-Default.yml
+  survey_spec:
+  - question_name: 'Default VLAN:'
+    required: true
+    type: integer
+    variable: prompt_l2_vlandefault
+    min: 1
+    max: 4086
 
 - name: L2-VLAN-DefaultDisablePorts
   description: Disable all L2 ports in the default or user-specified VLAN.
   playbook: icx_config_playbooks/L2-VLAN-DefaultDisablePorts.yml
+  survey_spec:
+  - question_name: 'VLAN ID:'
+    question_description: (Leave blank to disable L2 ports in default VLAN)
+    required: false
+    type: integer
+    variable: prompt_l2_vlanid
+    min: 1
+    max: 4086
+  - question_name: 'Disabled Port Name:'
+    required: false
+    type: text
+    variable: prompt_l2_disabled_port_desc
+    min: 1
+    max: 1024
+    default: 'DISABLED'
 
 - name: L3-IPv4-ACL
   description: Create or replace IPv4 Access-List.
+  comments: |
+    # =====================
+    # Note: If the ACL already exists, it will be replaced with the access-list entered
+    #       into the survey prompt.
+    #
+    # Note: The 'ssh access-group ###' command will be removed and re-added if it matches
+    #       the access-list name or number entered in the prompt.  This is to avoid a
+    #       lockout when applying the access-list.
+    #
+    # Note: Only the ssh access-group will be checked.  A lockout can occur if the
+    #       access-list being applied is tied to a router interface.
   playbook: icx_config_playbooks/L3-IPv4-ACL.yml
+  survey_spec:
+  - question_name: 'IPv4 Access-List Name or Number:'
+    required: true
+    type: text
+    variable: prompt_ipv4_acl_name
+    min: 1
+    max: 1024
+  - question_name: 'IPv4 Access-List Type:'
+    required: true
+    type: multiplechoice
+    variable: prompt_ipv4_acl_type
+    choices: |-
+      standard
+      extended
+  - question_name: 'IPv4 Access-List:'
+    required: true
+    type: textarea
+    variable: prompt_ipv4_acl
+    min: 0
+    max: 100000
 
 - name: L3-IPv4-DefaultRoute
   description: Configure default route.
   playbook: icx_config_playbooks/L3-IPv4-DefaultRoute.yml
+  survey_spec:
+  - question_name: 'Default Router IPv4 Address:'
+    required: true
+    type: text
+    variable: prompt_ipv4_defrtr
+    min: 7
+    max: 15
+  - question_name: OSPF Default Information Originate
+    question_description: 'Include default route in OSPF updates?'
+    required: true
+    type: multiplechoice
+    variable: prompt_ipv4_ospf_definfo
+    min: null
+    max: null
+    default: 'no'
+    choices: |-
+      yes
+      no
 
 - name: L3-IPv4-Interface
   description: Add/Remove/Replace IPv4 address on interface.
+  comments: |
+    # =====================
+    # Note: If template is run on more than one switch, the 'host_icx_int' variable
+    #       needs to be defined for each host in the 'VARIABLES' section of the
+    #       AWX Inventory Host page.
+    #       To remove an IP address from the interface, define the 'iface' field and
+    #       leave the 'ipv4.addr' field blank.
+    #       Playbook will not configure interfaces if the IP address matches the
+    #       IP defined in 'ansible_host'.
+    #       Prompt variables will be ignored if more than one host is in the play.
+    #       Host variables will take precedence over prompt variables if only one host
+    #       is in play.
+    #
+    # host_icx_int examples:
+    #
+    # Adding multiple IP interfaces:
+    # ------------------------------
+    # host_icx_int:
+    #   - iface: e1/1/2
+    #     ipv4:
+    #       addr: 10.10.200.1
+    #       mask: 255.255.255.0
+    #   - iface: ve20
+    #     ipv4:
+    #       addr: 192.168.200.1
+    #       mask: 255.255.255.0
+    # ------------------------------
+    #
+    # Removing IP address from interface:
+    # -----------------------------------
+    # host_icx_int:
+    #   - iface: e1/1/2
+    #     ipv4:
+    #       addr:
+    #       mask:
+    # -----------------------------------
   playbook: icx_config_playbooks/L3-IPv4-Interface.yml
+  survey_spec:
+  - question_name: 'IP Interface (For single host deployment):'
+    question_description: Enter the interface to configure as L3 (e.g. ve20 or e1/1/1)
+    required: false
+    type: text
+    variable: prompt_rtr_int
+    min: 1
+    max: 1024
+  - question_name: 'IPv4 Address:'
+    required: false
+    type: text
+    variable: prompt_rtr_int_ip
+    min: 7
+    max: 15
+  - question_name: 'Subnet Mask:'
+    question_description: (e.g. 255.255.255.0)
+    required: false
+    type: text
+    variable: prompt_rtr_int_mask
+    min: 7
+    max: 15
 
 - name: L3-IPv4-MCastPIM
   description: Enable IPv4 PIM routing.
+  comments: |
+    # =====================
+    # Note: This template needs to be applied before running other IPv4 PIM templates.
   playbook: icx_config_playbooks/L3-IPv4-MCastPIM.yml
 
 - name: L3-IPv4-MCastPIMFilter
   description: Configure IP PIM Neighbor-Filter ACL.
+  comments: |
+    # =====================
+    # Note: The following templates need to be applied before running this template:
+    #       L3-IPv4-MCastPIM
+    #       L3-IPv4-MCastPIMInterface
   playbook: icx_config_playbooks/L3-IPv4-MCastPIMFilter.yml
+  survey_spec:
+  - question_name: 'PIM Interface:'
+    question_description: Enter the PIM Interface (e.g. ve20 or e1/1/1)
+    required: true
+    type: text
+    variable: prompt_pimint
+    min: 0
+    max: 1024
+  - question_name: 'PIM ACL:'
+    question_description: Enter the ACL Name or Number
+    required: true
+    type: text
+    variable: prompt_pimacl
+    min: 0
+    max: 1024
+    default: '86'
 
 - name: L3-IPv4-MCastPIMInterface
   description: Enable IPv4 PIM-Sparse on a router interface.
+  comments: |
+    # =====================
+    # Note: L3-IPv4-MCastPIM needs to be applied before running this template.
   playbook: icx_config_playbooks/L3-IPv4-MCastPIMInterface.yml
+  survey_spec:
+  - question_name: 'PIM Interface:'
+    question_description: Enter the Interface (e.g. ve20 or e1/1/1)
+    required: true
+    type: text
+    variable: prompt_pimint
+    min: 0
+    max: 1024
 
 - name: L3-IPv4-OSPFGlobal
   description: Configure OSPF area.
+  comments: |
+    # =====================
+    # Note: In addition to creating a new OSPF area, the following OSPF options
+    #       are also applied:
+    #       
+    #       auto-cost reference-bandwidth 10000
+    #       graceful-restart restart-time 60
+    #       log adjacency
+    #       redistribute connected
   playbook: icx_config_playbooks/L3-IPv4-OSPFGlobal.yml
+  survey_spec:
+  - question_name: 'OSPF Area ID:'
+    required: true
+    type: text
+    variable: prompt_ipv4_ospf_area
+    min: 1
+    max: 1024
 
 - name: L3-IPv4-OSPFInt
   description: Configure OSPF interface.
+  comments: |
+    # =====================
+    # Note: OSPF Area needs to be created globally with 'L3-IPv4-OSPFGlobal' before
+    #       running this template.
   playbook: icx_config_playbooks/L3-IPv4-OSPFInt.yml
+  survey_spec:
+  - question_name: 'OSPF Area:'
+    required: true
+    type: text
+    variable: prompt_rtr_ospf_area
+    min: 1
+    max: 1024
+  - question_name: 'Interface:'
+    question_description: (e.g. e1/1/2 or ve20)
+    required: true
+    type: text
+    variable: prompt_rtr_int
+    min: 1
+    max: 1024
+  - question_name: 'OSPF Retransmit-Interval:'
+    required: false
+    type: integer
+    variable: prompt_rtr_ospf_retrans
+    min: 0
+    max: 3600
+    default: 5
+  - question_name: 'OSPF Transmit Delay:'
+    required: false
+    type: integer
+    variable: prompt_rtr_ospf_transdelay
+    min: 0
+    max: 3600
+    default: 1
+  - question_name: 'OSPF Authentication Key ID:'
+    required: false
+    type: integer
+    variable: prompt_rtr_ospf_keyid
+    min: 1
+    max: 255
+  - question_name: 'OSPF MD5 Authentication Key:'
+    required: false
+    type: password
+    variable: prompt_rtr_ospf_md5key
+    min: 1
+    max: 16
 
 - name: L3-IPv4-ProxyArp
   description: Enable/Disable proxy-arp for an interface.
   playbook: icx_config_playbooks/L3-IPv4-ProxyArp.yml
+  survey_spec:
+  - question_name: 'Enable/Disable Proxy-ARP:'
+    required: true
+    type: multiplechoice
+    variable: prompt_ipv4_pxyarp
+    default: Disable
+    choices: |-
+      Enable
+      Disable
+  - question_name: 'Interface:'
+    question_description: (e.g. eth 1/1/1 or ve 20)
+    required: true
+    type: text
+    variable: prompt_ipv4_pxyarp_int
+    min: 3
+    max: 1024
 
 - name: L3-IPv4-Redirects
   description: Enable/Disable IPv4 ICMP redirects on a Virtual Interface.
   playbook: icx_config_playbooks/L3-IPv4-Redirects.yml
+  survey_spec:
+  - question_name: 'Enable or Disable ICMP Redirects:'
+    required: true
+    type: multiplechoice
+    variable: prompt_ipv4_redirect
+    default: Disable
+    choices: |-
+      Enable
+      Disable
+  - question_name: 'Virtual Interface:'
+    question_description: (e.g. ve 10)
+    required: true
+    type: text
+    variable: prompt_ipv4_redirect_int
+    min: 2
+    max: 1024
 
 - name: L3-IPv4-VRRP
   description: Add or modify VRRP VRID on interface.
+  comments: |
+    # =====================
+    # Note: If template is run on more than one switch, the 'host_icx_int' variable
+    #       needs to be defined for each host in the 'VARIABLES' section of the
+    #       AWX Inventory Host page.
+    #
+    #       Prompt variables will be ignored if more than one host is in the play.
+    #       Host variables will take precedence over prompt variables if only one host
+    #       is in play.
+    #       VRRP address for an 'owner' router will be automatically set to the interface
+    #       IPv4 address.
+    #
+    # host_icx_int examples:
+    #
+    # Add owner VRRP router interface (Required Variables)
+    # ----------------------------------------------------
+    # host_icx_int:
+    #   - iface: ve997
+    #     ipv4:
+    #       addr: 10.10.97.1
+    #       mask: 255.255.255.0
+    #       vrrp:
+    #         vrid: 97
+    #         mode: owner
+    # ----------------------------------------------------
+    #
+    # Add backup VRRP router interface (Required Variables)
+    # -----------------------------------------------------
+    # host_icx_int:
+    #   - iface: e1/1/2
+    #     ipv4:
+    #       addr: 10.10.97.2
+    #       mask: 255.255.255.0
+    #       vrrp:
+    #         vrid: 97
+    #         addr: 10.10.97.1
+    #         mode: backup
+    # -----------------------------------------------------
+    #
+    # Add VRRP router interface (With Optional Variables)
+    # ---------------------------------------------------
+    # host_icx_int:
+    #   - iface: e1/1/2
+    #     ipv4:
+    #       addr: 10.10.97.2
+    #       mask: 255.255.255.0
+    #       vrrp:
+    #         vrid: 97
+    #         addr: 10.10.97.1
+    #         mode: backup
+    #         priority: 150
+    #         version: v3
+    #         v2_checksum: true
+    # --------------------------------------------------
   playbook: icx_config_playbooks/L3-IPv4-VRRP.yml
+  survey_spec:
+  - question_name: 'L3 Interface:'
+    question_description: (e.g. e1/1/1 or ve20)
+    required: false
+    type: text
+    variable: prompt_rtr_vrrp_int
+    min: 1
+    max: 1024
+  - question_name: 'VRRP VRID:'
+    required: false
+    type: integer
+    variable: prompt_rtr_vrrp_vrid
+    min: 1
+    max: 255
+  - question_name: 'VRRP Router Mode:'
+    required: false
+    type: multiplechoice
+    variable: prompt_rtr_vrrp_mode
+    choices: |-
+      backup
+      owner
+  - question_name: 'VRRP IPv4 Address:'
+    required: false
+    type: text
+    variable: prompt_rtr_vrrp_ip
+    min: 7
+    max: 15
+  - question_name: 'VRRP Priority:'
+    required: false
+    type: integer
+    variable: prompt_rtr_vrrp_ownerpri
+    min: 1
+    max: 254
+  - question_name: 'VRRP Version:'
+    required: false
+    type: multiplechoice
+    variable: prompt_rtr_vrrp_version
+    choices: |-
+      v2
+      v3
+  - question_name: 'Use VRRPv2 Checksum?'
+    question_description: (only valid with VRRPv3)
+    required: false
+    type: multiplechoice
+    variable: prompt_rtr_vrrp_v2checksum
+    choices: |-
+      yes
+      no
 
 - name: L3-IPv6-CacheLifetime
   description: Configure the IPv6 cache-aging lifetime.
   playbook: icx_config_playbooks/L3-IPv6-CacheLifetime.yml
+  survey_spec:
+  - question_name: 'IPv6 Cache-Lifetime:'
+    question_description: (in seconds)
+    required: true
+    type: integer
+    variable: prompt_ipv6_cache
+    min: 0
+    max: 4294967295
+    default: 0
 
 - name: L3-IPv6-DefaultRoute
   description: Configure default IPv6 route.
   playbook: icx_config_playbooks/L3-IPv6-DefaultRoute.yml
+  survey_spec:
+  - question_name: 'Default Router IPv6 Address:'
+    required: true
+    type: text
+    variable: prompt_ipv6_defrtr
+    min: 1
+    max: 1024
 
 - name: L3-IPv6-Interface
   description: Add/Remove/Replace IPv6 address on interface.
+  comments: |
+    # =====================
+    # Note: If template is run on more than one switch, the 'host_icx_int' variable
+    #       needs to be defined for each host in the 'VARIABLES' section of the
+    #       AWX Inventory Host page.
+    #       To remove an IP address from the interface, define the 'iface' field and
+    #       leave the 'ipv6.addr' field blank.
+    #       Playbook will not configure interfaces if the IP address matches the IP
+    #       defined in 'ansible_host'.
+    #       Prompt variables will be ignored if more than one host is in the play.
+    #       Host variables will take precedence over prompt variables if only one host
+    #       is in play.
+    #       'ipv6.addr' field requires both the address and mask. (e.g. fc02::1/64)
+    #
+    # host_icx_int examples:
+    #
+    # Adding multiple IP interfaces:
+    # ------------------------------
+    # host_icx_int:
+    #   - iface: e1/3/1
+    #     ipv6:
+    #       addr: fc01::1/64
+    #   - iface: ve997
+    #     ipv6:
+    #       addr: fc02::1/64
+    # ------------------------------
+    #
+    # Removing IP address from interface:
+    # -----------------------------------
+    # host_icx_int:
+    #   - iface: e1/3/1
+    #     ipv6:
+    #       addr:
+    # -----------------------------------
   playbook: icx_config_playbooks/L3-IPv6-Interface.yml
+  survey_spec:
+  - question_name: 'IP Interface (For single host deployment):'
+    question_description: Enter the interface to configure as L3 (e.g. ve20 or e1/1/1)
+    required: false
+    type: text
+    variable: prompt_rtr_int
+    min: 1
+    max: 1024
+  - question_name: 'IPv6 Address and Mask:'
+    question_description: (e.g. fc01::1/64)
+    required: false
+    type: text
+    variable: prompt_rtr_int_ip
+    min: 0
+    max: 1024
 
 - name: L3-IPv6-MCastPIM
   description: Enable IPv6 PIM routing.
+  comments: |
+    # =====================
+    # Note: This template needs to be applied before running other IPv6 PIM templates
   playbook: icx_config_playbooks/L3-IPv6-MCastPIM.yml
 
 - name: L3-IPv6-MCastPIMFilter
   description: Configure IPv6 PIM Neighbor-Filter ACL.
+  comments: |
+    # =====================
+    # Note: The following templates need to be applied before running this template:
+    #       L3-IPv6-MCastPIM
+    #       L3-IPv6-MCastPIMInterface
   playbook: icx_config_playbooks/L3-IPv6-MCastPIMFilter.yml
+  survey_spec:
+  - question_name: 'PIM Interface:'
+    question_description: (e.g. ve20 or e1/1/1)
+    required: true
+    type: text
+    variable: prompt_pimint
+    min: 0
+    max: 1024
+  - question_name: 'PIM ACL Name:'
+    required: true
+    type: text
+    variable: prompt_pimacl
+    min: 0
+    max: 1024
+    default: NoRemoteAccess
 
 - name: L3-IPv6-MCastPIMInterface
   description: Enable IPv6 PIM-Sparse on a router interface.
+  comments: |
+    # =====================
+    # Note: L3-IPv6-MCastPIM needs to be applied before running this template.
   playbook: icx_config_playbooks/L3-IPv6-MCastPIMInterface.yml
+  survey_spec:
+  - question_name: 'PIM Interface:'
+    question_description: (e.g. ve20 or e1/1/1)
+    required: true
+    type: text
+    variable: prompt_pimint
+    min: 0
+    max: 1024
 
 - name: L3-IPv6-OSPFGlobal
   description: Configure OSPFv3 area.
   playbook: icx_config_playbooks/L3-IPv6-OSPFGlobal.yml
+  survey_spec:
+  - question_name: 'OSPFv3 Area:'
+    required: true
+    type: text
+    variable: prompt_rtr_ospfv3_area
+    min: 0
+    max: 1024
 
 - name: L3-IPv6-OSPFInt
   description: Configure OSPFv3 interface.
+  comments: |
+    # =====================
+    # Note: OSPFv3 Area needs to be created globally with 'L3-IPv6-OSPFGlobal'
+    #       before running this template.
   playbook: icx_config_playbooks/L3-IPv6-OSPFInt.yml
+  survey_spec:
+  - question_name: 'OSPFv3 Area:'
+    required: true
+    type: text
+    variable: prompt_rtr_ospfv3_area
+    min: 0
+    max: 1024
+  - question_name: 'Interface:'
+    question_description: (e.g. e1/1/2 or ve20)
+    required: true
+    type: text
+    variable: prompt_rtr_int
+    min: 0
+    max: 1024
+  - question_name: 'OSPFv3 Retransmit-Interval:'
+    required: false
+    type: integer
+    variable: prompt_rtr_ospfv3_retrans
+    min: 0
+    max: 3600
+    default: 5
+  - question_name: 'OSPFv3 Transmit-Delay:'
+    required: false
+    type: integer
+    variable: prompt_rtr_ospfv3_transdelay
+    min: 0
+    max: 3600
+    default: 1
+  - question_name: 'OSPFv3 IPSec Auth Security Parameter Index:'
+    required: false
+    type: integer
+    variable: prompt_rtr_ospfv3_ipsec_spi
+    min: 256
+    max: 4294967295
+  - question_name: 'OSPFv3 IPSec Auth SHA1 Key:'
+    question_description: (40 character hex key)
+    required: false
+    type: password
+    variable: prompt_rtr_ospfv3_ipsec_key
+    min: 40
+    max: 40
 
 - name: L3-IPv6-Redirects
   description: Enable/Disable IPv6 ICMP redirects on a Virtual Interface.
   playbook: icx_config_playbooks/L3-IPv6-Redirects.yml
+  survey_spec:
+  - question_name: 'Enable or Disable ICMP Redirects:'
+    required: true
+    type: multiplechoice
+    variable: prompt_ipv6_redirect
+    default: Disable
+    choices: |-
+      Enable
+      Disable
+  - question_name: 'Virtual Interface:'
+    question_description: (e.g. ve 10)
+    required: true
+    type: text
+    variable: prompt_ipv6_redirect_int
+    min: 2
+    max: 1024
 
 - name: L3-IPv6-VRRP
   description: Add or modify VRRPv3 VRID on interface.
+  comments: |
+    # =====================
+    # Note: If template is run on more than one switch, the 'host_icx_int' variable
+    #       needs to be defined for each host in the 'VARIABLES' section of the
+    #       AWX Inventory Host page.
+    #       Prompt variables will be ignored if more than one host is in the play.
+    #       Host variables will take precedence over prompt variables if only one host
+    #       is in play.
+    #       VRRPv3 address for an 'owner' router will be automatically set to the
+    #       interface IPv6 address.
+    #       Backup router has an optional 'priority' variable that can be set.
+    #
+    #
+    # host_icx_int examples:
+    #
+    # Add Owner VRRPv3 Router Interface (Required Variables)
+    # ----------------------------------------------------
+    # host_icx_int:
+    #   - iface: ve997
+    #     ipv6:
+    #       addr: fc02::1/64
+    #       vrrp:
+    #         vrid: 97
+    #         mode: owner
+    # ----------------------------------------------------
+    #
+    # Add Backup VRRPv3 Router Interface (Required Variables)
+    # -----------------------------------------------------
+    # host_icx_int:
+    #   - iface: ve997
+    #     ipv6:
+    #       addr: fc02::2/64
+    #       vrrp:
+    #         vrid: 97
+    #         addr: fc02::1
+    #         mode: backup
+    # -----------------------------------------------------
+    #
+    # Add VRRP router interface (With Optional 'priority' Variable)
+    # ---------------------------------------------------
+    # host_icx_int:
+    #   - iface: ve 997
+    #     ipv6:
+    #       addr: fc02::2/64
+    #       vrrp:
+    #         vrid: 97
+    #         addr: fc02::1
+    #         mode: backup
+    #         priority: 150
+    # --------------------------------------------------
   playbook: icx_config_playbooks/L3-IPv6-VRRP.yml
+  survey_spec:
+  - question_name: 'L3 Interface:'
+    question_description: (e.g. e1/1/1 or ve20)
+    required: false
+    type: text
+    variable: prompt_rtr_vrrpv3_int
+    min: 1
+    max: 1024
+  - question_name: 'VRRPv3 VRID:'
+    required: false
+    type: integer
+    variable: prompt_rtr_vrrpv3_vrid
+    min: 1
+    max: 255
+  - question_name: 'VRRPv3 Router Mode:'
+    required: false
+    type: multiplechoice
+    variable: prompt_rtr_vrrpv3_mode
+    choices: |-
+      backup
+      owner
+  - question_name: 'VRRPv3 IPv6 Address:'
+    required: false
+    type: text
+    variable: prompt_rtr_vrrpv3_ip
+    min: 1
+    max: 1024
+  - question_name: 'VRRPv3 Priority:'
+    required: false
+    type: integer
+    variable: prompt_rtr_vrrpv3_priority
+    min: 1
+    max: 254
 
 - name: LAG-Interface-Add
   description: Create and deploy a new LAG.
   playbook: icx_config_playbooks/LAG-Interface-Add.yml
+  survey_spec:
+  - question_name: 'New LAG Name:'
+    required: true
+    type: text
+    variable: prompt_lag_name
+    min: 1
+    max: 64
+  - question_name: 'LAG Mode:'
+    required: true
+    type: multiplechoice
+    variable: prompt_lag_mode
+    choices: |-
+      dynamic
+      static
+      keep-alive
+  - question_name: 'LAG ID:'
+    required: false
+    type: integer
+    variable: prompt_lag_id
+    min: 0
+    max: 2047
+  - question_name: 'LAG Interface(s):'
+    question_description: (e.g. e 1/1/1 e 1/1/2)
+    required: true
+    type: text
+    variable: prompt_lag_int
+    min: 3
+    max: 1024
 
 - name: LAG-Interface-Enable
   description: Enable a disabled LAG interface.
+  comments: |
+    # =====================
+    # Note: LAG-Interface-Add needs to be applied before running this template.
   playbook: icx_config_playbooks/LAG-Interface-Enable.yml
+  survey_spec:
+  - question_name: 'LAG Name:'
+    required: true
+    type: text
+    variable: prompt_lag_name
+    min: 1
+    max: 64
+  - question_name: 'LAG Interface(s):'
+    question_description: (e.g. e 1/1/1 e 1/1/2 or e 1/1/3 to 1/1/4 for range)
+    required: true
+    type: text
+    variable: prompt_lag_int
+    min: 3
+    max: 1024
 
 - name: LAG-Interface-Name
   description: Set the port-name of a LAG port.
+  comments: |
+    # =====================
+    # Note: LAG-Interface-Add needs to be applied before running this template.
   playbook: icx_config_playbooks/LAG-Interface-Name.yml
+  survey_spec:
+  - question_name: 'LAG Name:'
+    required: true
+    type: text
+    variable: prompt_lag_name
+    min: 1
+    max: 64
+  - question_name: 'LAG Port:'
+    question_description: (e.g. 1/1/1)
+    required: true
+    type: text
+    variable: prompt_lag_port
+    min: 5
+    max: 8
+  - question_name: 'LAG Port Name:'
+    required: true
+    type: text
+    variable: prompt_lag_portname
+    min: 0
+    max: 1024
 
 - name: PortSec-FlexAuth-Global
   description: Configure 802.1X global settings.
   playbook: icx_config_playbooks/PortSec-FlexAuth-Global.yml
+  survey_spec:
+  - question_name: '802.1X Default Authentication VLAN:'
+    required: false
+    type: integer
+    variable: prompt_flexauth_def_vlan
+    min: 1
+    max: 4086
+  - question_name: 'Enable Reauthentication?'
+    required: false
+    type: multiplechoice
+    variable: prompt_flexauth_reauth
+    choices: |-
+      yes
+      no
+  - question_name: 'Reauthentication-Period:'
+    question_description: (in seconds)
+    required: false
+    type: integer
+    variable: prompt_flexauth_reauth_period
+    min: 1
+    max: 4294967295
+    default: 3600
+  - question_name: '802.1X Max Number of Authentication Attempts:'
+    required: false
+    type: integer
+    variable: prompt_flexauth_max_reauth_req
+    min: 1
+    max: 10
+    default: 2
+  - question_name: '802.1X Max Number of Frame Retransmissions:'
+    required: false
+    type: integer
+    variable: prompt_flexauth_max_req
+    min: 1
+    max: 10
+    default: 2
+  - question_name: '802.1X Tx Timeout:'
+    question_description: (in seconds)
+    required: false
+    type: integer
+    variable: prompt_flexauth_timeout_tx
+    min: 1
+    max: 4294967295
+    default: 30
+  - question_name: '802.1X Timeout Quiet-Period:'
+    question_description: (in seconds)
+    required: false
+    type: integer
+    variable: prompt_flexauth_timeout_quiet
+    min: 1
+    max: 4294967295
+    default: 60
+  - question_name: '802.1X Supplicant Timeout:'
+    question_description: (in seconds)
+    required: false
+    type: integer
+    variable: prompt_flexauth_timeout_supplicant
+    min: 1
+    max: 4294967295
+    default: 30
 
 - name: PortSec-FlexAuth-Int
   description: Enable 802.1X on interface.
   playbook: icx_config_playbooks/PortSec-FlexAuth-Int.yml
+  survey_spec:
+  - question_name: 'Interface(s):'
+    question_description: (e.g. e 1/1/1 or e 1/1/2 to 1/1/4 for range)
+    required: true
+    type: text
+    variable: prompt_flexauth_int
+    min: 3
+    max: 1024
+  - question_name: 'Interface Authentication Order:'
+    required: false
+    type: multiplechoice
+    variable: prompt_flexauth_int_order
+    choices: |-
+      dot1x mac-auth
+      mac-auth dot1x
+  - question_name: 'Interface Authentication Default VLAN:'
+    required: false
+    type: integer
+    variable: prompt_flexauth_int_vlan
+    min: 1
+    max: 4086
 
 - name: PortSec-StickyMac
   description: Apply Sticky-MAC Port security to interface.
   playbook: icx_config_playbooks/PortSec-StickyMac.yml
+  survey_spec:
+  - question_name: 'Interface(s):'
+    question_description: (e.g. e 1/1/2 to 1/1/4 for range)
+    required: true
+    type: text
+    variable: prompt_portsec_int
+    min: 3
+    max: 1024
+  - question_name: 'Max number of MAC Addresess:'
+    required: false
+    type: integer
+    variable: prompt_portsec_max
+    min: 1
+    max: 64
+    default: 1
+  - question_name: 'Auto-Save Interval (In Minutes):'
+    required: false
+    type: integer
+    variable: prompt_portsec_autosave
+    min: 15
+    max: 1440
 
 - name: Remote-AAA-Accounting
   description: Configure AAA accounting for commands and/or EXEC login sessions.
   playbook: icx_config_playbooks/Remote-AAA-Accounting.yml
+  survey_spec:
+  - question_name: 'Accounting method:'
+    required: true
+    type: multiplechoice
+    variable: prompt_aaa_prim
+    choices: |-
+      radius
+      tacacs+
+  - question_name: 'Enable AAA accounting for commands?'
+    required: true
+    type: multiplechoice
+    variable: prompt_aaa_cmdacct
+    default: 'Yes'
+    choices: |-
+      Yes
+      No
+  - question_name: 'Enable AAA Accounting for EXEC Login Sessions?'
+    required: true
+    type: multiplechoice
+    variable: prompt_aaa_execacct
+    default: 'Yes'
+    choices: |-
+      Yes
+      No
 
 - name: Remote-AAA-Authentication
   description: Configure AAA authentication.
   playbook: icx_config_playbooks/Remote-AAA-Authentication.yml
+  survey_spec:
+  - question_name: 'Primary Authentication Method:'
+    required: true
+    type: multiplechoice
+    variable: prompt_aaa_prim
+    choices: |-
+      enable
+      line
+      local
+      none
+      radius
+      tacacs
+      tacacs+
+  - question_name: 'Secondary Authentication Method:'
+    question_description: Optional. Can be left blank.
+    required: false
+    type: multiplechoice
+    variable: prompt_aaa_sec
+    choices: |-
+      enable
+      line
+      local
+      none
+      radius
+      tacacs
+      tacacs+
 
 - name: Remote-AAA-Authorization
   description: Configure AAA authorization for commands and EXEC sessions.
   playbook: icx_config_playbooks/Remote-AAA-Authorization.yml
+  survey_spec:
+  - question_name: 'Authorization Method:'
+    required: true
+    type: multiplechoice
+    variable: prompt_aaa_prim
+    choices: |-
+      radius
+      tacacs+
+  - question_name: 'Enable AAA authorization for commands?'
+    required: true
+    type: multiplechoice
+    variable: prompt_aaa_cmdauth
+    default: 'Yes'
+    choices: |-
+      Yes
+      No
+  - question_name: 'Enable AAA Authorization for EXEC Login Sessions?'
+    required: true
+    type: multiplechoice
+    variable: prompt_aaa_execauth
+    default: 'Yes'
+    choices: |-
+      Yes
+      No
 
 - name: Remote-HTTP-Disable
   description: Disable HTTP access.
@@ -169,38 +1230,227 @@
 - name: Remote-LLDP-Advertise
   description: Configure LLDP advertisements on interface(s).
   playbook: icx_config_playbooks/Remote-LLDP-Advertise.yml
+  survey_spec:
+  - question_name: 'Enable/Disable LLDP advertisements:'
+    required: true
+    type: multiplechoice
+    variable: prompt_lldp_adv_enable
+    default: Enable
+    choices: |-
+      Enable
+      Disable
+  - question_name: 'LLDP Advertisement:'
+    required: true
+    type: multiplechoice
+    variable: prompt_lldp_adv
+    choices: |-
+      link-aggregation
+      mac-phy-config-status
+      management-address
+      max-frame-size
+      med-capabilities
+      med-location-id
+      med-network-policy
+      med-power-via-mdi
+      port-description
+      port-id-subtype
+      port-vlan-id
+      power-via-mdi
+      system-capabilities
+      system-description
+      system-name
+      vlan-name
+  - question_name: 'LLDP Operating Mode:'
+    required: true
+    type: multiplechoice
+    variable: prompt_lldp_opmode
+    default: ports
+    choices: |-
+      ports
+      receive
+      transmit
+  - question_name: 'Ethernet Interface(s):'
+    question_description: (e.g. e 1/1/1, e 1/1/2 to 1/1/5)
+    required: true
+    type: text
+    variable: prompt_lldp_adv_int
+    min: 3
+    max: 1024
+    default: all
 
 - name: Remote-LLDP-EnableInt
   description: Enable/Disable LLDP on interface(s).
   playbook: icx_config_playbooks/Remote-LLDP-EnableInt.yml
+  survey_spec:
+  - question_name: 'Enable/Disable LLDP:'
+    required: true
+    type: multiplechoice
+    variable: prompt_lldp_enable
+    default: Enable
+    choices: |-
+      Enable
+      Disable
+  - question_name: 'LLDP Operating Mode:'
+    required: true
+    type: multiplechoice
+    variable: prompt_lldp_opmode
+    default: ports
+    choices: |-
+      ports
+      receive
+      transmit
+  - question_name: 'Ethernet Interface(s):'
+    question_description: (e.g. e 1/1/1, e 1/1/2 to 1/1/5)
+    required: true
+    type: text
+    variable: prompt_lldp_enable_int
+    min: 3
+    max: 1024
+    default: all
 
 - name: Remote-LLDP-Run
   description: Enable/Disable LLDP.
   playbook: icx_config_playbooks/Remote-LLDP-Run.yml
+  survey_spec:
+  - question_name: 'Enable/Disable LLDP:'
+    required: true
+    type: multiplechoice
+    variable: prompt_lldp_enable
+    default: Enable
+    choices: |-
+      Enable
+      Disable
 
 - name: Remote-MGMT-ACLDenyCreate
   description: Create Deny ACLs for IPv4 and IPv6.
+  comments: |
+    # =====================
+    # Note: Creates deny ACLs named '86' for IPv4 and 'NoRemoteAccess' for IPv6.
+    #       These ACLs are required for other templates that blackhole traffic.
   playbook: icx_config_playbooks/Remote-MGMT-ACLDenyCreate.yml
 
 - name: Remote-MGMT-ACLPermit
   description: Add or modify IPv4/6 ACL.
   playbook: icx_config_playbooks/Remote-MGMT-ACLPermit.yml
+  survey_spec:
+  - question_name: 'ACL Name:'
+    required: true
+    type: text
+    variable: prompt_mgmt_aclname
+    min: 1
+    max: 1024
+  - question_name: 'IPv4/6 Address or Range to Permit:'
+    question_description: (For range use /xx, e.g. 192.168.1.0/24)
+    required: true
+    type: text
+    variable: prompt_mgmt_allowip
+    min: 1
+    max: 1024
 
 - name: Remote-MGMT-ClientList
   description: Add Client IPv4/6 address to service access list.
   playbook: icx_config_playbooks/Remote-MGMT-ClientList.yml
+  survey_spec:
+  - question_name: 'Service(s):'
+    required: true
+    type: multiselect
+    variable: prompt_mgmt_service
+    choices: |-
+      telnet client
+      snmp-client
+      web client
+      ip ssh client
+  - question_name: 'IPv4/6 Client Address:'
+    required: true
+    type: text
+    variable: prompt_mgmt_clientip
+    min: 1
+    max: 1024
 
 - name: Remote-Radius-Host
   description: Add RADIUS server.
   playbook: icx_config_playbooks/Remote-Radius-Host.yml
+  survey_spec:
+  - question_name: 'Radius Server IPv4/6 Address:'
+    required: true
+    type: text
+    variable: prompt_rem_radiusip
+    min: 1
+    max: 1024
+  - question_name: 'RADIUS Shared Secret:'
+    required: true
+    type: password
+    variable: prompt_rem_radiuskey
+    min: 1
+    max: 64
+  - question_name: 'RADIUS Authentication Port:'
+    required: false
+    type: integer
+    variable: prompt_rem_radiusauth
+    min: 0
+    max: 65535
+    default: 1812
+  - question_name: 'RADIUS Accounting Port:'
+    required: false
+    type: integer
+    variable: prompt_rem_radiusacct
+    min: 0
+    max: 65535
+    default: 1813
+  - question_name: 'Use RADIUS Server for Dot1X?'
+    required: false
+    type: multiplechoice
+    variable: prompt_rem_radiusdot1x
+    default: 'Yes'
+    choices: |-
+      Yes
+      No
 
 - name: Remote-Radius-SrcInt
   description: Configure the source interface for RADIUS traffic.
+  comments: |
+    # =====================
+    # The <host_srcint> variable takes precedence over the <prompt_srcint> variable that
+    # is set by the AWX survey prompt.  The <host_srcint> variable is used to set the
+    # source-interface for outgoing RADIUS, TACACS, NTP, SNMP and syslog traffic.
+    # It can be manually defined for the host, inventory, template, etc.
+    #
+    # The management interface cannot be used as the source-interface for NTP or SNMP.
+    # A LAG interface cannot be used as a source-interface for SNMP.
+    # If the management or a LAG interface is defined in the <host_srcint> variable,
+    # the following variables can be used to override for the corresponding application:
+    # <host_snmp_srcint>: Use to set source-interface for SNMP.
+    # <host_ntp_srcint>: Use to set source-interface for NTP.
   playbook: icx_config_playbooks/Remote-Radius-SrcInt.yml
+  survey_spec:
+  - question_name: 'Source Interface:'
+    question_description: (i.e. eth 1/2/2, management 1)
+    required: true
+    type: text
+    variable: prompt_srcint
+    min: 2
+    max: 1024
 
 - name: Remote-Radius-Timeout
   description: Configure RADIUS timeout.
   playbook: icx_config_playbooks/Remote-Radius-Timeout.yml
+  survey_spec:
+  - question_name: 'Radius-Server Retransmit:'
+    question_description: Number of retries before giving up
+    required: true
+    type: integer
+    variable: prompt_radius_retransmit
+    min: 1
+    max: 5
+    default: 3
+  - question_name: 'Radius-Server Timeout:'
+    question_description: Server timeout in seconds
+    required: true
+    type: integer
+    variable: prompt_radius_timeout
+    min: 1
+    max: 15
+    default: 3
 
 - name: Remote-SNMP-ConfigTacacs
   description: Enable SNMP config-tacacs.
@@ -209,42 +1459,311 @@
 - name: Remote-SNMP-LinkChange
   description: Enable/Disable SNMP traps for interface state changes.
   playbook: icx_config_playbooks/Remote-SNMP-LinkChange.yml
+  survey_spec:
+  - question_name: 'Enable/Disable Link-Change Traps:'
+    required: true
+    type: multiplechoice
+    variable: prompt_snmp_intchange
+    default: Disable
+    choices: |-
+      Enable
+      Disable
+  - question_name: 'Interface(s):'
+    question_description: (e.g. eth 1/1/1 or eth 1/1/2 to 1/1/4 for range)
+    required: true
+    type: text
+    variable: prompt_snmp_intchange_int
+    min: 3
+    max: 1024
 
 - name: Remote-SNMP-Location
   description: Configure the system location.
   playbook: icx_config_playbooks/Remote-SNMP-Location.yml
+  survey_spec:
+  - question_name: 'SNMP Location:'
+    required: true
+    type: text
+    variable: prompt_snmp_loc
+    min: 1
+    max: 255
 
 - name: Remote-SNMP-SrcInt
   description: Configure the source interface for outgoing SNMP traps.
+  comments: |
+    # =====================
+    # The <host_srcint> variable takes precedence over the <prompt_srcint> variable that
+    # is set by the AWX survey prompt.  The <host_srcint> variable is used to set the
+    # source-interface for outgoing RADIUS, TACACS, NTP, SNMP and syslog traffic.
+    # It can be manually defined for the host, inventory, template, etc.
+    #
+    # The management interface cannot be used as the source-interface for NTP or SNMP.
+    # A LAG interface cannot be used as a source-interface for SNMP.
+    # If the management or a LAG interface is defined in the <host_srcint> variable,
+    # the following variables can be used to override for the corresponding application:
+    # <host_snmp_srcint>: Use to set source-interface for SNMP.
+    # <host_ntp_srcint>: Use to set source-interface for NTP.
   playbook: icx_config_playbooks/Remote-SNMP-SrcInt.yml
+  survey_spec:
+  - question_name: 'Source Interface:'
+    question_description: (i.e. eth 1/2/2, ve 10)
+    required: true
+    type: text
+    variable: prompt_srcint
+    min: 2
+    max: 1024
 
 - name: Remote-SNMPv2
   description: Add IPv4/6 SNMPv2 community string.
+  comments: |
+    # =====================
+    # Note: 'Remote-MGMT-ACLDenyCreate' will need to be applied before running this
+    #       template if denying SNMPv2 traffic.
+    #
+    #       'Remote-MGMT-ACLPermit' will need to be applied before running this template
+    #       if allowing SNMPv2 traffic.
   playbook: icx_config_playbooks/Remote-SNMPv2.yml
+  survey_spec:
+  - question_name: 'IP Version:'
+    required: true
+    type: multiplechoice
+    variable: prompt_snmp_ipver
+    default: ipv4
+    choices: |-
+      ipv4
+      ipv6
+  - question_name: 'SNMPv2 Community String:'
+    required: true
+    type: password
+    variable: prompt_snmp_community
+    min: 1
+    max: 32
+  - question_name: 'SNMPv2 ACL:'
+    question_description: (Leave blank to apply deny ACL)
+    required: false
+    type: text
+    variable: prompt_snmp_acl
+    min: 1
+    max: 1024
+  - question_name: 'SNMPv2 Server IPv4/6 Address:'
+    required: false
+    type: text
+    variable: prompt_snmp_host
+    min: 1
+    max: 1024
 
 - name: Remote-SNMPv3-Group
   description: Add or replace SNMPv3 group.
   playbook: icx_config_playbooks/Remote-SNMPv3-Group.yml
+  survey_spec:
+  - question_name: 'SNMPv3 Group Name:'
+    required: true
+    type: text
+    variable: prompt_snmp_group
+    min: 1
+    max: 32
+  - question_name: 'SNMPv3 ACL:'
+    required: false
+    type: text
+    variable: prompt_snmp_acl
+    min: 1
+    max: 1024
+  - question_name: 'SNMPv3 View Authentication:'
+    required: true
+    type: multiplechoice
+    variable: prompt_snmp_auth
+    default: priv
+    choices: |-
+      auth
+      noauth
+      priv
+  - question_name: 'SNMPv3 Read View Name:'
+    required: false
+    type: text
+    variable: prompt_snmp_readview
+    min: 1
+    max: 32
+    default: all
+  - question_name: 'SNMPv3 Write View Name:'
+    required: false
+    type: text
+    variable: prompt_snmp_writeview
+    min: 1
+    max: 32
+    default: all
+  - question_name: 'SNMPv3 Notify View Name:'
+    required: false
+    type: text
+    variable: prompt_snmp_notifyview
+    min: 1
+    max: 32
+    default: all
 
 - name: Remote-SNMPv3-Host
   description: Add IPv4/6 SNMPv3 Server Address.
   playbook: icx_config_playbooks/Remote-SNMPv3-Host.yml
+  survey_spec:
+  - question_name: 'SNMPv3 Server IPv4/6 Address:'
+    required: true
+    type: text
+    variable: prompt_snmp_host
+    min: 1
+    max: 1024
+  - question_name: 'SNMPv3 Server User Name:'
+    required: true
+    type: text
+    variable: prompt_snmp_user
+    min: 1
+    max: 32
 
 - name: Remote-SNMPv3-User
   description: Add or replace SNMPv3 user.
   playbook: icx_config_playbooks/Remote-SNMPv3-User.yml
+  survey_spec:
+  - question_name: 'SNMPv3 User Name:'
+    required: true
+    type: text
+    variable: prompt_snmp_user
+    min: 1
+    max: 32
+  - question_name: 'SNMPv3 Group Name:'
+    required: true
+    type: text
+    variable: prompt_snmp_group
+    min: 1
+    max: 32
+  - question_name: 'SNMPv3 Access ACL:'
+    required: false
+    type: integer
+    variable: prompt_snmp_acl
+    min: 1
+    max: 99
+  - question_name: 'Authentication Method:'
+    required: true
+    type: multiplechoice
+    variable: prompt_snmp_auth_method
+    default: sha
+    choices: |-
+      md5
+      sha
+  - question_name: 'Authentication Password:'
+    question_description: (8 to 16 chars for MD5, 8 to 20 chars for SHA)
+    required: true
+    type: password
+    variable: prompt_snmp_auth
+    min: 8
+    max: 20
+  - question_name: 'Privacy Method:'
+    required: true
+    type: multiplechoice
+    variable: prompt_snmp_priv_method
+    default: aes
+    choices: |-
+      aes
+      des
+  - question_name: 'Privacy Password:'
+    question_description: (8 to 16 chars for DES, 12 to 16 chars for AES)
+    required: true
+    type: password
+    variable: prompt_snmp_priv
+    min: 8
+    max: 16
 
 - name: Remote-SNMPv3-View
   description: Include/exclude MIB subtree from view.
   playbook: icx_config_playbooks/Remote-SNMPv3-View.yml
+  survey_spec:
+  - question_name: 'SNMPv3 View Name:'
+    required: true
+    type: text
+    variable: prompt_snmp_view_name
+    min: 1
+    max: 32
+  - question_name: 'MIB subtree:'
+    required: true
+    type: text
+    variable: prompt_snmp_view_mib
+    min: 1
+    max: 1024
+  - question_name: 'Include or Exclude MIB Subtree from view:'
+    required: true
+    type: multiplechoice
+    variable: prompt_snmp_view_include
+    choices: |-
+      included
+      excluded
 
 - name: Remote-SSH-ACLPermit
   description: Add SSH ACL permit entry for IPv4/6 host or range.
   playbook: icx_config_playbooks/Remote-SSH-ACLPermit.yml
+  survey_spec:
+  - question_name: 'SSH Access-List name or number:'
+    required: true
+    type: text
+    variable: prompt_ssh_acl_name
+    min: 1
+    max: 1024
+  - question_name: 'IPv4/6 Address or Range:'
+    question_description: (e.g. 10.10.10.0/24 or fc00::0/64 for range)
+    required: true
+    type: text
+    variable: prompt_ssh_allow
+    min: 1
+    max: 1024
+  - question_name: 'Log Matches?'
+    required: true
+    type: multiplechoice
+    variable: prompt_log_match
+    default: 'no'
+    choices: |-
+      yes
+      no
 
 - name: Remote-SSH-Harden
   description: Apply SSH hardening config.
+  comments: |
+    # =====================
+    # Note: SSH access-list must be created with L3-IPv4-ACL or Remote-SSH-ACLPermit before
+    # running this template.
   playbook: icx_config_playbooks/Remote-SSH-Harden.yml
+  survey_spec:
+  - question_name: 'SSH IPv4 Access-List Name or Number:'
+    required: false
+    type: text
+    variable: prompt_ssh_ipv4_acl
+    min: 1
+    max: 1024
+    default: SSH_ACCESS
+  - question_name: 'SSH IPv6 Access-List Name or Number:'
+    required: false
+    type: text
+    variable: prompt_ssh_ipv6_acl
+    min: 1
+    max: 1024
+    default: RemoteAccess
+  - question_name: 'SSH Idle Time:'
+    question_description: (in minutes)
+    required: true
+    type: integer
+    variable: prompt_ssh_idletime
+    min: 0
+    max: 240
+    default: 10
+  - question_name: 'SSH Login Timeout:'
+    question_description: (in seconds)
+    required: true
+    type: integer
+    variable: prompt_ssh_timeout
+    min: 1
+    max: 120
+    default: 60
+  - question_name: 'Disable AES-CBC Encryption Mode?'
+    required: true
+    type: multiplechoice
+    variable: prompt_ssh_disable_aescbc
+    default: 'yes'
+    choices: |-
+      yes
+      no
 
 - name: Remote-SSH-KeyClient
   description: Generate SSH client key.
@@ -257,10 +1776,44 @@
 - name: Remote-Tacacs-Host
   description: Add TACACS server.
   playbook: icx_config_playbooks/Remote-Tacacs-Host.yml
+  survey_spec:
+  - question_name: 'TACACS Server IPv4/6 Address:'
+    required: true
+    type: text
+    variable: prompt_rem_tacacsip
+    min: 1
+    max: 1024
+  - question_name: 'TACACS Shared Secret:'
+    required: true
+    type: password
+    variable: prompt_rem_tacacskey
+    min: 1
+    max: 64
 
 - name: Remote-Tacacs-SrcInt
   description: Configure the source interface for TACACS traffic.
+  comments: |
+    # =====================
+    # The <host_srcint> variable takes precedence over the <prompt_srcint> variable that
+    # is set by the AWX survey prompt.  The <host_srcint> variable is used to set the
+    # source-interface for outgoing RADIUS, TACACS, NTP, SNMP and syslog traffic.
+    # It can be manually defined for the host, inventory, template, etc.
+    #
+    # The management interface cannot be used as the source-interface for NTP or SNMP.
+    # A LAG interface cannot be used as a source-interface for SNMP.
+    # If the management or a LAG interface is defined in the <host_srcint> variable,
+    # the following variables can be used to override for the corresponding application:
+    # <host_snmp_srcint>: Use to set source-interface for SNMP.
+    # <host_ntp_srcint>: Use to set source-interface for NTP.
   playbook: icx_config_playbooks/Remote-Tacacs-SrcInt.yml
+  survey_spec:
+  - question_name: 'Source Interface:'
+    question_description: (i.e. eth 1/2/2, management 1)
+    required: true
+    type: text
+    variable: prompt_srcint
+    min: 2
+    max: 1024
 
 - name: Remote-Telnet-Disable
   description: Disable Telnet server.
@@ -268,67 +1821,439 @@
 
 - name: Remote-User-EnablePW
   description: Configure Enable Password.
+  comments: |
+    # =====================
+    # Note: If passsword-masking is enabled, it will be removed before setting password,
+    #       then reenabled.
   playbook: icx_config_playbooks/Remote-User-EnablePW.yml
+  survey_spec:
+  - question_name: 'Enable Password:'
+    required: true
+    type: password
+    variable: prompt_remote_enablepw
+    min: 1
+    max: 32
 
 - name: Remote-User-LocalAcct
   description: Add a local user account.
   playbook: icx_config_playbooks/Remote-User-LocalAcct.yml
+  survey_spec:
+  - question_name: 'Local Account Username:'
+    required: true
+    type: text
+    variable: prompt_localacct_user
+    min: 1
+    max: 1024
+  - question_name: 'Local Account Password:'
+    required: true
+    type: password
+    variable: prompt_localacct_pw
+    min: 1
+    max: 60
 
 - name: Remote-User-StrictMode
   description: Configure strict standards for passwords.
+  comments: |
+    # =====================
+    # Note: Applies the following config:
+    #         enable strict-password-enforcement
+    #         enable password-min-length <prompt_rem_pwminlength>
+    #         enable user password-masking
   playbook: icx_config_playbooks/Remote-User-StrictMode.yml
+  survey_spec:
+  - question_name: 'Minimum Password Length:'
+    required: false
+    type: integer
+    variable: prompt_rem_pwminlength
+    min: 1
+    max: 48
+    default: 12
 
 - name: System-Errdisable-PacketInError
   description: Configure sampling interval and auto-recovery for packet inError.
   playbook: icx_config_playbooks/System-Errdisable-PacketInError.yml
+  survey_spec:
+  - question_name: 'InError packet threshold:'
+    required: true
+    type: integer
+    variable: prompt_inerror_threshold
+    min: 10
+    max: 4294967295
+  - question_name: 'Interface(s):'
+    question_description: (e.g. eth 1/1/1 or eth 1/1/2 to 1/1/4 for range)
+    required: true
+    type: text
+    variable: prompt_inerror_int
+    min: 3
+    max: 1024
 
 - name: System-Misc-Banner
   description: Apply login banner(s).
   playbook: icx_config_playbooks/System-Misc-Banner.yml
+  survey_spec:
+  - question_name: 'Banner Connection(s):'
+    required: true
+    type: multiselect
+    variable: prompt_banner_conn
+    default: |-
+      motd
+      exec
+      incoming
+    choices: |-
+      motd
+      exec
+      incoming
+  - question_name: 'Banner Text:'
+    required: true
+    type: textarea
+    variable: prompt_banner_text
+    min: 1
+    max: 2556
 
 - name: System-Misc-BootPriority
   description: Modify boot priority.
   playbook: icx_config_playbooks/System-Misc-BootPriority.yml
+  survey_spec:
+  - question_name: 'Flash Partition:'
+    required: true
+    type: multiplechoice
+    variable: prompt_flash_part
+    choices: |-
+      Primary
+      Secondary
 
 - name: System-Misc-ConsoleHarden
   description: Secure console access.
   playbook: icx_config_playbooks/System-Misc-ConsoleHarden.yml
+  survey_spec:
+  - question_name: 'Console Timeout:'
+    question_description: '(in minutes)'
+    required: true
+    type: integer
+    variable: prompt_console_timeout
+    min: 0
+    max: 240
+    default: 10
 
 - name: System-Misc-DHCPClient
   description: Enable/Disable DHCP client.
   playbook: icx_config_playbooks/System-Misc-DHCPClient.yml
+  survey_spec:
+  - question_name: 'Enable/Disable DHCP Client:'
+    required: true
+    type: multiplechoice
+    variable: prompt_dhcp_client
+    default: Disable
+    choices: |-
+      Enable
+      Disable
 
 - name: System-Misc-DNS
   description: Add a DNS domain and server IPv4/6 address.
   playbook: icx_config_playbooks/System-Misc-DNS.yml
+  survey_spec:
+  - question_name: 'DNS Domain:'
+    required: true
+    type: text
+    variable: prompt_dns_domain
+    min: 1
+    max: 1024
+  - question_name: 'DNS Server IPv4/6 Address:'
+    required: true
+    type: text
+    variable: prompt_dns_server
+    min: 1
+    max: 1024
 
 - name: System-Misc-DoS
   description: Configure DoS protection on device.
   playbook: icx_config_playbooks/System-Misc-DoS.yml
+  survey_spec:
+  - question_name: 'ICMP Burst-Normal:'
+    question_description: (in kbps) (ICX7XXX only)
+    required: false
+    type: integer
+    variable: prompt_dos_icmp_normal
+    min: 20
+    max: 10000000
+    default: 5000
+  - question_name: 'ICMP Burst-Max:'
+    question_description: (in kbps) (ICX7XXX only)
+    required: false
+    type: integer
+    variable: prompt_dos_icmp_max
+    min: 20
+    max: 10000000
+    default: 10000
+  - question_name: 'ICMP Lockup Time:'
+    question_description: (in seconds) (ICX7XXX only)
+    required: false
+    type: integer
+    variable: prompt_dos_icmp_lockup
+    min: 1
+    max: 10000
+    default: 300
+  - question_name: 'TCP Burst-Normal:'
+    question_description: (in packets)
+    required: false
+    type: integer
+    variable: prompt_dos_tcp_normal
+    min: 30
+    max: 100000
+    default: 30
+  - question_name: 'TCP Burst-Max:'
+    question_description: (in packets)
+    required: false
+    type: integer
+    variable: prompt_dos_tcp_max
+    min: 30
+    max: 100000
+    default: 100
+  - question_name: TCP Lockup Time
+    question_description: (in seconds)
+    required: false
+    type: integer
+    variable: prompt_dos_tcp_lockup
+    min: 1
+    max: 10000
+    default: 300
 
 - name: System-Misc-Hostname
   description: Configure hostname.
+  comments: |
+    # =====================
+    # Note: If running against a single host, the hostname can be set with the prompt.
+    #       Otherwise the name of the host in the AWX Inventory will be used.
   playbook: icx_config_playbooks/System-Misc-Hostname.yml
+  survey_spec:
+  - question_name: 'Hostname: (For Single-Host deployment)'
+    question_description: (Leave blank if using the AWX inventory host name as hostname)
+    required: false
+    type: text
+    variable: prompt_hostname
+    min: 1
+    max: 1024
 
 - name: System-QoS-Profiles
   description: Configure QoS queues and mapping.
   playbook: icx_config_playbooks/System-QoS-Profiles.yml
+  survey_spec:
+  - question_name: 'DSCP to Internal Forwarding Priority Map:'
+    required: false
+    type: textarea
+    variable: prompt_qos_dscpmap
+    min: 0
+    max: 4096
+    default: |-
+      0 to 0
+      8 to 1
+      16 to 2
+      38 to 3
+      49 to 4
+      48 to 7
+  - question_name: 'Egress Shaper IFG Bytes:'
+    question_description: (FI 8.0.70+ Option)
+    required: false
+    type: integer
+    variable: prompt_qos_ifgbytes
+    min: 1
+    max: 127
+    default: 20
+  - question_name: 'Queue 7 Name:'
+    required: true
+    type: text
+    variable: prompt_qos_qn7
+    min: 1
+    max: 32
+    default: qosp7
+  - question_name: 'Queue 7 Bandwidth:'
+    question_description: Enter percentage or "sp" (strict priority)
+    required: true
+    type: text
+    variable: prompt_qos_qbw7
+    min: 1
+    max: 3
+    default: sp
+  - question_name: 'Queue 6 Name:'
+    required: true
+    type: text
+    variable: prompt_qos_qn6
+    min: 1
+    max: 32
+    default: qosp6
+  - question_name: 'Queue 6 Bandwidth:'
+    question_description: Enter percentage or "sp" (strict priority)
+    required: true
+    type: text
+    variable: prompt_qos_qbw6
+    min: 1
+    max: 3
+    default: sp
+  - question_name: 'Queue 5 Name:'
+    required: true
+    type: text
+    variable: prompt_qos_qn5
+    min: 1
+    max: 32
+    default: qosp5
+  - question_name: 'Queue 5 Bandwidth:'
+    question_description: Enter percentage or "sp" (strict priority)
+    required: true
+    type: text
+    variable: prompt_qos_qbw5
+    min: 1
+    max: 3
+    default: '3'
+  - question_name: 'Queue 4 Name:'
+    required: true
+    type: text
+    variable: prompt_qos_qn4
+    min: 1
+    max: 32
+    default: qosp4
+  - question_name: 'Queue 4 Bandwidth:'
+    question_description: Enter percentage or "sp" (strict priority)
+    required: true
+    type: text
+    variable: prompt_qos_qbw4
+    min: 1
+    max: 3
+    default: '24'
+  - question_name: 'Queue 3 Name:'
+    required: true
+    type: text
+    variable: prompt_qos_qn3
+    min: 1
+    max: 32
+    default: qosp3
+  - question_name: 'Queue 3 Bandwidth:'
+    question_description: Enter percentage or "sp" (strict priority)
+    required: true
+    type: text
+    variable: prompt_qos_qbw3
+    min: 1
+    max: 3
+    default: '3'
+  - question_name: 'Queue 2 Name:'
+    required: true
+    type: text
+    variable: prompt_qos_qn2
+    min: 1
+    max: 32
+    default: qosp2
+  - question_name: 'Queue 2 Bandwidth:'
+    question_description: Enter percentage or "sp" (strict priority)
+    required: true
+    type: text
+    variable: prompt_qos_qbw2
+    min: 1
+    max: 3
+    default: '64'
+  - question_name: 'Queue 1 Name:'
+    required: true
+    type: text
+    variable: prompt_qos_qn1
+    min: 1
+    max: 32
+    default: qosp1
+  - question_name: 'Queue 1 Bandwidth:'
+    question_description: Enter percentage or "sp" (strict priority)
+    required: true
+    type: text
+    variable: prompt_qos_qbw1
+    min: 1
+    max: 3
+    default: '3'
+  - question_name: 'Queue 0 Name:'
+    required: true
+    type: text
+    variable: prompt_qos_qn0
+    min: 1
+    max: 32
+    default: qosp0
+  - question_name: 'Queue 0 Bandwidth:'
+    question_description: Enter percentage or "sp" (strict priority)
+    required: true
+    type: text
+    variable: prompt_qos_qbw0
+    min: 1
+    max: 3
+    default: '3'
 
 - name: System-QoS-RLimitOutput
   description: Configure rate-limiting on an interface.
+  comments: |
+    # =====================
+    # Note: ICX7750 requires running the System-QoS-StoreAndForward
+    #       template before this template can be applied.
   playbook: icx_config_playbooks/System-QoS-RLimitOutput.yml
+  survey_spec:
+  - question_name: 'Interface:'
+    question_description: (i.e. e1/1/1)
+    required: true
+    type: text
+    variable: prompt_qos_rlimitint
+    min: 0
+    max: 1024
+  - question_name: 'Rate-Limit:'
+    question_description: (in Kbps)
+    required: true
+    type: text
+    variable: prompt_qos_rlimitkb
+    min: 0
+    max: 1024
+  - question_name: 'Priority:'
+    required: false
+    type: integer
+    variable: prompt_qos_rlimitpri
+    min: 0
+    max: 7
 
 - name: System-QoS-StoreAndForward
   description: (ICX7750 only) Configure store-and-forward mode and reload switch.
+  comments: |
+    # =====================
+    # Note: Device will reload after successfully configuring store-and-forward mode.
   playbook: icx_config_playbooks/System-QoS-StoreAndForward.yml
 
 - name: System-QoS-Trust
   description: Configure interface to inspect ingress traffic and map to matching queues.
+  comments: |
+    # =====================
+    # Note: DSCP trust can only be configured on physical ethernet interfaces.
   playbook: icx_config_playbooks/System-QoS-Trust.yml
+  survey_spec:
+  - question_name: 'Interface:'
+    question_description: (i.e. e1/1/2)
+    required: true
+    type: text
+    variable: prompt_qos_int
+    min: 0
+    max: 1024
 
 - name: System-Syslog-Buffer
   description: Modify syslog buffer length.
+  comments: |
+    # =====================
+    # Note: Change of syslog length will not take affect until after a reboot.
+    #       Survey prompt will give this option.
   playbook: icx_config_playbooks/System-Syslog-Buffer.yml
+  survey_spec:
+  - question_name: 'Syslog Buffer Length:'
+    required: true
+    type: integer
+    variable: prompt_log_buffer
+    min: 1
+    max: 4000
+  - question_name: 'Reboot After Config?'
+    question_description: (Configuration will only take effect after reboot)
+    required: false
+    type: multiplechoice
+    variable: prompt_log_reload
+    default: 'Yes'
+    choices: |-
+      Yes
+      No
 
 - name: System-Syslog-Console
   description: Enable logging to console.
@@ -337,18 +2262,97 @@
 - name: System-Syslog-Facility
   description: Configure Syslog Server Facility Options.
   playbook: icx_config_playbooks/System-Syslog-Facility.yml
+  survey_spec:
+  - question_name: 'Logging Facility:'
+    required: true
+    type: multiplechoice
+    variable: prompt_log_facility
+    choices: |-
+      auth
+      cron
+      daemon
+      kern
+      local0
+      local1
+      local2
+      local3
+      local4
+      local5
+      local6
+      local7
+      lpr
+      mail
+      news
+      sys9
+      sys10
+      sys11
+      sys12
+      sys13
+      sys14
+      syslog
+      user
+      uucp
 
 - name: System-Syslog-Host
   description: Configure syslog forwarding to a syslog server.
   playbook: icx_config_playbooks/System-Syslog-Host.yml
+  survey_spec:
+  - question_name: 'Syslog Server IPv4/6 Address:'
+    required: true
+    type: text
+    variable: prompt_log_host
+    min: 1
+    max: 1024
 
 - name: System-Syslog-Severity
   description: Enable/Disable event logging at severity level.
   playbook: icx_config_playbooks/System-Syslog-Severity.yml
+  survey_spec:
+  - question_name: 'Enable or Disable Severity Level:'
+    required: true
+    type: multiplechoice
+    variable: prompt_log_level_enable
+    choices: |-
+      Enable
+      Disable
+  - question_name: 'Syslog Message Severity:'
+    required: true
+    type: multiplechoice
+    variable: prompt_log_level
+    choices: |-
+      alerts
+      critical
+      debugging
+      emergencies
+      errors
+      informational
+      notifications
+      warnings
 
 - name: System-Syslog-SrcInt
   description: Configure the source interface for syslog traffic.
+  comments: |
+    # =====================
+    # The <host_srcint> variable takes precedence over the <prompt_srcint> variable that
+    # is set by the AWX survey prompt.  The <host_srcint> variable is used to set the
+    # source-interface for outgoing RADIUS, TACACS, NTP, SNMP and syslog traffic.
+    # It can be manually defined for the host, inventory, template, etc.
+    #
+    # The management interface cannot be used as the source-interface for NTP or SNMP.
+    # A LAG interface cannot be used as a source-interface for SNMP.
+    # If the management or a LAG interface is defined in the <host_srcint> variable,
+    # the following variables can be used to override for the corresponding application:
+    # <host_snmp_srcint>: Use to set source-interface for SNMP.
+    # <host_ntp_srcint>: Use to set source-interface for NTP.
   playbook: icx_config_playbooks/System-Syslog-SrcInt.yml
+  survey_spec:
+  - question_name: 'Source Interface:'
+    question_description: (i.e. eth 1/2/2, management 1)
+    required: true
+    type: text
+    variable: prompt_srcint
+    min: 2
+    max: 1024
 
 - name: System-Time-NTPDisableMD5
   description: Disable NTP MD5 Authentication.
@@ -357,11 +2361,121 @@
 - name: System-Time-NTPServer
   description: Add NTP Server and/or NTP authentication key.
   playbook: icx_config_playbooks/System-Time-NTPServer.yml
+  survey_spec:
+  - question_name: 'NTP Server IP:'
+    required: false
+    type: text
+    variable: prompt_ntp_server
+    min: 0
+    max: 1024
+  - question_name: 'NTP Key ID:'
+    question_description: (Required if adding authenticated NTP server and/or key)
+    required: false
+    type: integer
+    variable: prompt_ntp_keyid
+    min: 1
+    max: 65535
+  - question_name: 'NTP Authentication Method:'
+    question_description: (Required if adding NTP key)
+    required: false
+    type: multiplechoice
+    variable: prompt_ntp_authmethod
+    choices: |-
+      md5
+      sha1
+  - question_name: 'NTP Key:'
+    required: false
+    type: password
+    variable: prompt_ntp_key
+    min: 1
+    max: 16
 
 - name: System-Time-NTPSrcInt
   description: Configure the source interface for NTP traffic.
+  comments: |
+    # =====================
+    # The <host_srcint> variable takes precedence over the <prompt_srcint> variable that
+    # is set by the AWX survey prompt.  The <host_srcint> variable is used to set the
+    # source-interface for outgoing RADIUS, TACACS, NTP, SNMP and syslog traffic.
+    # It can be manually defined for the host, inventory, template, etc.
+    #
+    # The management interface cannot be used as the source-interface for NTP or SNMP.
+    # A LAG interface cannot be used as a source-interface for SNMP.
+    # If the management or a LAG interface is defined in the <host_srcint> variable,
+    # the following variables can be used to override for the corresponding application:
+    # <host_snmp_srcint>: Use to set source-interface for SNMP.
+    # <host_ntp_srcint>: Use to set source-interface for NTP.
   playbook: icx_config_playbooks/System-Time-NTPSrcInt.yml
+  survey_spec:
+  - question_name: 'Source Interface:'
+    question_description: (i.e. eth 1/2/2, ve 10)
+    required: true
+    type: text
+    variable: prompt_srcint
+    min: 2
+    max: 1024
 
 - name: System-Time-TimeZone
   description: Modify the local timezone.
   playbook: icx_config_playbooks/System-Time-TimeZone.yml
+  survey_spec:
+  - question_name: Timezone
+    question_description: Select Timezone
+    required: true
+    type: multiplechoice
+    variable: prompt_tz
+    choices: |-
+      us alaska
+      us aleutian
+      us arizona
+      us central
+      us east-indiana
+      us eastern
+      us hawaii
+      us michigan
+      us mountain
+      us pacific
+      us samoa
+      gmt gmt+00
+      gmt gmt+01
+      gmt gmt+02
+      gmt gmt+03
+      gmt gmt+03:30
+      gmt gmt+04
+      gmt gmt+04:30
+      gmt gmt+05
+      gmt gmt+05:30
+      gmt gmt+06
+      gmt gmt+06:30
+      gmt gmt+07
+      gmt gmt+08
+      gmt gmt+09
+      gmt gmt+09:30
+      gmt gmt+10
+      gmt gmt+10:30
+      gmt gmt+11
+      gmt gmt+11:30
+      gmt gmt+12
+      gmt gmt-01
+      gmt gmt-02
+      gmt gmt-03
+      gmt gmt-03:30
+      gmt gmt-04
+      gmt gmt-05
+      gmt gmt-06
+      gmt gmt-07
+      gmt gmt-08
+      gmt gmt-08:30
+      gmt gmt-09
+      gmt gmt-09:30
+      gmt gmt-10
+      gmt gmt-11
+      gmt gmt-12
+  - question_name: 'Configure Summer-Time?'
+    required: true
+    type: multiplechoice
+    variable: prompt_tz_summertime
+    default: 'No'
+    choices: |-
+      Yes
+      No

@@ -3,49 +3,14 @@
   block:
   - {name: Debug, debug: {msg: "Updating template '{{bJtName}}'"}}
 
-  - name: Get Playbook Comments
-    shell: cat {{PbFilePath}} | grep '^# '
-    changed_when: false
-    failed_when: false
-    register: PlaybookComments
-
-  - name: Scrape Playbook Prompts
-    shell: "grep '^#! Prompt' {{PbFilePath}} | sed 's/^.*Prompt: //g'"
-    failed_when: false
-    changed_when: false
-    register: RawPrompts
-
   - name: Add Survey Prompts
-    block:
-      - name: Prepare Survey Prompt Payload
-        set_fact:
-          PromptPayload:
-            name: ''
-            description: ''
-            spec: "{{tPrompt|regex_replace(NewlineVar, '\\\\n')}}"
-        vars: {tPrompt: '{{RawPrompts.stdout_lines[0]|from_yaml}}'}
-
-      - name: Add Survey Prompts
-        uri:
-          url: '{{AwxApi}}/job_templates/{{bJtId}}/survey_spec/'
-          method: POST
-          headers: {Content-Type: "application/json"}
-          body: "{{tPayload|regex_replace('@question','?')|regex_replace('@comma',',')}}"
-          body_format: json
-        register: PromptStatus
-        vars: {tPayload: "{{PromptPayload|regex_replace('@colon', ':')}}"}
-
-      - name: Enable Survey Prompts
-        uri:
-          url: '{{AwxApi}}/job_templates/{{bJtId}}/'
-          method: PATCH
-          headers: {Content-Type: "application/json"}
-          body: {survey_enabled: true}
-          body_format: json
-        when:
-          - PromptStatus.status is defined
-          - PromptStatus.status == 200
-    when: RawPrompts.stdout_lines[0] is defined
+    uri:
+      url: '{{AwxApi}}/job_templates/{{bJtId}}/survey_spec/'
+      method: POST
+      headers: {Content-Type: "application/json"}
+      body: {name: '', description: '', spec: '{{bJtSpec.survey_spec}}'}
+      body_format: json
+    register: rPromptStatus
 
   - name: Update Template Options
     uri:
@@ -54,14 +19,15 @@
       headers: {Content-Type: "application/json"}
       body:
         description: '{{bJtSpec.description|default("", true)}}'
+        survey_enabled: '{{rPromptStatus.status|default(0, true) == 200}}'
         extra_vars: >-
-          template_version: {{AwxMgmtVer}}
+          playbook_rev: 0.0.1
 
-          {{PlaybookComments.stdout}}
+          {{bJtSpec.comments|default()}}
       body_format: json
 
   - name: Add Template to "Updated" List
     set_fact: {UpdatedTemplates: '{{UpdatedTemplates|default([]) + [bJtName]}}'}
   vars: {bJtName: '{{PbFileName}}'}
 
-- {name: Reset Var, set_fact: {rNewJt: }}
+- {name: Reset Vars, set_fact: {rNewJt: , rPromptStatus: }}
