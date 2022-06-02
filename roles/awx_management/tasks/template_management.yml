@@ -23,9 +23,22 @@
     bCreds: '{{rTemplateCreds|default("null", true)}}'
     bHaveCreds: '{{bCreds.results is defined}}'
     bAskCreds: '{{bJtSpec.ask_credential_on_launch|default(true)}}'
+    bDoRevCheck: false
+
+- name: Set Management Template Update Message
+  set_fact:
+    PostMsg:
+      - "{{this_jt_name}} updated to v{{tPbRev}}"
+      - "Relaunch template to continue."
+  vars:
+    tPbRev: "{{(mgmt_templates|selectattr('name', '==', this_jt_name)
+                              |list)[0].playbook_rev}}"
+  when: playbook_rev is not defined
 
 - name: Load ICX Config Template Specs
   include_vars: tm_spec_icx_config_templates.yml
+  when: playbook_rev is defined and
+        ('create' in MgmtFunc|lower or 'remove' in MgmtFunc|lower)
 
 - name: Create/Update ICX Config Templates
   block:
@@ -38,18 +51,19 @@
     loop_control: {loop_var: bJtSpec}
     vars:
       bJt: "{{rJts.json.results|selectattr('name', '==', bJtSpec.name)|list}}"
-  when: "'create' in MgmtFunc|lower"
+  vars: {bHaveCreds: false, bAskCreds: true}
+  when: "'create' in MgmtFunc|lower and playbook_rev is defined"
 
 - name: Remove ICX Config Templates
   block:
   - name: Set Template List
-    set_fact: {RemoveTemplateList: '{{icx_config_template}}'}
+    set_fact: {RemoveTemplateList: '{{icx_config_templates}}'}
 
   - name: Remove ICX Config Templates
     include_tasks: tm_remove_template.yml
     loop: '{{RemoveTemplateList}}'
     loop_control: {loop_var: bJtSpec}
     vars:
-      bJt: "{{(rJts.json.results|selectattr('name', '==', bJtSpec.name)|list)}}"
+      bJt: "{{rJts.json.results|selectattr('name', '==', bJtSpec.name)|list}}"
     when: bJt[0].project|default(0) == rThisTemplate.json.project
-  when: "'remove' in MgmtFunc|lower"
+  when: "'remove' in MgmtFunc|lower and playbook_rev is defined"

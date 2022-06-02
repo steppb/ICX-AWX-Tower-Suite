@@ -13,13 +13,10 @@
       force_basic_auth: yes
       timeout: 60
   vars:
-    AwxMgmtVer: 1.4
-    ServerVersion: '{{ansible_icx_mgmt_ver|default(0)}}'
     AwxApi: https://{{ansible_host}}/api/v2
     MgmtFunc: '{{prompt_mgmt_role|default("Management Update", true)}}'
-    YamlExt: '.yml'
-    NewlineVar: '\\\\n'
     template_validate_certs: no
+    PbRev: '{{playbook_rev|default("0.0.0")}}'
 
   roles:
   - {role: awx_management}

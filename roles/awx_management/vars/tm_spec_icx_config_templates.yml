@@ -1,5 +1,6 @@
 icx_config_templates:
 - name: Hardware-Interface-100FX
+  playbook_rev: 0.1.0
   description: Enable/Disable 100BaseFX support on a fiber port.
   playbook: icx_config_playbooks/Hardware-Interface-100FX.yml
   survey_spec:
@@ -20,6 +21,7 @@ icx_config_templates:
     max: 1024
 
 - name: L2-MSTP-Config
+  playbook_rev: 0.1.0
   description: Setup and start initial MSTP configuration.
   comments: |
     # =====================
@@ -59,6 +61,7 @@ icx_config_templates:
     default: 1-4000
 
 - name: L2-MSTP-Instance
+  playbook_rev: 0.1.0
   description: Configure MSTP instance priority.
   comments: |
     # =====================
@@ -81,6 +84,7 @@ icx_config_templates:
     max: 61440
 
 - name: L2-MSTP-Interface
+  playbook_rev: 0.1.0
   description: Configure interfaces as MSTP admin-edge or point-to-point ports.
   comments: |
     # =====================
@@ -104,6 +108,7 @@ icx_config_templates:
     max: 1024
 
 - name: L2-MSTP-VLAN
+  playbook_rev: 0.1.0
   description: Add VLAN(s) to MSTP Instance.
   comments: |
     # =====================
@@ -126,6 +131,7 @@ icx_config_templates:
     max: 1024
 
 - name: L2-STP-BPDUGuard
+  playbook_rev: 0.1.0
   description: Enable/Disable STP BPDU guard on an interface.
   playbook: icx_config_playbooks/L2-STP-BPDUGuard.yml
   survey_spec:
@@ -146,6 +152,7 @@ icx_config_templates:
     max: 1024
 
 - name: L2-STP-DesignatedProtect
+  playbook_rev: 0.1.0
   description: Enable/Disable Spanning-tree designated-protect on an interface.
   playbook: icx_config_playbooks/L2-STP-DesignatedProtect.yml
   survey_spec:
@@ -166,6 +173,7 @@ icx_config_templates:
     max: 1024
 
 - name: L2-STP-FastUplinkSpan
+  playbook_rev: 0.1.0
   description: Enable/Disable Fast Uplink Span for interface(s).
   playbook: icx_config_playbooks/L2-STP-FastUplinkSpan.yml
   survey_spec:
@@ -186,6 +194,7 @@ icx_config_templates:
     max: 1024
 
 - name: L2-VLAN-Config
+  playbook_rev: 0.1.0
   description: Add or modify VLAN.
   playbook: icx_config_playbooks/L2-VLAN-Config.yml
   survey_spec:
@@ -241,6 +250,7 @@ icx_config_templates:
       802.1w
 
 - name: L2-VLAN-Default
+  playbook_rev: 0.1.0
   description: Configure default VLAN.
   comments: |
     # =====================
@@ -256,6 +266,7 @@ icx_config_templates:
     max: 4086
 
 - name: L2-VLAN-DefaultDisablePorts
+  playbook_rev: 0.1.0
   description: Disable all L2 ports in the default or user-specified VLAN.
   playbook: icx_config_playbooks/L2-VLAN-DefaultDisablePorts.yml
   survey_spec:
@@ -275,6 +286,7 @@ icx_config_templates:
     default: 'DISABLED'
 
 - name: L3-IPv4-ACL
+  playbook_rev: 0.1.0
   description: Create or replace IPv4 Access-List.
   comments: |
     # =====================
@@ -310,6 +322,7 @@ icx_config_templates:
     max: 100000
 
 - name: L3-IPv4-DefaultRoute
+  playbook_rev: 0.1.0
   description: Configure default route.
   playbook: icx_config_playbooks/L3-IPv4-DefaultRoute.yml
   survey_spec:
@@ -332,6 +345,7 @@ icx_config_templates:
       no
 
 - name: L3-IPv4-Interface
+  playbook_rev: 0.1.0
   description: Add/Remove/Replace IPv4 address on interface.
   comments: |
     # =====================
@@ -393,6 +407,7 @@ icx_config_templates:
     max: 15
 
 - name: L3-IPv4-MCastPIM
+  playbook_rev: 0.1.0
   description: Enable IPv4 PIM routing.
   comments: |
     # =====================
@@ -400,6 +415,7 @@ icx_config_templates:
   playbook: icx_config_playbooks/L3-IPv4-MCastPIM.yml
 
 - name: L3-IPv4-MCastPIMFilter
+  playbook_rev: 0.1.0
   description: Configure IP PIM Neighbor-Filter ACL.
   comments: |
     # =====================
@@ -425,6 +441,7 @@ icx_config_templates:
     default: '86'
 
 - name: L3-IPv4-MCastPIMInterface
+  playbook_rev: 0.1.0
   description: Enable IPv4 PIM-Sparse on a router interface.
   comments: |
     # =====================
@@ -440,6 +457,7 @@ icx_config_templates:
     max: 1024
 
 - name: L3-IPv4-OSPFGlobal
+  playbook_rev: 0.1.0
   description: Configure OSPF area.
   comments: |
     # =====================
@@ -460,6 +478,7 @@ icx_config_templates:
     max: 1024
 
 - name: L3-IPv4-OSPFInt
+  playbook_rev: 0.1.0
   description: Configure OSPF interface.
   comments: |
     # =====================
@@ -508,6 +527,7 @@ icx_config_templates:
     max: 16
 
 - name: L3-IPv4-ProxyArp
+  playbook_rev: 0.1.0
   description: Enable/Disable proxy-arp for an interface.
   playbook: icx_config_playbooks/L3-IPv4-ProxyArp.yml
   survey_spec:
@@ -528,6 +548,7 @@ icx_config_templates:
     max: 1024
 
 - name: L3-IPv4-Redirects
+  playbook_rev: 0.1.0
   description: Enable/Disable IPv4 ICMP redirects on a Virtual Interface.
   playbook: icx_config_playbooks/L3-IPv4-Redirects.yml
   survey_spec:
@@ -548,6 +569,7 @@ icx_config_templates:
     max: 1024
 
 - name: L3-IPv4-VRRP
+  playbook_rev: 0.1.0
   description: Add or modify VRRP VRID on interface.
   comments: |
     # =====================
@@ -654,6 +676,7 @@ icx_config_templates:
       no
 
 - name: L3-IPv6-CacheLifetime
+  playbook_rev: 0.1.0
   description: Configure the IPv6 cache-aging lifetime.
   playbook: icx_config_playbooks/L3-IPv6-CacheLifetime.yml
   survey_spec:
@@ -667,6 +690,7 @@ icx_config_templates:
     default: 0
 
 - name: L3-IPv6-DefaultRoute
+  playbook_rev: 0.1.0
   description: Configure default IPv6 route.
   playbook: icx_config_playbooks/L3-IPv6-DefaultRoute.yml
   survey_spec:
@@ -678,6 +702,7 @@ icx_config_templates:
     max: 1024
 
 - name: L3-IPv6-Interface
+  playbook_rev: 0.1.0
   description: Add/Remove/Replace IPv6 address on interface.
   comments: |
     # =====================
@@ -731,6 +756,7 @@ icx_config_templates:
     max: 1024
 
 - name: L3-IPv6-MCastPIM
+  playbook_rev: 0.1.0
   description: Enable IPv6 PIM routing.
   comments: |
     # =====================
@@ -738,6 +764,7 @@ icx_config_templates:
   playbook: icx_config_playbooks/L3-IPv6-MCastPIM.yml
 
 - name: L3-IPv6-MCastPIMFilter
+  playbook_rev: 0.1.0
   description: Configure IPv6 PIM Neighbor-Filter ACL.
   comments: |
     # =====================
@@ -762,6 +789,7 @@ icx_config_templates:
     default: NoRemoteAccess
 
 - name: L3-IPv6-MCastPIMInterface
+  playbook_rev: 0.1.0
   description: Enable IPv6 PIM-Sparse on a router interface.
   comments: |
     # =====================
@@ -777,6 +805,7 @@ icx_config_templates:
     max: 1024
 
 - name: L3-IPv6-OSPFGlobal
+  playbook_rev: 0.1.0
   description: Configure OSPFv3 area.
   playbook: icx_config_playbooks/L3-IPv6-OSPFGlobal.yml
   survey_spec:
@@ -788,6 +817,7 @@ icx_config_templates:
     max: 1024
 
 - name: L3-IPv6-OSPFInt
+  playbook_rev: 0.1.0
   description: Configure OSPFv3 interface.
   comments: |
     # =====================
@@ -837,6 +867,7 @@ icx_config_templates:
     max: 40
 
 - name: L3-IPv6-Redirects
+  playbook_rev: 0.1.0
   description: Enable/Disable IPv6 ICMP redirects on a Virtual Interface.
   playbook: icx_config_playbooks/L3-IPv6-Redirects.yml
   survey_spec:
@@ -857,6 +888,7 @@ icx_config_templates:
     max: 1024
 
 - name: L3-IPv6-VRRP
+  playbook_rev: 0.1.0
   description: Add or modify VRRPv3 VRID on interface.
   comments: |
     # =====================
@@ -944,6 +976,7 @@ icx_config_templates:
     max: 254
 
 - name: LAG-Interface-Add
+  playbook_rev: 0.1.0
   description: Create and deploy a new LAG.
   playbook: icx_config_playbooks/LAG-Interface-Add.yml
   survey_spec:
@@ -976,6 +1009,7 @@ icx_config_templates:
     max: 1024
 
 - name: LAG-Interface-Enable
+  playbook_rev: 0.1.0
   description: Enable a disabled LAG interface.
   comments: |
     # =====================
@@ -997,6 +1031,7 @@ icx_config_templates:
     max: 1024
 
 - name: LAG-Interface-Name
+  playbook_rev: 0.1.0
   description: Set the port-name of a LAG port.
   comments: |
     # =====================
@@ -1024,6 +1059,7 @@ icx_config_templates:
     max: 1024
 
 - name: PortSec-FlexAuth-Global
+  playbook_rev: 0.1.0
   description: Configure 802.1X global settings.
   playbook: icx_config_playbooks/PortSec-FlexAuth-Global.yml
   survey_spec:
@@ -1088,6 +1124,7 @@ icx_config_templates:
     default: 30
 
 - name: PortSec-FlexAuth-Int
+  playbook_rev: 0.1.0
   description: Enable 802.1X on interface.
   playbook: icx_config_playbooks/PortSec-FlexAuth-Int.yml
   survey_spec:
@@ -1113,6 +1150,7 @@ icx_config_templates:
     max: 4086
 
 - name: PortSec-StickyMac
+  playbook_rev: 0.1.0
   description: Apply Sticky-MAC Port security to interface.
   playbook: icx_config_playbooks/PortSec-StickyMac.yml
   survey_spec:
@@ -1138,6 +1176,7 @@ icx_config_templates:
     max: 1440
 
 - name: Remote-AAA-Accounting
+  playbook_rev: 0.1.0
   description: Configure AAA accounting for commands and/or EXEC login sessions.
   playbook: icx_config_playbooks/Remote-AAA-Accounting.yml
   survey_spec:
@@ -1166,6 +1205,7 @@ icx_config_templates:
       No
 
 - name: Remote-AAA-Authentication
+  playbook_rev: 0.1.0
   description: Configure AAA authentication.
   playbook: icx_config_playbooks/Remote-AAA-Authentication.yml
   survey_spec:
@@ -1196,6 +1236,7 @@ icx_config_templates:
       tacacs+
 
 - name: Remote-AAA-Authorization
+  playbook_rev: 0.1.0
   description: Configure AAA authorization for commands and EXEC sessions.
   playbook: icx_config_playbooks/Remote-AAA-Authorization.yml
   survey_spec:
@@ -1224,10 +1265,12 @@ icx_config_templates:
       No
 
 - name: Remote-HTTP-Disable
+  playbook_rev: 0.1.0
   description: Disable HTTP access.
   playbook: icx_config_playbooks/Remote-HTTP-Disable.yml
 
 - name: Remote-LLDP-Advertise
+  playbook_rev: 0.1.0
   description: Configure LLDP advertisements on interface(s).
   playbook: icx_config_playbooks/Remote-LLDP-Advertise.yml
   survey_spec:
@@ -1279,6 +1322,7 @@ icx_config_templates:
     default: all
 
 - name: Remote-LLDP-EnableInt
+  playbook_rev: 0.1.0
   description: Enable/Disable LLDP on interface(s).
   playbook: icx_config_playbooks/Remote-LLDP-EnableInt.yml
   survey_spec:
@@ -1309,6 +1353,7 @@ icx_config_templates:
     default: all
 
 - name: Remote-LLDP-Run
+  playbook_rev: 0.1.0
   description: Enable/Disable LLDP.
   playbook: icx_config_playbooks/Remote-LLDP-Run.yml
   survey_spec:
@@ -1322,6 +1367,7 @@ icx_config_templates:
       Disable
 
 - name: Remote-MGMT-ACLDenyCreate
+  playbook_rev: 0.1.0
   description: Create Deny ACLs for IPv4 and IPv6.
   comments: |
     # =====================
@@ -1330,6 +1376,7 @@ icx_config_templates:
   playbook: icx_config_playbooks/Remote-MGMT-ACLDenyCreate.yml
 
 - name: Remote-MGMT-ACLPermit
+  playbook_rev: 0.1.0
   description: Add or modify IPv4/6 ACL.
   playbook: icx_config_playbooks/Remote-MGMT-ACLPermit.yml
   survey_spec:
@@ -1348,6 +1395,7 @@ icx_config_templates:
     max: 1024
 
 - name: Remote-MGMT-ClientList
+  playbook_rev: 0.1.0
   description: Add Client IPv4/6 address to service access list.
   playbook: icx_config_playbooks/Remote-MGMT-ClientList.yml
   survey_spec:
@@ -1368,6 +1416,7 @@ icx_config_templates:
     max: 1024
 
 - name: Remote-Radius-Host
+  playbook_rev: 0.1.0
   description: Add RADIUS server.
   playbook: icx_config_playbooks/Remote-Radius-Host.yml
   survey_spec:
@@ -1407,6 +1456,7 @@ icx_config_templates:
       No
 
 - name: Remote-Radius-SrcInt
+  playbook_rev: 0.1.0
   description: Configure the source interface for RADIUS traffic.
   comments: |
     # =====================
@@ -1432,6 +1482,7 @@ icx_config_templates:
     max: 1024
 
 - name: Remote-Radius-Timeout
+  playbook_rev: 0.1.0
   description: Configure RADIUS timeout.
   playbook: icx_config_playbooks/Remote-Radius-Timeout.yml
   survey_spec:
@@ -1453,10 +1504,12 @@ icx_config_templates:
     default: 3
 
 - name: Remote-SNMP-ConfigTacacs
+  playbook_rev: 0.1.0
   description: Enable SNMP config-tacacs.
   playbook: icx_config_playbooks/Remote-SNMP-ConfigTacacs.yml
 
 - name: Remote-SNMP-LinkChange
+  playbook_rev: 0.1.0
   description: Enable/Disable SNMP traps for interface state changes.
   playbook: icx_config_playbooks/Remote-SNMP-LinkChange.yml
   survey_spec:
@@ -1477,6 +1530,7 @@ icx_config_templates:
     max: 1024
 
 - name: Remote-SNMP-Location
+  playbook_rev: 0.1.0
   description: Configure the system location.
   playbook: icx_config_playbooks/Remote-SNMP-Location.yml
   survey_spec:
@@ -1488,6 +1542,7 @@ icx_config_templates:
     max: 255
 
 - name: Remote-SNMP-SrcInt
+  playbook_rev: 0.1.0
   description: Configure the source interface for outgoing SNMP traps.
   comments: |
     # =====================
@@ -1513,6 +1568,7 @@ icx_config_templates:
     max: 1024
 
 - name: Remote-SNMPv2
+  playbook_rev: 0.1.0
   description: Add IPv4/6 SNMPv2 community string.
   comments: |
     # =====================
@@ -1552,6 +1608,7 @@ icx_config_templates:
     max: 1024
 
 - name: Remote-SNMPv3-Group
+  playbook_rev: 0.1.0
   description: Add or replace SNMPv3 group.
   playbook: icx_config_playbooks/Remote-SNMPv3-Group.yml
   survey_spec:
@@ -1599,6 +1656,7 @@ icx_config_templates:
     default: all
 
 - name: Remote-SNMPv3-Host
+  playbook_rev: 0.1.0
   description: Add IPv4/6 SNMPv3 Server Address.
   playbook: icx_config_playbooks/Remote-SNMPv3-Host.yml
   survey_spec:
@@ -1616,6 +1674,7 @@ icx_config_templates:
     max: 32
 
 - name: Remote-SNMPv3-User
+  playbook_rev: 0.1.0
   description: Add or replace SNMPv3 user.
   playbook: icx_config_playbooks/Remote-SNMPv3-User.yml
   survey_spec:
@@ -1669,6 +1728,7 @@ icx_config_templates:
     max: 16
 
 - name: Remote-SNMPv3-View
+  playbook_rev: 0.1.0
   description: Include/exclude MIB subtree from view.
   playbook: icx_config_playbooks/Remote-SNMPv3-View.yml
   survey_spec:
@@ -1693,6 +1753,7 @@ icx_config_templates:
       excluded
 
 - name: Remote-SSH-ACLPermit
+  playbook_rev: 0.1.0
   description: Add SSH ACL permit entry for IPv4/6 host or range.
   playbook: icx_config_playbooks/Remote-SSH-ACLPermit.yml
   survey_spec:
@@ -1719,6 +1780,7 @@ icx_config_templates:
       no
 
 - name: Remote-SSH-Harden
+  playbook_rev: 0.1.0
   description: Apply SSH hardening config.
   comments: |
     # =====================
@@ -1766,14 +1828,17 @@ icx_config_templates:
       no
 
 - name: Remote-SSH-KeyClient
+  playbook_rev: 0.1.0
   description: Generate SSH client key.
   playbook: icx_config_playbooks/Remote-SSH-KeyClient.yml
 
 - name: Remote-SSH-KeyServer
+  playbook_rev: 0.1.0
   description: Generate SSH server key.
   playbook: icx_config_playbooks/Remote-SSH-KeyServer.yml
 
 - name: Remote-Tacacs-Host
+  playbook_rev: 0.1.0
   description: Add TACACS server.
   playbook: icx_config_playbooks/Remote-Tacacs-Host.yml
   survey_spec:
@@ -1791,6 +1856,7 @@ icx_config_templates:
     max: 64
 
 - name: Remote-Tacacs-SrcInt
+  playbook_rev: 0.1.0
   description: Configure the source interface for TACACS traffic.
   comments: |
     # =====================
@@ -1816,10 +1882,12 @@ icx_config_templates:
     max: 1024
 
 - name: Remote-Telnet-Disable
+  playbook_rev: 0.1.0
   description: Disable Telnet server.
   playbook: icx_config_playbooks/Remote-Telnet-Disable.yml
 
 - name: Remote-User-EnablePW
+  playbook_rev: 0.1.0
   description: Configure Enable Password.
   comments: |
     # =====================
@@ -1835,6 +1903,7 @@ icx_config_templates:
     max: 32
 
 - name: Remote-User-LocalAcct
+  playbook_rev: 0.1.0
   description: Add a local user account.
   playbook: icx_config_playbooks/Remote-User-LocalAcct.yml
   survey_spec:
@@ -1852,6 +1921,7 @@ icx_config_templates:
     max: 60
 
 - name: Remote-User-StrictMode
+  playbook_rev: 0.1.0
   description: Configure strict standards for passwords.
   comments: |
     # =====================
@@ -1870,6 +1940,7 @@ icx_config_templates:
     default: 12
 
 - name: System-Errdisable-PacketInError
+  playbook_rev: 0.1.0
   description: Configure sampling interval and auto-recovery for packet inError.
   playbook: icx_config_playbooks/System-Errdisable-PacketInError.yml
   survey_spec:
@@ -1888,6 +1959,7 @@ icx_config_templates:
     max: 1024
 
 - name: System-Misc-Banner
+  playbook_rev: 0.1.0
   description: Apply login banner(s).
   playbook: icx_config_playbooks/System-Misc-Banner.yml
   survey_spec:
@@ -1911,6 +1983,7 @@ icx_config_templates:
     max: 2556
 
 - name: System-Misc-BootPriority
+  playbook_rev: 0.1.0
   description: Modify boot priority.
   playbook: icx_config_playbooks/System-Misc-BootPriority.yml
   survey_spec:
@@ -1923,6 +1996,7 @@ icx_config_templates:
       Secondary
 
 - name: System-Misc-ConsoleHarden
+  playbook_rev: 0.1.0
   description: Secure console access.
   playbook: icx_config_playbooks/System-Misc-ConsoleHarden.yml
   survey_spec:
@@ -1936,6 +2010,7 @@ icx_config_templates:
     default: 10
 
 - name: System-Misc-DHCPClient
+  playbook_rev: 0.1.0
   description: Enable/Disable DHCP client.
   playbook: icx_config_playbooks/System-Misc-DHCPClient.yml
   survey_spec:
@@ -1949,6 +2024,7 @@ icx_config_templates:
       Disable
 
 - name: System-Misc-DNS
+  playbook_rev: 0.1.0
   description: Add a DNS domain and server IPv4/6 address.
   playbook: icx_config_playbooks/System-Misc-DNS.yml
   survey_spec:
@@ -1966,6 +2042,7 @@ icx_config_templates:
     max: 1024
 
 - name: System-Misc-DoS
+  playbook_rev: 0.1.0
   description: Configure DoS protection on device.
   playbook: icx_config_playbooks/System-Misc-DoS.yml
   survey_spec:
@@ -2019,6 +2096,7 @@ icx_config_templates:
     default: 300
 
 - name: System-Misc-Hostname
+  playbook_rev: 0.1.0
   description: Configure hostname.
   comments: |
     # =====================
@@ -2035,6 +2113,7 @@ icx_config_templates:
     max: 1024
 
 - name: System-QoS-Profiles
+  playbook_rev: 0.1.0
   description: Configure QoS queues and mapping.
   playbook: icx_config_playbooks/System-QoS-Profiles.yml
   survey_spec:
@@ -2181,6 +2260,7 @@ icx_config_templates:
     default: '3'
 
 - name: System-QoS-RLimitOutput
+  playbook_rev: 0.1.0
   description: Configure rate-limiting on an interface.
   comments: |
     # =====================
@@ -2210,6 +2290,7 @@ icx_config_templates:
     max: 7
 
 - name: System-QoS-StoreAndForward
+  playbook_rev: 0.1.0
   description: (ICX7750 only) Configure store-and-forward mode and reload switch.
   comments: |
     # =====================
@@ -2217,6 +2298,7 @@ icx_config_templates:
   playbook: icx_config_playbooks/System-QoS-StoreAndForward.yml
 
 - name: System-QoS-Trust
+  playbook_rev: 0.1.0
   description: Configure interface to inspect ingress traffic and map to matching queues.
   comments: |
     # =====================
@@ -2232,6 +2314,7 @@ icx_config_templates:
     max: 1024
 
 - name: System-Syslog-Buffer
+  playbook_rev: 0.1.0
   description: Modify syslog buffer length.
   comments: |
     # =====================
@@ -2256,10 +2339,12 @@ icx_config_templates:
       No
 
 - name: System-Syslog-Console
+  playbook_rev: 0.1.0
   description: Enable logging to console.
   playbook: icx_config_playbooks/System-Syslog-Console.yml
 
 - name: System-Syslog-Facility
+  playbook_rev: 0.1.0
   description: Configure Syslog Server Facility Options.
   playbook: icx_config_playbooks/System-Syslog-Facility.yml
   survey_spec:
@@ -2294,6 +2379,7 @@ icx_config_templates:
       uucp
 
 - name: System-Syslog-Host
+  playbook_rev: 0.1.0
   description: Configure syslog forwarding to a syslog server.
   playbook: icx_config_playbooks/System-Syslog-Host.yml
   survey_spec:
@@ -2305,6 +2391,7 @@ icx_config_templates:
     max: 1024
 
 - name: System-Syslog-Severity
+  playbook_rev: 0.1.0
   description: Enable/Disable event logging at severity level.
   playbook: icx_config_playbooks/System-Syslog-Severity.yml
   survey_spec:
@@ -2330,6 +2417,7 @@ icx_config_templates:
       warnings
 
 - name: System-Syslog-SrcInt
+  playbook_rev: 0.1.0
   description: Configure the source interface for syslog traffic.
   comments: |
     # =====================
@@ -2355,10 +2443,12 @@ icx_config_templates:
     max: 1024
 
 - name: System-Time-NTPDisableMD5
+  playbook_rev: 0.1.0
   description: Disable NTP MD5 Authentication.
   playbook: icx_config_playbooks/System-Time-NTPDisableMD5.yml
 
 - name: System-Time-NTPServer
+  playbook_rev: 0.1.0
   description: Add NTP Server and/or NTP authentication key.
   playbook: icx_config_playbooks/System-Time-NTPServer.yml
   survey_spec:
@@ -2391,6 +2481,7 @@ icx_config_templates:
     max: 16
 
 - name: System-Time-NTPSrcInt
+  playbook_rev: 0.1.0
   description: Configure the source interface for NTP traffic.
   comments: |
     # =====================
@@ -2416,6 +2507,7 @@ icx_config_templates:
     max: 1024
 
 - name: System-Time-TimeZone
+  playbook_rev: 0.1.0
   description: Modify the local timezone.
   playbook: icx_config_playbooks/System-Time-TimeZone.yml
   survey_spec:

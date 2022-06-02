@@ -5,7 +5,7 @@
 
   - name: Add Template to "Updated" List
     set_fact: {UpdatedTemplates: '{{UpdatedTemplates|default([]) + [tEntry]}}'}
-    vars: {tEntry: "{{bJtSpec.name}}"}
+    vars: {tEntry: "{{bJtSpec.name}} {{bPbRev}} -> {{bPbSpecRev}}"}
   when: rNewJt.json.id|default("null", true) == "null"
 
 - name: Add Survey Prompts
@@ -29,7 +29,7 @@
       use_fact_cache: '{{bJtSpec.use_fact_cache|default(false)}}'
       survey_enabled: '{{rPromptStatus.status|default(0, true) == 200}}'
       extra_vars: >-
-        playbook_rev: 0.0.1
+        playbook_rev: {{bPbSpecRev}}
 
         {{bJtSpec.comments|default()}}
     body_format: json
