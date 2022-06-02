@@ -119,17 +119,6 @@
     loop: '{{PromptPayloads}}'
   when: "'remove' not in MgmtFunc|lower"
 
-- name: Load ICX Config Template Vars
-  include_vars: tm_spec_icx_config_templates.yml
-
-- name: Remove ICX Config Templates
-  block:
-  - name: Remove ICX Config Templates
-    include_tasks: tm_remove_template.yml
-
-  - {name: End Play, meta: end_play}
-  when: "'remove' in MgmtFunc|lower"
-
 - {name: Template Management, include_tasks: template_management.yml}
 
 - name: Job Status

@@ -7,6 +7,9 @@
   uri: {url: '{{AwxApi}}/job_templates/?page_size={{rJtNum.json.count}}'}
   register: rJts
 
+- name: Load ICX Config Template Vars
+  include_vars: tm_spec_icx_config_templates.yml
+
 - name: Create/Update ICX Config Templates
   block:
   - name: Set Template List
@@ -19,3 +22,17 @@
     vars:
       bJt: "{{rJts.json.results|selectattr('name', '==', bJtSpec.name)|list}}"
   when: "'create' in MgmtFunc|lower"
+
+- name: Remove ICX Config Templates
+  block:
+  - name: Set Template List
+    set_fact: {RemoveTemplateList: '{{icx_config_template}}'}
+
+  - name: Remove ICX Config Templates
+    include_tasks: tm_remove_template.yml
+    loop: '{{RemoveTemplateList}}'
+    loop_control: {loop_var: bJtSpec}
+    vars:
+      bJt: "{{(rJts.json.results|selectattr('name', '==', bJtSpec.name)|list)}}"
+    when: bJt[0].project|default(0) == rThisTemplate.json.project
+  when: "'remove' in MgmtFunc|lower"

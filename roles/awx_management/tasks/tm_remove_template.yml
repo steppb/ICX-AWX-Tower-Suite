@@ -1,17 +1,13 @@
 ---
-- name: Get Template List
-  uri: {url: '{{AwxApi}}/job_templates/?name={{item}}'}
-  loop: '{{icx_config_templates}}'
-  register: JobTemplates
+- {name: Debug, debug: {msg: "Removing template {{bJtSpec.name}}"}}
 
 - name: Remove Templates
   uri:
-    url: '{{AwxApi}}/job_templates/{{JobTemplates.results[idx].json.results[0].id}}/'
+    url: '{{AwxApi}}/job_templates/{{bJt[0].id}}/'
     method: DELETE
     return_content: no
     status_code: 204
-  loop: '{{icx_config_templates}}'
-  loop_control: {index_var: idx}
-  when:
-    - JobTemplates.results[idx].json.results[0] is defined
-    - JobTemplates.results[idx].json.results[0].project == rThisTemplate.json.project
+
+- name: Add Template to "Removed" List
+  set_fact:
+    RemovedTemplates: '{{RemovedTemplates|default([]) + [bJtSpec.name]}}'
