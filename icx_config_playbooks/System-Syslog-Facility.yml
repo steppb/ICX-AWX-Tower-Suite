@@ -1,4 +1,3 @@
-#! Description: Configure Syslog Server Facility Options.
 #! Prompt: [{question_name: Logging Facility@colon, question_description: '', required: true, type: multiplechoice, variable: prompt_log_facility, min: null, max: null, default: '', choices: auth\ncron\ndaemon\nkern\nlocal0\nlocal1\nlocal2\nlocal3\nlocal4\nlocal5\nlocal6\nlocal7\nlpr\nmail\nnews\nsys9\nsys10\nsys11\nsys12\nsys13\nsys14\nsyslog\nuser\nuucp}]
 # =====================
 ---

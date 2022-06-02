@@ -1,4 +1,3 @@
-#! Description: Enable/Disable logging severity level.
 #! Prompt: [{question_name: Enable or Disable Severity Level@colon, question_description: '', required: true, type: multiplechoice, variable: prompt_log_level_enable, min: null, max: null, default: '', choices: Enable\nDisable}, {question_name: Syslog Message Severity@colon, question_description: '', required: true, type: multiplechoice, variable: prompt_log_level, min: null, max: null, default: '', choices: alerts\ncritical\ndebugging\nemergencies\nerrors\ninformational\nnotifications\nwarnings}]
 # =====================
 ---

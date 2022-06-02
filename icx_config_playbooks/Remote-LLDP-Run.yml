@@ -1,4 +1,3 @@
-#! Description: Enable/Disable LLDP.
 #! Prompt: [{question_name: Enable/Disable LLDP@colon, required: true, type: multiplechoice, variable: prompt_lldp_enable, default: Enable, choices: Enable\nDisable}]
 # =====================
 ---

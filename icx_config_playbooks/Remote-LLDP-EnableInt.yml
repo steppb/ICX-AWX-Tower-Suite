@@ -1,4 +1,3 @@
-#! Description: Enable/Disable LLDP on interface(s).
 #! Prompt: [{question_name: Enable/Disable LLDP@colon, required: true, type: multiplechoice, variable: prompt_lldp_enable, default: Enable, choices: Enable\nDisable}, {question_name: LLDP Operating Mode@colon, required: true, type: multiplechoice, variable: prompt_lldp_opmode, default: ports, choices: ports\nreceive\ntransmit}, {question_name: Ethernet Interface(s)@colon, question_description: (e.g. e 1/1/1@comma e 1/1/2 to 1/1/5), required: true, type: text, variable: prompt_lldp_enable_int, min: 3, max: 1024, default: all}]
 # =====================
 ---

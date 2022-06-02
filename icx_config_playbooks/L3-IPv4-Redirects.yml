@@ -1,4 +1,3 @@
-#! Description: Enable/Disable IPv4 ICMP redirects on a Virtual Interface.
 #! Prompt: [{question_name: Enable or Disable ICMP Redirects@colon, question_description: '', required: true, type: multiplechoice, variable: prompt_ipv4_redirect, min: null, max: null, default: Disable, choices: Enable\nDisable}, {question_name: Virtual Interface@colon, question_description: (e.g. ve 10), required: true, type: text, variable: prompt_ipv4_redirect_int, min: 2, max: 1024, default: ''}]
 # =====================
 ---

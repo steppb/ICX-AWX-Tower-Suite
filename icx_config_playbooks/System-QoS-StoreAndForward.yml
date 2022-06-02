@@ -1,4 +1,3 @@
-#! Description: (ICX7750 only) Configure store-and-forward mode and reload switch.
 # =====================
 # Note: Device will reload after successfully configuring store-and-forward mode.
 ---

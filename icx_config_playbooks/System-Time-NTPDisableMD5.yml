@@ -1,4 +1,3 @@
-#! Description: Disable NTP MD5 Authentication.
 # =====================
 ---
 - hosts: all

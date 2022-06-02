@@ -1,4 +1,3 @@
-#! Description: Enable logging to console.
 # =====================
 ---
 - hosts: all

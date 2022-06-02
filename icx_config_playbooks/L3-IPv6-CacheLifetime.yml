@@ -1,4 +1,3 @@
-#! Description: Configure the IPv6 cache-aging lifetime.
 #! Prompt: [{question_name: IPv6 Cache-Lifetime@colon, question_description: (in seconds), required: true, type: integer, variable: prompt_ipv6_cache, min: 0, max: 4294967295, default: 0}]
 # =====================
 ---

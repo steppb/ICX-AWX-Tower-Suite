@@ -1,4 +1,3 @@
-#! Description: Disable HTTP access.
 # =====================
 ---
 - hosts: all

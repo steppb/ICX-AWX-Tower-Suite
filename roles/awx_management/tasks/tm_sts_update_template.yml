@@ -3,26 +3,11 @@
   block:
   - {name: Debug, debug: {msg: "Updating template '{{bJtName}}'"}}
 
-  - name: Get Playbook Descriptions
-    shell: grep '{{DescRegex}}' {{PbFilePath}} | sed 's/{{DescRegex}}//g'
-    register: description
-    changed_when: false
-    failed_when: false
-    vars: {DescRegex: '#! Description: '}
-
   - name: Get Playbook Comments
     shell: cat {{PbFilePath}} | grep '^# '
     changed_when: false
     failed_when: false
     register: PlaybookComments
-
-  - name: Add Description to Template
-    uri:
-      url: '{{AwxApi}}/job_templates/{{bJtId}}/'
-      method: PATCH
-      headers: {Content-Type: "application/json"}
-      body: {description: '{{description.stdout_lines[0]|default("")}}'}
-      body_format: json
 
   - name: Scrape Playbook Prompts
     shell: "grep '^#! Prompt' {{PbFilePath}} | sed 's/^.*Prompt: //g'"
@@ -62,12 +47,13 @@
           - PromptStatus.status == 200
     when: RawPrompts.stdout_lines[0] is defined
 
-  - name: Add Comments and Version to Template
+  - name: Update Template Options
     uri:
       url: '{{AwxApi}}/job_templates/{{bJtId}}/'
       method: PATCH
       headers: {Content-Type: "application/json"}
       body:
+        description: '{{bJtSpec.description|default("", true)}}'
         extra_vars: >-
           template_version: {{AwxMgmtVer}}
 

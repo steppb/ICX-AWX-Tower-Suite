@@ -1,4 +1,3 @@
-#! Description: Apply login banner(s).
 #! Prompt: [{question_name: Banner Connection(s)@colon, required: true, type: multiselect, variable: prompt_banner_conn, default: motd\nexec\nincoming, choices: motd\nexec\nincoming}, {question_name: Banner Text@colon, required: true, type: textarea, variable: prompt_banner_text, min: 1, max: 2556}]
 # =====================
 ---

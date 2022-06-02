@@ -1,4 +1,3 @@
-#! Description: Generate SSH client key.
 # =====================
 ---
 - hosts: all

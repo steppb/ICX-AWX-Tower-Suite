@@ -1,4 +1,3 @@
-#! Description: Disable Telnet server.
 # =====================
 ---
 - hosts: all

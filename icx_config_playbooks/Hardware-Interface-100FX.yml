@@ -1,4 +1,3 @@
-#! Description: Enable/Disable 100BaseFX support on a fiber port.
 #! Prompt: [{question_name: Enable/Disable 100BaseFX support@colon, required: true, type: multiplechoice, variable: prompt_100fx_enable, default: Enable, choices: Enable\nDisable}, {question_name: Interface or Range@colon, question_description: (e.g. eth 1/1/1 or eth 1/1/2 to 1/1/4 for range), required: true, type: text, variable: prompt_100fx_int, min: 3, max: 1024}]
 # =====================
 ---

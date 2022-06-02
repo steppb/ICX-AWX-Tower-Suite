@@ -1,4 +1,3 @@
-#! Description: Generate SSH server key.
 # =====================
 ---
 - hosts: all

@@ -1,4 +1,3 @@
-#! Description: Add SSH ACL permit entry for IPv4/6 host or range.
 #! Prompt: [{question_name: SSH Access-List name or number@colon, required: true, type: text, variable: prompt_ssh_acl_name, min: 1, max: 1024}, {question_name: IPv4/6 Address or Range@colon, question_description: (e.g. 10.10.10.0/24 or fc00@colon@colon0/64 for range), required: true, type: text, variable: prompt_ssh_allow, min: 1, max: 1024}, {question_name: Log Matches@question, required: true, type: multiplechoice, variable: prompt_log_match, default: 'no', choices: yes\nno}]
 # =====================
 ---

@@ -1,275 +1,367 @@
-icx_config_templates:
 - name: Hardware-Interface-100FX
+  description: Enable/Disable 100BaseFX support on a fiber port.
   playbook: icx_config_playbooks/Hardware-Interface-100FX.yml
 
 - name: L2-MSTP-Config
+  description: Setup and start initial MSTP configuration.
   playbook: icx_config_playbooks/L2-MSTP-Config.yml
 
 - name: L2-MSTP-Instance
+  description: Configure MSTP instance priority.
   playbook: icx_config_playbooks/L2-MSTP-Instance.yml
 
 - name: L2-MSTP-Interface
+  description: Configure interfaces as MSTP admin-edge or point-to-point ports.
   playbook: icx_config_playbooks/L2-MSTP-Interface.yml
 
 - name: L2-MSTP-VLAN
+  description: Add VLAN(s) to MSTP Instance.
   playbook: icx_config_playbooks/L2-MSTP-VLAN.yml
 
 - name: L2-STP-BPDUGuard
+  description: Enable/Disable STP BPDU guard on an interface.
   playbook: icx_config_playbooks/L2-STP-BPDUGuard.yml
 
 - name: L2-STP-DesignatedProtect
+  description: Enable/Disable Spanning-tree designated-protect on an interface.
   playbook: icx_config_playbooks/L2-STP-DesignatedProtect.yml
 
 - name: L2-STP-FastUplinkSpan
+  description: Enable/Disable Fast Uplink Span for interface(s).
   playbook: icx_config_playbooks/L2-STP-FastUplinkSpan.yml
 
 - name: L2-VLAN-Config
+  description: Add or modify VLAN.
   playbook: icx_config_playbooks/L2-VLAN-Config.yml
 
 - name: L2-VLAN-Default
+  description: Configure default VLAN.
   playbook: icx_config_playbooks/L2-VLAN-Default.yml
 
 - name: L2-VLAN-DefaultDisablePorts
+  description: Disable all L2 ports in the default or user-specified VLAN.
   playbook: icx_config_playbooks/L2-VLAN-DefaultDisablePorts.yml
 
 - name: L3-IPv4-ACL
+  description: Create or replace IPv4 Access-List.
   playbook: icx_config_playbooks/L3-IPv4-ACL.yml
 
 - name: L3-IPv4-DefaultRoute
+  description: Configure default route.
   playbook: icx_config_playbooks/L3-IPv4-DefaultRoute.yml
 
 - name: L3-IPv4-Interface
+  description: Add/Remove/Replace IPv4 address on interface.
   playbook: icx_config_playbooks/L3-IPv4-Interface.yml
 
 - name: L3-IPv4-MCastPIM
+  description: Enable IPv4 PIM routing.
   playbook: icx_config_playbooks/L3-IPv4-MCastPIM.yml
 
 - name: L3-IPv4-MCastPIMFilter
+  description: Configure IP PIM Neighbor-Filter ACL.
   playbook: icx_config_playbooks/L3-IPv4-MCastPIMFilter.yml
 
 - name: L3-IPv4-MCastPIMInterface
+  description: Enable IPv4 PIM-Sparse on a router interface.
   playbook: icx_config_playbooks/L3-IPv4-MCastPIMInterface.yml
 
 - name: L3-IPv4-OSPFGlobal
+  description: Configure OSPF area.
   playbook: icx_config_playbooks/L3-IPv4-OSPFGlobal.yml
 
 - name: L3-IPv4-OSPFInt
+  description: Configure OSPF interface.
   playbook: icx_config_playbooks/L3-IPv4-OSPFInt.yml
 
 - name: L3-IPv4-ProxyArp
+  description: Enable/Disable proxy-arp for an interface.
   playbook: icx_config_playbooks/L3-IPv4-ProxyArp.yml
 
 - name: L3-IPv4-Redirects
+  description: Enable/Disable IPv4 ICMP redirects on a Virtual Interface.
   playbook: icx_config_playbooks/L3-IPv4-Redirects.yml
 
 - name: L3-IPv4-VRRP
+  description: Add or modify VRRP VRID on interface.
   playbook: icx_config_playbooks/L3-IPv4-VRRP.yml
 
 - name: L3-IPv6-CacheLifetime
+  description: Configure the IPv6 cache-aging lifetime.
   playbook: icx_config_playbooks/L3-IPv6-CacheLifetime.yml
 
 - name: L3-IPv6-DefaultRoute
+  description: Configure default IPv6 route.
   playbook: icx_config_playbooks/L3-IPv6-DefaultRoute.yml
 
 - name: L3-IPv6-Interface
+  description: Add/Remove/Replace IPv6 address on interface.
   playbook: icx_config_playbooks/L3-IPv6-Interface.yml
 
 - name: L3-IPv6-MCastPIM
+  description: Enable IPv6 PIM routing.
   playbook: icx_config_playbooks/L3-IPv6-MCastPIM.yml
 
 - name: L3-IPv6-MCastPIMFilter
+  description: Configure IPv6 PIM Neighbor-Filter ACL.
   playbook: icx_config_playbooks/L3-IPv6-MCastPIMFilter.yml
 
 - name: L3-IPv6-MCastPIMInterface
+  description: Enable IPv6 PIM-Sparse on a router interface.
   playbook: icx_config_playbooks/L3-IPv6-MCastPIMInterface.yml
+
 - name: L3-IPv6-OSPFGlobal
+  description: Configure OSPFv3 area.
   playbook: icx_config_playbooks/L3-IPv6-OSPFGlobal.yml
 
 - name: L3-IPv6-OSPFInt
+  description: Configure OSPFv3 interface.
   playbook: icx_config_playbooks/L3-IPv6-OSPFInt.yml
 
 - name: L3-IPv6-Redirects
+  description: Enable/Disable IPv6 ICMP redirects on a Virtual Interface.
   playbook: icx_config_playbooks/L3-IPv6-Redirects.yml
 
 - name: L3-IPv6-VRRP
+  description: Add or modify VRRPv3 VRID on interface.
   playbook: icx_config_playbooks/L3-IPv6-VRRP.yml
 
 - name: LAG-Interface-Add
+  description: Create and deploy a new LAG.
   playbook: icx_config_playbooks/LAG-Interface-Add.yml
 
 - name: LAG-Interface-Enable
+  description: Enable a disabled LAG interface.
   playbook: icx_config_playbooks/LAG-Interface-Enable.yml
 
 - name: LAG-Interface-Name
+  description: Set the port-name of a LAG port.
   playbook: icx_config_playbooks/LAG-Interface-Name.yml
 
 - name: PortSec-FlexAuth-Global
+  description: Configure 802.1X global settings.
   playbook: icx_config_playbooks/PortSec-FlexAuth-Global.yml
 
 - name: PortSec-FlexAuth-Int
+  description: Enable 802.1X on interface.
   playbook: icx_config_playbooks/PortSec-FlexAuth-Int.yml
 
 - name: PortSec-StickyMac
+  description: Apply Sticky-MAC Port security to interface.
   playbook: icx_config_playbooks/PortSec-StickyMac.yml
 
 - name: Remote-AAA-Accounting
+  description: Configure AAA accounting for commands and/or EXEC login sessions.
   playbook: icx_config_playbooks/Remote-AAA-Accounting.yml
 
 - name: Remote-AAA-Authentication
+  description: Configure AAA authentication.
   playbook: icx_config_playbooks/Remote-AAA-Authentication.yml
 
 - name: Remote-AAA-Authorization
+  description: Configure AAA authorization for commands and EXEC sessions.
   playbook: icx_config_playbooks/Remote-AAA-Authorization.yml
 
 - name: Remote-HTTP-Disable
+  description: Disable HTTP access.
   playbook: icx_config_playbooks/Remote-HTTP-Disable.yml
 
 - name: Remote-LLDP-Advertise
+  description: Configure LLDP advertisements on interface(s).
   playbook: icx_config_playbooks/Remote-LLDP-Advertise.yml
 
 - name: Remote-LLDP-EnableInt
+  description: Enable/Disable LLDP on interface(s).
   playbook: icx_config_playbooks/Remote-LLDP-EnableInt.yml
 
 - name: Remote-LLDP-Run
+  description: Enable/Disable LLDP.
   playbook: icx_config_playbooks/Remote-LLDP-Run.yml
 
 - name: Remote-MGMT-ACLDenyCreate
+  description: Create Deny ACLs for IPv4 and IPv6.
   playbook: icx_config_playbooks/Remote-MGMT-ACLDenyCreate.yml
 
 - name: Remote-MGMT-ACLPermit
+  description: Add or modify IPv4/6 ACL.
   playbook: icx_config_playbooks/Remote-MGMT-ACLPermit.yml
 
 - name: Remote-MGMT-ClientList
+  description: Add Client IPv4/6 address to service access list.
   playbook: icx_config_playbooks/Remote-MGMT-ClientList.yml
 
 - name: Remote-Radius-Host
+  description: Add RADIUS server.
   playbook: icx_config_playbooks/Remote-Radius-Host.yml
 
 - name: Remote-Radius-SrcInt
+  description: Configure the source interface for RADIUS traffic.
   playbook: icx_config_playbooks/Remote-Radius-SrcInt.yml
 
 - name: Remote-Radius-Timeout
+  description: Configure RADIUS timeout.
   playbook: icx_config_playbooks/Remote-Radius-Timeout.yml
 
 - name: Remote-SNMP-ConfigTacacs
+  description: Enable SNMP config-tacacs.
   playbook: icx_config_playbooks/Remote-SNMP-ConfigTacacs.yml
 
 - name: Remote-SNMP-LinkChange
+  description: Enable/Disable SNMP traps for interface state changes.
   playbook: icx_config_playbooks/Remote-SNMP-LinkChange.yml
 
 - name: Remote-SNMP-Location
+  description: Configure the system location.
   playbook: icx_config_playbooks/Remote-SNMP-Location.yml
 
 - name: Remote-SNMP-SrcInt
+  description: Configure the source interface for outgoing SNMP traps.
   playbook: icx_config_playbooks/Remote-SNMP-SrcInt.yml
 
 - name: Remote-SNMPv2
+  description: Add IPv4/6 SNMPv2 community string.
   playbook: icx_config_playbooks/Remote-SNMPv2.yml
 
 - name: Remote-SNMPv3-Group
+  description: Add or replace SNMPv3 group.
   playbook: icx_config_playbooks/Remote-SNMPv3-Group.yml
 
 - name: Remote-SNMPv3-Host
+  description: Add IPv4/6 SNMPv3 Server Address.
   playbook: icx_config_playbooks/Remote-SNMPv3-Host.yml
 
 - name: Remote-SNMPv3-User
+  description: Add or replace SNMPv3 user.
   playbook: icx_config_playbooks/Remote-SNMPv3-User.yml
 
 - name: Remote-SNMPv3-View
+  description: Include/exclude MIB subtree from view.
   playbook: icx_config_playbooks/Remote-SNMPv3-View.yml
 
 - name: Remote-SSH-ACLPermit
+  description: Add SSH ACL permit entry for IPv4/6 host or range.
   playbook: icx_config_playbooks/Remote-SSH-ACLPermit.yml
 
 - name: Remote-SSH-Harden
+  description: Apply SSH hardening config.
   playbook: icx_config_playbooks/Remote-SSH-Harden.yml
 
 - name: Remote-SSH-KeyClient
+  description: Generate SSH client key.
   playbook: icx_config_playbooks/Remote-SSH-KeyClient.yml
 
 - name: Remote-SSH-KeyServer
+  description: Generate SSH server key.
   playbook: icx_config_playbooks/Remote-SSH-KeyServer.yml
 
 - name: Remote-Tacacs-Host
+  description: Add TACACS server.
   playbook: icx_config_playbooks/Remote-Tacacs-Host.yml
 
 - name: Remote-Tacacs-SrcInt
+  description: Configure the source interface for TACACS traffic.
   playbook: icx_config_playbooks/Remote-Tacacs-SrcInt.yml
 
 - name: Remote-Telnet-Disable
+  description: Disable Telnet server.
   playbook: icx_config_playbooks/Remote-Telnet-Disable.yml
 
 - name: Remote-User-EnablePW
+  description: Configure Enable Password.
   playbook: icx_config_playbooks/Remote-User-EnablePW.yml
 
 - name: Remote-User-LocalAcct
+  description: Add a local user account.
   playbook: icx_config_playbooks/Remote-User-LocalAcct.yml
 
 - name: Remote-User-StrictMode
+  description: Configure strict standards for passwords.
   playbook: icx_config_playbooks/Remote-User-StrictMode.yml
 
 - name: System-Errdisable-PacketInError
+  description: Configure sampling interval and auto-recovery for packet inError.
   playbook: icx_config_playbooks/System-Errdisable-PacketInError.yml
 
 - name: System-Misc-Banner
+  description: Apply login banner(s).
   playbook: icx_config_playbooks/System-Misc-Banner.yml
 
 - name: System-Misc-BootPriority
+  description: Modify boot priority.
   playbook: icx_config_playbooks/System-Misc-BootPriority.yml
 
 - name: System-Misc-ConsoleHarden
+  description: Secure console access.
   playbook: icx_config_playbooks/System-Misc-ConsoleHarden.yml
 
 - name: System-Misc-DHCPClient
+  description: Enable/Disable DHCP client.
   playbook: icx_config_playbooks/System-Misc-DHCPClient.yml
 
 - name: System-Misc-DNS
+  description: Add a DNS domain and server IPv4/6 address.
   playbook: icx_config_playbooks/System-Misc-DNS.yml
 
 - name: System-Misc-DoS
+  description: Configure DoS protection on device.
   playbook: icx_config_playbooks/System-Misc-DoS.yml
 
 - name: System-Misc-Hostname
+  description: Configure hostname.
   playbook: icx_config_playbooks/System-Misc-Hostname.yml
 
 - name: System-QoS-Profiles
+  description: Configure QoS queues and mapping.
   playbook: icx_config_playbooks/System-QoS-Profiles.yml
 
 - name: System-QoS-RLimitOutput
+  description: Configure rate-limiting on an interface.
   playbook: icx_config_playbooks/System-QoS-RLimitOutput.yml
 
 - name: System-QoS-StoreAndForward
+  description: (ICX7750 only) Configure store-and-forward mode and reload switch.
   playbook: icx_config_playbooks/System-QoS-StoreAndForward.yml
 
 - name: System-QoS-Trust
+  description: Configure interface to inspect ingress traffic and map to matching queues.
   playbook: icx_config_playbooks/System-QoS-Trust.yml
 
 - name: System-Syslog-Buffer
+  description: Modify syslog buffer length.
   playbook: icx_config_playbooks/System-Syslog-Buffer.yml
 
 - name: System-Syslog-Console
+  description: Enable logging to console.
   playbook: icx_config_playbooks/System-Syslog-Console.yml
 
 - name: System-Syslog-Facility
+  description: Configure Syslog Server Facility Options.
   playbook: icx_config_playbooks/System-Syslog-Facility.yml
 
 - name: System-Syslog-Host
+  description: Configure syslog forwarding to a syslog server.
   playbook: icx_config_playbooks/System-Syslog-Host.yml
 
 - name: System-Syslog-Severity
+  description: Enable/Disable event logging at severity level.
   playbook: icx_config_playbooks/System-Syslog-Severity.yml
 
 - name: System-Syslog-SrcInt
+  description: Configure the source interface for syslog traffic.
   playbook: icx_config_playbooks/System-Syslog-SrcInt.yml
 
 - name: System-Time-NTPDisableMD5
+  description: Disable NTP MD5 Authentication.
   playbook: icx_config_playbooks/System-Time-NTPDisableMD5.yml
 
 - name: System-Time-NTPServer
+  description: Add NTP Server and/or NTP authentication key.
   playbook: icx_config_playbooks/System-Time-NTPServer.yml
 
 - name: System-Time-NTPSrcInt
+  description: Configure the source interface for NTP traffic.
   playbook: icx_config_playbooks/System-Time-NTPSrcInt.yml
 
 - name: System-Time-TimeZone
+  description: Modify the local timezone.
   playbook: icx_config_playbooks/System-Time-TimeZone.yml
