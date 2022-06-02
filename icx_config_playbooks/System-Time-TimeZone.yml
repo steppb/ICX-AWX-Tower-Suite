@@ -1,5 +1,3 @@
-#! Prompt: [{question_name: Timezone, question_description: Select Timezone, required: true, type: multiplechoice, variable: template_tz, default: '', choices: us alaska\nus aleutian\nus arizona\nus central\nus east-indiana\nus eastern\nus hawaii\nus michigan\nus mountain\nus pacific\nus samoa\ngmt gmt+00\ngmt gmt+01\ngmt gmt+02\ngmt gmt+03\ngmt gmt+03@colon30\ngmt gmt+04\ngmt gmt+04@colon30\ngmt gmt+05\ngmt gmt+05@colon30\ngmt gmt+06\ngmt gmt+06@colon30\ngmt gmt+07\ngmt gmt+08\ngmt gmt+09\ngmt gmt+09@colon30\ngmt gmt+10\ngmt gmt+10@colon30\ngmt gmt+11\ngmt gmt+11@colon30\ngmt gmt+12\ngmt gmt-01\ngmt gmt-02\ngmt gmt-03\ngmt gmt-03@colon30\ngmt gmt-04\ngmt gmt-05\ngmt gmt-06\ngmt gmt-07\ngmt gmt-08\ngmt gmt-08@colon30\ngmt gmt-09\ngmt gmt-09@colon30\ngmt gmt-10\ngmt gmt-11\ngmt gmt-12, new_question: true}, {question_name: Summer-Time, question_description: Configure Summer-Time@question, required: true, type: multiplechoice, variable: template_tz_summertime, default: 'False', choices: True\nFalse, new_question: true} ]
-# =====================
 ---
 - hosts: all
   connection: network_cli
@@ -8,14 +6,13 @@
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
-    template_tz_summertime: false
     newline_var: "\r"
     error_parse: '^.*ConnectionError: '
 
   tasks:
   - name: Configure Timezone
     icx_config:
-      lines: clock timezone {{template_tz}}
+      lines: clock timezone {{prompt_tz}}
       save_when: changed
     register: icxconfig_status
     failed_when: icxconfig_status.msg is defined and "MODULE FAILURE" not in icxconfig_status.msg
@@ -33,4 +30,4 @@
     icx_config:
       lines: clock summer-time
       save_when: changed
-    when: template_tz_summertime|bool
+    when: prompt_tz_summertime|default(false)

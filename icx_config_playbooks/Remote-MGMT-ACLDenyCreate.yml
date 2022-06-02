@@ -1,6 +1,3 @@
-# =====================
-# Note: Creates deny ACLs named '86' for IPv4 and 'NoRemoteAccess' for IPv6.
-#       These ACLs are required for other templates that blackhole traffic.
 ---
 - hosts: all
   connection: network_cli

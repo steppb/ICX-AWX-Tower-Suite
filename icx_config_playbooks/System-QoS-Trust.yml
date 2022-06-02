@@ -1,6 +1,3 @@
-#! Prompt: [{question_name: Target Interface, question_description: Enter the interface. (i.e. e1/1/2), required: true, type: text, variable: template_qos_int, min: 0, max: 1024, default: '', choices: '', new_question: true}]
-# =====================
-# Note: DSCP trust can only be configured on physical ethernet interfaces.
 ---
 - hosts: all
   connection: network_cli
@@ -15,13 +12,13 @@
   tasks:
   - name: Verify Interface type
     assert:
-      that: template_qos_int is match("^e.*")
+      that: prompt_qos_int is match("^e.*")
       fail_msg: "ERROR: DSCP Trust can only be applied to ethernet interfaces"
 
   - name: Configure QoS Trust on Interface
     icx_config:
       lines: trust dscp
-      parents: interface {{template_qos_int}}
+      parents: interface {{prompt_qos_int}}
       save_when: changed
     register: icxconfig_status
     failed_when: icxconfig_status.msg is defined and "MODULE FAILURE" not in icxconfig_status.msg

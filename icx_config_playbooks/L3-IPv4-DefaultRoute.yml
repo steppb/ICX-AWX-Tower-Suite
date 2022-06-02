@@ -1,5 +1,3 @@
-#! Prompt: [{question_name: Default Router, question_description: Enter IP address of default router@colon, required: true, type: text, variable: template_rtr_defrtr, min: 7, max: 15, default: '', choices: '', new_question: true}, {question_name: OSPF Default Information Originate, question_description: Include default route in OSPF updates@question, required: true, type: multiplechoice, variable: template_rtr_ospf_definfo, min: null, max: null, default: 'no', choices: yes\nno}]
-# =====================
 ---
 - hosts: all
   connection: network_cli
@@ -13,7 +11,7 @@
 
   tasks:
   - name: Configure Default Route
-    icx_config: {lines: 'ip route 0.0.0.0/0 {{template_rtr_defrtr}}', save_when: changed}
+    icx_config: {lines: 'ip route 0.0.0.0/0 {{prompt_ipv4_defrtr}}', save_when: changed}
     register: icxconfig_status
     failed_when: icxconfig_status.msg is defined and "MODULE FAILURE" not in icxconfig_status.msg
 
@@ -26,7 +24,7 @@
     icx_config: {lines: default-information-originate, parents: router ospf, save_when: changed}
     register: icxconfig_status
     failed_when: false
-    when: error_msg is not defined and template_rtr_ospf_definfo|bool
+    when: error_msg is not defined and prompt_ipv4_ospf_definfo|bool
 
   - name: Parse Switch Error
     set_fact:

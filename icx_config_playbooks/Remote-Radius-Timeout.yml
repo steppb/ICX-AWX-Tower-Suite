@@ -1,5 +1,3 @@
-#! Prompt: [{question_name: Radius-Server Retransmit@colon, question_description: Number of retries before giving up, required: true, type: integer, variable: prompt_radius_retransmit, min: 1, max: 5, default: 3, choices: ''}, {question_name: Radius-Server Timeout@colon, question_description: Server timeout in seconds, required: true, type: integer, variable: prompt_radius_timeout, min: 1, max: 15, default: 3, choices: ''}]
-# =====================
 ---
 - hosts: all
   connection: network_cli

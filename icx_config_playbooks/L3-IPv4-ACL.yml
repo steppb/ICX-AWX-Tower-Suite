@@ -1,14 +1,3 @@
-#! Prompt: [{question_name: IPv4 Access-List Name or Number@colon, required: true, type: text, variable: prompt_ipv4_acl_name, min: 1, max: 1024}, {question_name: IPv4 Access-List Type@colon, required: true, type: multiplechoice, variable: prompt_ipv4_acl_type, choices: standard\nextended}, {question_name: IPv4 Access-List@colon, required: true, type: textarea, variable: prompt_ipv4_acl, min: 0, max: 100000}]
-# =====================
-# Note: If the ACL already exists, it will be replaced with the access-list entered
-#       into the survey prompt.
-#
-# Note: The 'ssh access-group ###' command will be removed and re-added if it matches
-#       the access-list name or number entered in the prompt.  This is to avoid a
-#       lockout when applying the access-list.
-#
-# Note: Only the ssh access-group will be checked.  A lockout can occur if the
-#       access-list being applied is tied to a router interface.
 ---
 - hosts: all
   connection: network_cli

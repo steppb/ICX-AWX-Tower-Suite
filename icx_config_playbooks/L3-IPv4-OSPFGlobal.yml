@@ -1,10 +1,3 @@
-#! Prompt: [{question_name: OSPF Area ID@colon, question_description: '', required: true, type: text, variable: template_rtr_ospf_area, min: 1, max: 1024, default: '', choices: ''}]
-# =====================
-# Note: In addition to creating a new OSPF area, the following global options are also applied:
-#       auto-cost reference-bandwidth 10000
-#       graceful-restart restart-time 60
-#       log adjacency
-#       redistribute connected
 ---
 - hosts: all
   connection: network_cli
@@ -21,7 +14,7 @@
     icx_config:
       lines: |
         router ospf
-         area {{template_rtr_ospf_area}}
+         area {{prompt_ipv4_ospf_area}}
          auto-cost reference-bandwidth 10000
          graceful-restart restart-time 60
          log adjacency

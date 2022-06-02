@@ -1,4 +1,3 @@
-#! AwxMgmtIgnore
 ---
 - hosts: all
   connection: network_cli

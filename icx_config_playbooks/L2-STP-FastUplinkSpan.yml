@@ -1,5 +1,3 @@
-#! Prompt: [{question_name: Enable/Disable Fast Uplink Span@colon, required: true, type: multiplechoice, variable: prompt_stp_fastuplink, default: Enable, choices: Enable\nDisable}, {question_name: Ethernet or LAG interface(s)@colon, question_description: (e.g. e 1/1/1@comma e 1/1/2 to 1/1/5@comma lag 10@comma lag 11 to 15), required: true, type: text, variable: prompt_stp_fastuplink_int, min: 3, max: 1024}]
-# =====================
 ---
 - hosts: all
   connection: network_cli

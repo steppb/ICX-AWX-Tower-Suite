@@ -1,5 +1,3 @@
-#! Prompt: [{question_name: Enable/Disable Link-Change Traps@colon, required: true, type: multiplechoice, variable: prompt_snmp_intchange, default: Disable, choices: Enable\nDisable}, {question_name: Interface(s)@colon, question_description: (e.g. eth 1/1/1 or eth 1/1/2 to 1/1/4 for range), required: true, type: text, variable: prompt_snmp_intchange_int, min: 3, max: 1024}]
-# =====================
 ---
 - hosts: all
   connection: network_cli

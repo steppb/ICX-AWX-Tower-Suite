@@ -1,7 +1,3 @@
-#! Prompt: [{question_name: Target Interface, question_description: Enter the interface. (i.e. e1/1/1), required: true, type: text, variable: template_qos_rlimitint, min: 0, max: 1024, default: '', choices: '' }, {question_name: Target Rate-Limit, question_description: Enter the rate-limit (in Kbps), required: true, type: text, variable: template_qos_rlimitkb, min: 0, max: 1024, default: '', choices: '', new_question: true}, {question_name: Target Priority, question_description: Enter the target priority for the rate-limit. (optional), required: false, type: integer, variable: template_qos_rlimitpri, min: 0, max: 7, default: '', choices: '', new_question: true}]
-# =====================
-# Note: ICX7750 requires running the System-QoS-StoreAndForward
-#       template before this template can be applied.
 ---
 - hosts: all
   connection: network_cli
@@ -33,14 +29,14 @@
 
   - name: Setting Priority Value
     set_fact:
-      priority: "priority {{template_qos_rlimitpri}}"
+      priority: "priority {{prompt_qos_rlimitpri}}"
       cacheable: no
-    when: template_qos_rlimitpri is defined and template_qos_rlimitpri != ''
+    when: prompt_qos_rlimitpri is defined and prompt_qos_rlimitpri != ''
 
   - name: Configuring Rate-Limit on Interface
     icx_config:
-      lines: rate-limit output shaping {{template_qos_rlimitkb}} {{priority}}
-      parents: interface {{template_qos_rlimitint}}
+      lines: rate-limit output shaping {{prompt_qos_rlimitkb}} {{priority}}
+      parents: interface {{prompt_qos_rlimitint}}
       save_when: changed
     register: icxconfig_status
     failed_when: false

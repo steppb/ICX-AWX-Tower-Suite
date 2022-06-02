@@ -1,5 +1,3 @@
-#! Prompt: [{question_name: Default Router, question_description: Enter IPv6 address of default router@colon, required: true, type: text, variable: template_rtr_defv6rtr, min: 1, max: 1024, default: '', choices: ''}]
-# =====================
 ---
 - hosts: all
   connection: network_cli
@@ -16,7 +14,7 @@
     icx_config:
       lines: |
         ipv6 unicast-routing
-        ipv6 route ::/0 {{template_rtr_defv6rtr}}
+        ipv6 route ::/0 {{prompt_ipv6_defrtr}}
       save_when: changed
     register: IcxCfgStatus
     failed_when: IcxCfgStatus.msg is defined and "MODULE FAILURE" not in IcxCfgStatus.msg

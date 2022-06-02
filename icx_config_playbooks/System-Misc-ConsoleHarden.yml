@@ -1,5 +1,3 @@
-#! Prompt: [{question_name: Console Timeout (In Minutes)@colon, question_description: '', required: true, type: integer, variable: prompt_console_timeout, min: 0, max: 240, default: 10, choices: ''}]
-# =====================
 ---
 - hosts: all
   connection: network_cli

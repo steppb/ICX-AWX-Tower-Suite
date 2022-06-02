@@ -1,16 +1,3 @@
-#! Prompt: [{question_name: Source Interface@colon, question_description: (i.e. eth 1/2/2@comma ve 10), required: true, type: text, variable: prompt_srcint, min: 2, max: 1024, default: ''}]
-# =====================
-# The <host_srcint> variable takes precedence over the <prompt_srcint> variable that
-# is set by the AWX survey prompt.  The <host_srcint> variable is used to set the
-# source-interface for outgoing RADIUS, TACACS, NTP, SNMP and syslog traffic.
-# It can be manually defined for the host, inventory, template, etc.
-#
-# The management interface cannot be used as the source-interface for NTP or SNMP.
-# A LAG interface cannot be used as a source-interface for SNMP.
-# If the management or a LAG interface is defined in the <host_srcint> variable,
-# the following variables can be used to override for the corresponding application:
-# <host_snmp_srcint>: Use to set source-interface for SNMP.
-# <host_ntp_srcint>: Use to set source-interface for NTP.
 ---
 - hosts: all
   connection: network_cli

@@ -1,5 +1,3 @@
-#! Prompt: [{question_name: Enable/Disable DHCP Client@colon, question_description: '', required: true, type: multiplechoice, variable: prompt_dhcp_client, min: null, max: null, default: Disable, choices: Enable\nDisable}]
-# =====================
 ---
 - hosts: all
   connection: network_cli

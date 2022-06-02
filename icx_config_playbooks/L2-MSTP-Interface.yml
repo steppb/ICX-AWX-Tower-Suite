@@ -1,7 +1,3 @@
-#! Prompt: [{question_name: MSTP Point-to-Point Interface(s), question_description: Enter the MSTP Point-to-Point Interface(s). (e.g. e 1/1/1 or e1/1/1 to 1/1/24), required: false, type: text, variable: prompt_mstp_p2pint, min: 3, max: 1024}, {question_name: MSTP Edge Interface(s), question_description: Enter the MSTP Edge Interface(s). (e.g. e1/1/1 or e1/1/1 to 1/1/24), required: false, type: text, variable: prompt_mstp_edgeint, min: 3, max: 1024}]
-# =====================
-# Note: L2-MSTP-Config template needs to be applied before running this template.
-#       Only interfaces in an MSTP VLAN will be added to config.
 ---
 - hosts: all
   connection: network_cli

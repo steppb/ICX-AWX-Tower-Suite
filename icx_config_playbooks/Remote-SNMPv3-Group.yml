@@ -1,5 +1,3 @@
-#! Prompt: [{question_name: SNMPv3 Group Name@colon, required: true, type: text, variable: prompt_snmp_group, min: 1, max: 32}, {question_name: SNMPv3 ACL@colon, required: false, type: text, variable: prompt_snmp_acl, min: 1, max: 1024}, {question_name: SNMPv3 View Authentication@colon, required: true, type: multiplechoice, variable: prompt_snmp_auth, default: priv, choices: auth\nnoauth\npriv}, {question_name: SNMPv3 Read View Name@colon, required: false, type: text, variable: prompt_snmp_readview, min: 1, max: 32, default: all}, {question_name: SNMPv3 Write View Name@colon, required: false, type: text, variable: prompt_snmp_writeview, min: 1, max: 32, default: all}, {question_name: SNMPv3 Notify View Name@colon, required: false, type: text, variable: prompt_snmp_notifyview, min: 1, max: 32, default: all}]
-# =====================
 ---
 - hosts: all
   connection: network_cli

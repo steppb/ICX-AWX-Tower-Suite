@@ -1,9 +1,3 @@
-#! Prompt: [{question_name: Minimum Password Length@colon, question_description: '', required: false, type: integer, variable: prompt_rem_pwminlength, min: 1, max: 48, default: 12, choices: ''}]
-# =====================
-# Note: Applies the following config:
-#         enable strict-password-enforcement
-#         enable password-min-length {{prompt_rem_pwminlength}}
-#         enable user password-masking
 ---
 - hosts: all
   connection: network_cli
