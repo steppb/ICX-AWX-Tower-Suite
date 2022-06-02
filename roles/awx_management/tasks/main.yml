@@ -130,21 +130,21 @@
   - {name: End Play, meta: end_play}
   when: "'remove' in MgmtFunc|lower"
 
-- name: Display Update Message and Exit
-  block:
-    - name: Set AWX Management Version
-      set_fact: {ansible_icx_mgmt_ver: '{{AwxMgmtVer}}', cacheable: yes}
-
-    - name: Update Message
-      debug:
-        msg:
-          - "Template updated to version {{AwxMgmtVer}}."
-          - "Relaunch template to continue."
-
-    - {name: Ending Play, meta: end_play}
-  vars:
-    NoMgmtPrompt: '{{prompt_mgmt_role is not defined}}'
-    TemplateUpdate: '{{ServerVersion is version(AwxMgmtVer, "<")}}'
-  when: TemplateUpdate|bool or NoMgmtPrompt|bool
-
 - {name: Template Management, include_tasks: template_management.yml}
+
+- name: Job Status
+  debug:
+    msg:
+      - "Management Function: {{MgmtFunc|default('unspecified')}}"
+      - "========================"
+      - ""
+      - "Job Templates Created: {{CreatedTemplates|default([])|count}}"
+      - "========================"
+      - "{{CreatedTemplates|default()}}"
+      - "Job Templates Updated: {{UpdatedTemplates|default([])|count}}"
+      - "========================"
+      - "{{UpdatedTemplates|default()}}"
+      - "Job Templates Removed: {{RemovedTemplates|default([])|count}}"
+      - "========================"
+      - "{{RemovedTemplates|default()}}"
+      - "{{PostMsg|default()}}"

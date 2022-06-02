@@ -31,18 +31,3 @@
     vars:
       bJt: "{{rJts.json.results|selectattr('name', '==', bJtSpec.name)|list}}"
   when: "'create' in MgmtFunc|lower"
-
-
-- name: Debug
-  debug:
-    msg:
-      - "Job Templates Created"
-      - "========================"
-      - "{{CreatedTemplates|default(['none'])}}"
-      - ""
-      - "Job Templates Updated"
-      - "========================"
-      - "{{UpdatedTemplates|default(['none'])}}"
-      - ""
-
-- {name: End Play, meta: end_play}
