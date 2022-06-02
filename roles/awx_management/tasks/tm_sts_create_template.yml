@@ -1,6 +1,6 @@
 ---
 - name: Debug
-  debug: msg="Creating template '{{PbFileName}}'"
+  debug: msg="Creating template '{{bJtSpec.name}}'"
 
 - name: Create Template
   uri:
@@ -15,7 +15,7 @@
     tTemplateStruct:
       name: '{{bJtSpec.name}}'
       project: '{{PjId}}'
-      playbook: '{{PbFilePath}}'
+      playbook: '{{bJtSpec.playbook}}'
       ask_credential_on_launch: true
       ask_inventory_on_launch: '{{prompt_ask_inventory_on_launch|default(true)}}'
       ask_limit_on_launch: true

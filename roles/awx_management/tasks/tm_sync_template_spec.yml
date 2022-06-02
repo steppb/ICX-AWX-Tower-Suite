@@ -1,19 +1,13 @@
 ---
 - name: Template Create Block
   block:
-  - name: Create Templates
-    include_tasks: tm_sts_create_template.yml
-    vars:
-      PbFileName: '{{bJtSpec.name}}'
-      PbFilePath: '{{bJtSpec.playbook}}'
-    when: bJt[0].id is not defined
+  - {name: Create Templates, include_tasks: tm_sts_create_template.yml}
+  when: bJt[0].id is not defined
 
 - name: Template Update Block
   block:
   - name: Update Existing Templates
     include_tasks: tm_sts_update_template.yml
     vars:
-      PbFileName: '{{bJtSpec.name}}'
-      PbFilePath: '{{PjPath}}/{{bJtSpec.playbook}}'
       bJtId: '{{rNewJt.json.id|default(bJt[0].id)}}'
       bEV: '{{bJt[0].extra_vars|default("playbook_rev: 0.0.0", true)}}'

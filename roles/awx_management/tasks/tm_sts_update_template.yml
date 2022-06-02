@@ -1,33 +1,34 @@
 ---
-- name: Update Templates
+- name: If Updating Existing Template
   block:
-  - {name: Debug, debug: {msg: "Updating template '{{bJtName}}'"}}
-
-  - name: Add Survey Prompts
-    uri:
-      url: '{{AwxApi}}/job_templates/{{bJtId}}/survey_spec/'
-      method: POST
-      headers: {Content-Type: "application/json"}
-      body: {name: '', description: '', spec: '{{bJtSpec.survey_spec}}'}
-      body_format: json
-    register: rPromptStatus
-
-  - name: Update Template Options
-    uri:
-      url: '{{AwxApi}}/job_templates/{{bJtId}}/'
-      method: PATCH
-      headers: {Content-Type: "application/json"}
-      body:
-        description: '{{bJtSpec.description|default("", true)}}'
-        survey_enabled: '{{rPromptStatus.status|default(0, true) == 200}}'
-        extra_vars: >-
-          playbook_rev: 0.0.1
-
-          {{bJtSpec.comments|default()}}
-      body_format: json
+  - {name: Debug, debug: {msg: "Updating template '{{bJtSpec.name}}'"}}
 
   - name: Add Template to "Updated" List
-    set_fact: {UpdatedTemplates: '{{UpdatedTemplates|default([]) + [bJtName]}}'}
-  vars: {bJtName: '{{PbFileName}}'}
+    set_fact: {UpdatedTemplates: '{{UpdatedTemplates|default([]) + [tEntry]}}'}
+    vars: {tEntry: "{{bJtSpec.name}}"}
+  when: rNewJt.json.id|default("null", true) == "null"
+
+- name: Add Survey Prompts
+  uri:
+    url: '{{AwxApi}}/job_templates/{{bJtId}}/survey_spec/'
+    method: POST
+    headers: {Content-Type: "application/json"}
+    body: {name: '', description: '', spec: '{{bJtSpec.survey_spec}}'}
+    body_format: json
+  register: rPromptStatus
+
+- name: Update Template Options
+  uri:
+    url: '{{AwxApi}}/job_templates/{{bJtId}}/'
+    method: PATCH
+    headers: {Content-Type: "application/json"}
+    body:
+      description: '{{bJtSpec.description|default("", true)}}'
+      survey_enabled: '{{rPromptStatus.status|default(0, true) == 200}}'
+      extra_vars: >-
+        playbook_rev: 0.0.1
+
+        {{bJtSpec.comments|default()}}
+    body_format: json
 
 - {name: Reset Vars, set_fact: {rNewJt: , rPromptStatus: }}
