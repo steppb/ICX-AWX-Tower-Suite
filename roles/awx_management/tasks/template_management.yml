@@ -1,16 +1,4 @@
 ---
-- {name: Get Project Directory, uri: {url: '{{AwxApi}}/config/'}, register: AwxCfg}
-
-- name: Get Project Info
-  uri: {url: '{{AwxApi}}/projects/{{rThisTemplate.json.project}}/'}
-  register: rPjInfo
-
-- name: Set Job Variables
-  set_fact:
-    VerRe: '^.*(playbook|template)_version: ([0-9].[0-9]).*$'
-    PjId: "{{rThisTemplate.json.project}}"
-    PjPath: "{{AwxCfg.json.project_base_dir}}/{{rPjInfo.json.local_path}}"
-
 - name: Get Job Template Count
   uri: {url: '{{AwxApi}}/job_templates/'}
   register: rJtNum

@@ -14,7 +14,7 @@
   vars:
     tTemplateStruct:
       name: '{{bJtSpec.name}}'
-      project: '{{PjId}}'
+      project: '{{rThisTemplate.json.project}}'
       playbook: '{{bJtSpec.playbook}}'
       ask_credential_on_launch: true
       ask_inventory_on_launch: '{{prompt_ask_inventory_on_launch|default(true)}}'
