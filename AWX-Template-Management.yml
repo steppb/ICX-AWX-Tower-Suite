@@ -1,7 +1,5 @@
-#! Description: Create/update or remove templates in a project.
 ---
-- name: Create or Update Job Templates
-  hosts: all
+- hosts: all
   connection: local
   gather_facts: no
   module_defaults:
@@ -13,9 +11,11 @@
       force_basic_auth: yes
       timeout: 60
   vars:
+    ansible_python_interpreter: '{{ansible_playbook_python}}'
     AwxApi: https://{{ansible_host}}/api/v2
     MgmtFunc: '{{prompt_mgmt_role|default("Management Update", true)}}'
     template_validate_certs: no
+    IsAwxTmpltMgmt: true
     PbRev: '{{playbook_rev|default("0.0.0")}}'
 
   roles:
