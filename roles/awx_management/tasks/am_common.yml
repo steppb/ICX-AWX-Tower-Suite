@@ -1,4 +1,50 @@
 ---
+- name: Initial AWX System Host Tasks
+  block:
+  - {name: Store Facts, set_fact: {HostFacts: '{{icx_awx_mgmt|default({})}}'}}
+  - {name: Clear Host Facts, meta: clear_facts}
+
+  - name: Gather Host Facts
+    setup: gather_subset=!all,!min,network
+    register: rGather
+    connection: ssh
+    ignore_unreachable: true
+    ignore_errors: true
+    vars:
+      ansible_python_interpreter: '{{bPyInt}}'
+      ansible_user: '{{awxssh_user|default(prompt_awxcli_user)}}'
+      ansible_ssh_pass: '{{awxssh_pass|default(prompt_awxcli_pass)}}'
+
+  - name: Parse and Save Secondary Physical Interface Facts
+    set_fact: {PhysIntInfo: '{{PhysIntInfo|default([]) + [tIntInfo]}}'}
+    loop: '{{ansible_interfaces|select("match", "^e")|list}}'
+    loop_control: {loop_var: tInt}
+    vars:
+      tIntFacts: "{{vars['ansible_'~tInt]}}"
+      tIntIp: '{{tIntFacts.ipv4.address|default()}}'
+      tIntPrefix: '{{tIntFacts.ipv4.netmask|default()|iptest("get_cidr")}}'
+      tCfgd: '{{tIntFacts.ipv4.address is defined}}'
+      tIpAdd: "{{tIntIp}}/{{tIntPrefix}}"
+      tIntInfo: {interface: '{{tInt}}', address: "{{tIpAdd if tCfgd else ''}}"}
+    when:
+      - not rGather.failed|default(true)
+      - tIntIp != ansible_host
+
+  - {name: Clear Host Facts, meta: clear_facts}
+
+  - name: Restore Host Facts
+    set_fact: {icx_awx_mgmt: '{{HostFacts|combine(tPyIntVar)}}', cacheable: true}
+    vars:
+      tFacts: '{{rGather.ansible_facts}}'
+      tPyInt: '{{tFacts.discovered_interpreter_python|default("auto")}}'
+      tPyIntVar: {ssh_interpreter: '{{tPyInt}}'}
+
+  - name: Check Errors
+    assert: {that: not rGather.failed|default(true), fail_msg: "{{tFailMsg}}"}
+    vars: {tFailMsg: '{{rNetIntList.msg|default("Error gathering facts")}}'}
+  vars: {bPyInt: "{{HostFacts.ssh_interpreter_python|default('auto', true)}}"}
+  when: awxssh_user|default(prompt_awxcli_user) is defined
+
 - name: Get This Template Info
   uri: {url: '{{AwxApi}}/job_templates/{{awx_job_template_id}}/'}
   register: rThisTemplate
