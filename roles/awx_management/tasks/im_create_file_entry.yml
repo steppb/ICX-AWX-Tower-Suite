@@ -1,10 +1,10 @@
 ---
 - name: Set Initial Variables
   set_fact:
-    BinImgVersion: '{{ImgRepoFileName|regex_replace(BinVerRe, "\1.\2.\3")}}'
-    ImageType: '{{ImgRepoFileName|regex_replace("^.*([RrSsZzUu])[0-9].*", "\1")|upper}}'
-    PlatCode: '{{ImgRepoFileName|regex_replace("^([A-Za-z]{2,3})[RrSsZzUu].*", "\1")|upper}}'
-    IsUfi: "{{'ufi' in ImgRepoFileName|lower}}"
+    BinImgVersion: '{{bImgFileName|regex_replace(BinVerRe, "\1.\2.\3")}}'
+    ImageType: '{{bImgFileName|regex_replace("^.*([RrSsZzUu])[0-9].*", "\1")|upper}}'
+    PlatCode: '{{bImgFileName|regex_replace("^([A-Za-z]{2,3})[RrSsZzUu].*", "\1")|upper}}'
+    IsUfi: "{{'ufi' in bImgFileName|lower}}"
     SupportedPlatforms: []
     BootVer:
     IsSupported: no
@@ -18,11 +18,11 @@
 - name: Create Boot File Info List
   set_fact:
     BootImgList: '{{BootImgList|default([])}} + {{tBootFileInfo}}'
-    BootFileNames: "{{BootFileNames|default('None\nAuto Select\n')}}{{ImgRepoFileName}}\n"
+    BootFileNames: "{{BootFileNames|default('None\nAuto Select\n')}}{{bImgFileName}}\n"
   vars:
     tBootFileInfo:
-      - filename: '{{ImgRepoFileName}}'
-        path: '{{ImgRepoFilePath}}'
+      - filename: '{{bImgFileName}}'
+        path: '{{bImgFilePath}}'
         software_version: '{{BinImgVersion}}'
         supported_platforms: '{{BootPlatCodeSupport[PlatCode]}}'
   when:
@@ -66,24 +66,20 @@
         - BinImgVersion is version(item.image_ver_min, '>=')
         - BinImgVersion is version(item.image_ver_max, '<=')
 
-    - name: Create File Info Entry for List
+    - name: Create and Add File Entry to List
       set_fact:
+        SwImgList: '{{SwImgList|default([])}} + {{tSwImgInfo}}'
+        SwImgFileList: "{{SwImgFileList|default()}}{{bImgFileName}}\n"
+        SwImgVerList: "{{SwImgVerList|default([])}} + {{[BinImgVersion]}}"
+      vars:
         SwImgInfo:
-          - filename: '{{ImgRepoFileName}}'
+          - filename: '{{bImgFileName}}'
             image_type: '{{ImgType}}'
             is_ufi: '{{IsUfi}}'
-            path: '{{ImgRepoFilePath}}'
+            path: '{{bImgFilePath}}'
             software_version: '{{BinImgVersion}}'
             supported_platforms: '{{SupportedPlatforms}}'
             supported_bootrom_ver: '{{BootVer|default()}}'
             intermediate_image: '{{ImdImgList.files[0].path|default()}}'
-
-    - name: Add Entry to List
-      set_fact: {SwImgList: '{{SwImgList|default([])}} + {{SwImgInfo}}'}
-
-    - name: Add Filename to Survey Prompt List
-      set_fact:
-        SwImgFileList: "{{SwImgFileList|default()}}{{ImgRepoFileName}}\n"
-        SwImgVerList: "{{SwImgVerList|default([])}} + {{[BinImgVersion]}}"
     when: IsSupported|bool
   when: ImgType == "router" or ImgType == "switch"

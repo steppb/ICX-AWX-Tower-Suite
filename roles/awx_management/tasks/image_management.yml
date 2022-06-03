@@ -15,23 +15,25 @@
 
   - name: Search for Binary Files in Repo
     find: {paths: '{{ImgMgmtRepoDir}}', recurse: yes, patterns: '*.bin'}
-    register: rImgRepoFiles
+    register: rImgFiles
   connection: ssh
   vars:
     ansible_python_interpreter: '{{icx_awx_mgmt.ssh_interpreter}}'
     ansible_user: '{{awxssh_user|default(prompt_awxcli_user)}}'
     ansible_ssh_pass: '{{awxssh_pass|default(prompt_awxcli_pass)}}'
 
-- {name: Load Platform Support Lookup Table, include_vars: im_platform_support_table.yml}
+- name: Create File Lists
+  block:
+  - {name: Load Platform Table, include_vars: im_platform_support_table.yml}
 
-- name: Populate Image Table
-  include_tasks: im_create_file_entry.yml
-  loop: '{{rImgRepoFiles.files|sort(attribute="path")}}'
-  loop_control: {loop_var: ImgRepoFile, index_var: idx}
-  vars:
-    ImgRepoFilePath: '{{ImgRepoFile.path}}'
-    ImgRepoFileName: '{{ImgRepoFile.path|basename}}'
-  when: rImgRepoFiles.files is defined
+  - name: Populate Image Table
+    include_tasks: im_create_file_entry.yml
+    loop: '{{bImgFileList}}'
+    loop_control: {loop_var: bImgFilePath, index_var: idx}
+    vars:
+      bImgFileName: '{{bImgFilePath|basename}}'
+      bImgFileList: '{{rImgFiles.files|map(attribute="path")|flatten|sort()}}'
+  when: rImgFiles.files is defined
 
 - name: Store File List and Create Utility Templates
   block:
@@ -59,11 +61,11 @@
         src: all.yml.j2
         dest: '{{ImgMgmtRepoDir}}/host_vars/all.yml'
         mode: 0644
-  connection: ssh
-  vars:
-    ansible_python_interpreter: '{{icx_awx_mgmt.ssh_interpreter}}'
-    ansible_user: '{{awxssh_user|default(prompt_awxcli_user)}}'
-    ansible_ssh_pass: '{{awxssh_pass|default(prompt_awxcli_pass)}}'
+    connection: ssh
+    vars:
+      ansible_python_interpreter: '{{icx_awx_mgmt.ssh_interpreter}}'
+      ansible_user: '{{awxssh_user|default(prompt_awxcli_user)}}'
+      ansible_ssh_pass: '{{awxssh_pass|default(prompt_awxcli_pass)}}'
 
   - name: Get This Template Info
     uri: {url: '{{AwxApi}}/job_templates/{{awx_job_template_id}}/'}
