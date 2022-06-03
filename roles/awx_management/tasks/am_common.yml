@@ -45,6 +45,16 @@
   vars: {bPyInt: "{{HostFacts.ssh_interpreter_python|default('auto', true)}}"}
   when: awxssh_user|default(prompt_awxcli_user) is defined
 
+- name: Get Python Packages
+  pip_package_info: {clients: ['pip', 'pip3']}
+  register: rPipInfo
+
+- name: Install 'pexpect' Packages
+  pip: {name: pexpect, extra_args: --retries 0}
+  when:
+    - rPipInfo.pip.pexpect is not defined
+    - rPipInfo.pip3.pexpect is not defined
+
 - name: Get This Template Info
   uri: {url: '{{AwxApi}}/job_templates/{{awx_job_template_id}}/'}
   register: rThisTemplate

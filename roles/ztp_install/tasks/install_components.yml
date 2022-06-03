@@ -1,12 +1,3 @@
-- {name: Get Pip Packages, pip_package_info: {clients: ['pip', 'pip3']}, register: PInfo}
-
-- name: Install 'netaddr' Package
-  pip: {name: netaddr}
-  vars: {ansible_become: true, ansible_become_method: sudo}
-  when:
-    - PInfo.packages.pip.netaddr is not defined
-    - PInfo.packages.pip3.netaddr is not defined
-
 - name: Attempt to Install ISC-DHCP-Server
   apt: {name: isc-dhcp-server, update_cache: yes}
   register: DhcpInstallStatus

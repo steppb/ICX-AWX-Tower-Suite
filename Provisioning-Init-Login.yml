@@ -17,12 +17,6 @@
     template_validate_certs: no
 
   tasks:
-  - {name: Get List of Installed Packages, pip_package_info: , register: PipInfo}
-
-  - name: Install 'pexpect' Package
-    pip: {name: pexpect}
-    when: PipInfo.packages.pip.pexpect is not defined
-
   - name: Set Password from Template Variable
     set_fact: {ProvisioningPass: '{{template_provisioning_pass}}'}
     when:
