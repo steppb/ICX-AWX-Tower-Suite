@@ -2,9 +2,23 @@
 - hosts: all
   connection: local
   gather_facts: no
+  module_defaults:
+    uri:
+      validate_certs: '{{template_validate_certs}}'
+      method: GET
+      user: '{{awxlogin_user}}'
+      password: '{{awxlogin_pass}}'
+      force_basic_auth: yes
+      timeout: 60
   vars:
+    ansible_python_interpreter: '{{ansible_playbook_python}}'
+    AwxApi: https://{{ansible_host}}/api/v2
+    ValidFileTypes:
+      - .bin
+    MgmtFunc: "Image Management"
+    IsImgMgmt: true
     BinVerRe: '^[A-Za-z]{3,4}([0-9]{2})([0-9])([0-9]{2}[a-zA-Z]{0,2}(b[0-9]{3})?)(ufi)?.bin'
     ShVerRe: '[0-9]{2}.[0-9]{1}.[0-9]{2}[a-z]*'
 
   roles:
-  - {role: image_management}
+  - {role: awx_management}
