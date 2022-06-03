@@ -1,28 +1,37 @@
-- {name: Get Projects Directory, uri: {url: '{{AwxApi}}/config/'}, register: AwxCfg}
+- name: Create Directory or Find Image Files
+  block:
+  - name: Create Directory for Image Repo in Projects Directory
+    file:
+      path: '{{ImgMgmtRepoDir}}'
+      owner: '{{ansible_user}}'
+      group: '{{ansible_user}}'
+      state: directory
+    vars:
+      ansible_become: true
+      ansible_become_method: sudo
+      ansible_become_password: '{{awxssh_sudo|default(prompt_awxcli_sudo)
+                                             |default(prompt_awxcli_pass)}}'
+    when: IsImgMgmt|default(false)
 
-- name: Create Directory for Image Repo in Projects Directory
-  file:
-    path: '{{AwxCfg.json.project_base_dir}}/{{prompt_project_name}}'
-    state: directory
-  register: ImgRepoProjectDir
+  - name: Search for Binary Files in Repo
+    find: {paths: '{{ImgMgmtRepoDir}}', recurse: yes, patterns: '*.bin'}
+    register: rImgRepoFiles
+  connection: ssh
+  vars:
+    ansible_python_interpreter: '{{icx_awx_mgmt.ssh_interpreter}}'
+    ansible_user: '{{awxssh_user|default(prompt_awxcli_user)}}'
+    ansible_ssh_pass: '{{awxssh_pass|default(prompt_awxcli_pass)}}'
 
-- name: Search for Binary Files in Repo
-  find:
-    paths: '{{ImgRepoProjectDir.path}}'
-    recurse: yes
-    patterns: '*.bin'
-  register: ImgRepoFileReg
-
-- {name: Load Platform Support Lookup Table, include_vars: platform_support_table.yml}
+- {name: Load Platform Support Lookup Table, include_vars: im_platform_support_table.yml}
 
 - name: Populate Image Table
-  include_tasks: create_imagefile_entry.yml
-  loop: '{{ImgRepoFileReg.files|sort(attribute="path")}}'
+  include_tasks: im_create_file_entry.yml
+  loop: '{{rImgRepoFiles.files|sort(attribute="path")}}'
   loop_control: {loop_var: ImgRepoFile, index_var: idx}
   vars:
     ImgRepoFilePath: '{{ImgRepoFile.path}}'
     ImgRepoFileName: '{{ImgRepoFile.path|basename}}'
-  when: ImgRepoFileReg.files is defined
+  when: rImgRepoFiles.files is defined
 
 - name: Store File List and Create Utility Templates
   block:
@@ -38,16 +47,23 @@
     set_fact: {ansible_image_repo_boot_files: '{{BootImgList|default()}}', cacheable: yes}
     register: ImgRepoBootFileList
 
-  - name: Create Path for File Entry Variable File
-    file:
-      path: '{{ImgRepoProjectDir.path}}/host_vars'
-      state: directory
+  - name: Create Vars File in Repo Directory
+    block:
+    - name: Create Path for File Entry Variable File
+      file:
+        path: '{{ImgMgmtRepoDir}}/host_vars'
+        state: directory
 
-  - name: Create File Entry Variable File in Image Repo Directory
-    template:
-      src: all.yml.j2
-      dest: '{{ImgRepoProjectDir.path}}/host_vars/all.yml'
-      mode: 0644
+    - name: Create File Entry Variable File in Image Repo Directory
+      template:
+        src: all.yml.j2
+        dest: '{{ImgMgmtRepoDir}}/host_vars/all.yml'
+        mode: 0644
+  connection: ssh
+  vars:
+    ansible_python_interpreter: '{{icx_awx_mgmt.ssh_interpreter}}'
+    ansible_user: '{{awxssh_user|default(prompt_awxcli_user)}}'
+    ansible_ssh_pass: '{{awxssh_pass|default(prompt_awxcli_pass)}}'
 
   - name: Get This Template Info
     uri: {url: '{{AwxApi}}/job_templates/{{awx_job_template_id}}/'}
@@ -173,7 +189,7 @@
       body:
         survey_enabled: true
         extra_vars: >-
-          template_image_repo_dir: {{ImgRepoProjectDir.path}}
+          template_image_repo_dir: {{ImgMgmtRepoDir}}
       body_format: json
 
   - name: Enable 'Image-Flash-Copy-Ver' Survey Prompt
@@ -184,6 +200,6 @@
       body:
         survey_enabled: true
         extra_vars: >-
-          template_image_repo_dir: {{ImgRepoProjectDir.path}}
+          template_image_repo_dir: {{ImgMgmtRepoDir}}
       body_format: json
   when: SwImgList is defined

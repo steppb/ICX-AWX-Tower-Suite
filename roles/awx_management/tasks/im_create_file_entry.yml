@@ -45,12 +45,17 @@
     block:
     - name: Find Intermediate Update Images for 8.0.90+
       find:
-        paths: '{{ImgRepoProjectDir.path}}'
+        paths: '{{ImgMgmtRepoDir}}'
         recurse: yes
         patterns:
           - '{{PlatCode}}{{ImageType}}08080[a-zA-Z]{0,2}.bin'
         use_regex: yes
+      connection: ssh
       register: ImdImgList
+      vars:
+        ansible_python_interpreter: '{{icx_awx_mgmt.ssh_interpreter}}'
+        ansible_user: '{{awxssh_user|default(prompt_awxcli_user)}}'
+        ansible_ssh_pass: '{{awxssh_pass|default(prompt_awxcli_pass)}}'
       when: BinImgVersion is version('8.0.90', '>=')
 
     - name: Get Boot Image Version
