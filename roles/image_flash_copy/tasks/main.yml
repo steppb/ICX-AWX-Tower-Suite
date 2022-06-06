@@ -6,41 +6,35 @@
 - name: Gather Switch Info
   icx_facts: {gather_subset: hardware}
   connection: network_cli
-  vars: {ansible_network_os: icx, ansible_become: true, ansible_become_method: enable}
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
 
 - name: Assert Switch Access
   assert:
     that: ansible_net_model|default("null", true) != "null"
     fail_msg: "Failed to access switch"
 
-- name: Import File Entry Variable File
-  include_vars: '{{template_image_repo_dir}}/host_vars/all.yml'
-  failed_when: false
-
-- name: Check Status of Variable File Load
-  assert:
-    that: ansible_image_repo_files is defined
-    fail_msg:
-      - "Error loading {{template_image_repo_dir}}/host_vars/all.yml"
-      - "Run the 'Image-Management' template to rebuild variable file"
+- name: Set ICX Model
+  set_fact: {IcxModel: '{{ansible_net_model|regex_search("ICX[0-9]*")}}'}
 
 - name: Get Image From Version
   block:
-  - name: Find Image File
-    set_fact: {FileEntry: '{{tImgList[idx]}}'}
-    loop: '{{range(0, tImgList|length|int)|list}}'
-    loop_control: {index_var: idx}
-    vars: {tImgList: '{{ansible_image_repo_files|selectattr("software_version",
-                        "equalto", prompt_flash_copy_version)|list|selectattr("img_type",
-                        "equalto", prompt_image_mode|lower)|list}}'}
-    when: ansible_net_model|regex_search("ICX[0-9]*") in tImgList[idx].supported_platforms
+  - name: Find File Entry from Version
+    set_fact: {ImgEntry: '{{tImg[0]|default()}}'}
+    vars:
+      tImg: '{{ImgRepoFiles
+              |selectattr("supported_platforms", "contains", IcxModel)
+              |selectattr("software_version", "==", prompt_flash_copy_version)
+              |selectattr("img_type", "==", prompt_image_mode|lower)|list}}'
 
   - name: Verify Valid File Entry
     assert:
-      that: FileEntry|default("null", true) != "null"
+      that: ImgEntry|default("null", true) != "null"
       fail_msg: 'ERROR: Could not find {{prompt_flash_copy_version}} {{prompt_image_mode}}
                  image for {{ansible_net_model|regex_search("ICX[0-9]*")}}'
-      success_msg: "{{FileEntry.filename|default()}} found."
+      success_msg: "{{ImgEntry.filename|default()}} found."
   when: prompt_flash_copy_version|default("null", true) != "null" and
         prompt_image_mode|default("null", true) != "null"
 
@@ -48,43 +42,44 @@
   block:
   - name: Find File Entry
     set_fact:
-      FileEntry: '{{(bFL|selectattr("filename", "equalto", bImg)|list)[0]|default()}}'
+      ImgEntry: '{{(bFL|selectattr("filename", "==", bImg)|list)[0]|default()}}'
 
   - name: Verify Valid File
     assert:
-      that: FileEntry|default("null", true) != "null"
+      that: ImgEntry|default("null", true) != "null"
       fail_msg: "ERROR: File named {{bImg}} not found."
       success_msg: "{{bImg}} found."
 
   - name: Assert Image Compatibility
     assert:
-      that: ansible_net_model|regex_search("ICX[0-9]*") in FileEntry.supported_platforms
+      that: ansible_net_model|regex_search("ICX[0-9]*") in ImgEntry.supported_platforms
       fail_msg: "ERROR: {{bImg}} not compatible with {{ansible_net_model}}"
-  vars: {bImg: '{{prompt_flash_copy_filename}}', bFL: '{{ansible_image_repo_files}}'}
-  when: FileEntry is not defined
+  vars: {bImg: '{{prompt_flash_copy_filename}}', bFL: '{{ImgRepoFiles}}'}
+  when: ImgEntry is not defined
 
 - name: Auto Select Boot Image
-  set_fact: {BootEntry: '{{item}}'}
-  loop: '{{tBootList}}'
-  vars: {tBootList: '{{(ansible_image_repo_boot_files|selectattr("software_version",
-                        "equalto", FileEntry.supported_bootrom_ver)|list)}}'}
+  set_fact: {BootEntry: '{{tBootEntry[0]|default()}}'}
+  vars:
+    tBootVer: '{{ImgEntry.supported_bootrom_ver}}'
+    tBootEntry: '{{ImgRepoBootFiles
+                 |selectattr("supported_platforms", "contains", IcxModel)
+                 |selectattr("software_version", "==", tBootVer)|list}}'
   when:
     - prompt_bootflash_copy_filename|default() == "Auto Select"
-    - not FileEntry.is_ufi|bool
-    - tBootList[0]|default("null", true) != "null"
-    - ansible_net_model|regex_search("ICX[0-9]*") in item.supported_platforms
+    - not ImgEntry.is_ufi|bool
 
 - name: User Selected Boot Image Entry
   set_fact: {BootEntry: '{{tBootList[0]}}'}
-  vars: {tBootList: '{{(ansible_image_repo_boot_files|selectattr("filename",
-                    "equalto", prompt_bootflash_copy_filename)|list)}}'}
+  vars:
+    tBootList: '{{ImgRepoBootFiles
+                 |selectattr("filename", "==", prompt_bootflash_copy_filename)
+                 |selectattr("supported_platforms", "contains", "IcxModel")
+                 |list}}'
   when:
     - prompt_bootflash_copy_filename|default("null", true) != "null"
     - prompt_bootflash_copy_filename != "Auto Select"
     - prompt_bootflash_copy_filename != "None"
-    - not FileEntry.is_ufi|bool
-    - tBootList[0]|default("null", true) != "null"
-    - ansible_net_model in tBootEntry[0].supported_platforms
+    - not ImgEntry.is_ufi|bool
 
 - name: Get Current Switch Version - ansible_net_image
   set_fact: {CurSwVer: '{{ansible_net_image|regex_replace(BinVerRe, "\1.\2.\3")}}'}
@@ -100,25 +95,23 @@
   block:
   - name: Assert Existence of Intermediate Image
     assert:
-      that: FileEntry.intermediate_image|default("null", true) != "null"
+      that: ImgEntry.intermediate_image|default("null", true) != "null"
       fail_msg:
-        - "ERROR: Cannot update to {{FileEntry.software_version}} from {{CurSwVer}}"
+        - "ERROR: Cannot update to {{ImgEntry.software_version}} from {{CurSwVer}}"
         - "without an intermediate version."
-        - "Non-UFI 8.0.80 {{FileEntry.img_type}} image needs to be installed in image repo"
+        - "Non-UFI 8.0.80 {{ImgEntry.img_type}} image needs to be installed in image repo"
 
   - name: Find File Entry
     set_fact:
-      ImdFileEntry: '{{(tFL|selectattr("path", "equalto", tPath)|list)[0]|default()}}'
-    vars: {tFL: '{{ansible_image_repo_files}}', tPath: '{{FileEntry.intermediate_image}}'}
+      ImdFileEntry: '{{(tFL|selectattr("path", "==", tPath)|list)[0]|default()}}'
+    vars: {tFL: '{{ImgRepoFiles}}', tPath: '{{ImgEntry.intermediate_image}}'}
 
   - name: Get Intermediate Boot Image Entry
-    set_fact: {ImdBootEntry: '{{item}}'}
-    loop: '{{tBootList}}'
-    vars: {tBootList: '{{(ansible_image_repo_boot_files|selectattr("software_version",
-                          "equalto", "10.1.14")|list)}}'}
-    when:
-      - tBootList[0]|default("null", true) != "null"
-      - ansible_net_model|regex_search("ICX[0-9]*") in item.supported_platforms
+    set_fact: {ImdBootEntry: '{{tImdBootEntry}}'}
+    vars:
+      tImdBootEntry: '{{ImgRepoBootFiles
+                       |selectattr("supported_platforms", "contains", IcxModel)
+                       |selectattr("software_version", "==", "10.1.14")|list)}}'
 
   - name: Warn on no Bootrom
     debug: {msg: '{{ansible_net_model}} bootrom for 8.0.80 not found'}
@@ -133,26 +126,26 @@
   vars: {CurSwVer: '{{ansible_net_image|regex_replace(BinVerRe, "\1.\2.\3")}}'}
   when:
     - CurSwVer is version('8.0.80', '<')
-    - FileEntry.software_version is version('8.0.90', '>=')
+    - ImgEntry.software_version is version('8.0.90', '>=')
 
 - name: Image Config (Downgrade from 08.0.90)
   set_fact:
     UfiDowngrade: true
     ScpCpCfg:
-      - ScpFileEntry: '{{FileEntry}}'
+      - ScpFileEntry: '{{ImgEntry}}'
         ScpBootPath: "null"
-      - ScpFileEntry: '{{FileEntry}}'
+      - ScpFileEntry: '{{ImgEntry}}'
         ScpBootPath: '{{BootEntry.path}}'
   when:
     - CurSwVer is version('8.0.90', '>=')
-    - not FileEntry.is_ufi|bool
+    - not ImgEntry.is_ufi|bool
     - BootEntry.path|default("null", true) != "null"
 
 - name: Image Config
   set_fact: {ScpCpCfg: '{{ScpCpCfg|default([])}} + {{tVar}}'}
   vars:
     tVar:
-      - ScpFileEntry: '{{FileEntry}}'
+      - ScpFileEntry: '{{ImgEntry}}'
         ScpBootPath: '{{BootEntry.path|default("null", true)}}'
   when: not UfiDowngrade|default(false, true)|bool
 

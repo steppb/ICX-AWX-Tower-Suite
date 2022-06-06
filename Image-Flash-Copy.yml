@@ -5,5 +5,36 @@
   vars:
     BootPart: '{{"sec" if prompt_flash_part|lower == "secondary" else "pri"}}'
 
+  pre_tasks:
+  - name: REST API Block
+    block:
+    - name: Get AWX Server Host ID
+      uri:
+        url: '{{bAwxApi}}/hosts/?name={{prompt_image_repo_hostname|urlencode}}'
+      register: rAwxHost
+
+    - name: Get AWX Server Host Facts
+      uri: {url: '{{bAwxApi}}/hosts/{{tHostId}}/ansible_facts'}
+      register: rAwxHostFacts
+      vars: {tHostId: '{{rAwxHost.json.results[0].id}}'}
+    vars: {bAwxApi: "https://{{prompt_image_repo_address}}/api/v2"}
+    module_defaults:
+      uri:
+        validate_certs: '{{template_validate_certs|default(false)}}'
+        method: GET
+        user: '{{awxlogin_user}}'
+        password: '{{awxlogin_pass}}'
+        force_basic_auth: yes
+        timeout: 60
+
+  - name: Set File List Variables
+    set_fact:
+      ImgRepoFiles: '{{tAwxMgmt.img_mgmt.image_files|default()}}'
+      ImgRepoBootFiles: '{{tAwxMgmt.img_mgmt.boot_files|default()}}'
+      AwxHostInterpreter: '{{tPyInt}}'
+    vars:
+      tAwxMgmt: '{{rAwxHostFacts.json.icx_awx_mgmt|default()}}'
+      tPyInt: '{{tAwxMgmt.ssh_interpreter|default(ansible_playbook_python)}}'
+
   roles:
-  - {role: image_flash_copy.yml}
+  - {role: image_flash_copy}

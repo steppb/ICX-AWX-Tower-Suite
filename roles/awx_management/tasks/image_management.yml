@@ -39,37 +39,13 @@
       bIsUfi: "{{'ufi' in bImgFileName|lower}}"
     when: SoftwarePlatformSupport[bPlatCode] is defined or
           BootcodePlatformSupport[bPlatCode] is defined
-  when: rImgFiles.files is defined
 
-- name: Store File List and Create Utility Templates
-  block:
-  - name: Store IP Address of AWX Server
-    set_fact: {RemoteServerIp: '{{ansible_host}}'}
-    register: AwxSvrIp
-
-  - name: Store File Entry List in AWX Host Facts
-    set_fact: {ansible_image_repo_files: '{{SwImgList}}', cacheable: yes}
-    register: ImgRepoFileList
-
-  - name: Store Boot File Entry List in AWX Host Facts
-    set_fact: {ansible_image_repo_boot_files: '{{BootImgList|default()}}', cacheable: yes}
-    register: ImgRepoBootFileList
-
-  - name: Create Vars File in Repo Directory
-    block:
-    - name: Create Path for File Entry Variable File
-      file:
-        path: '{{ImgMgmtRepoDir}}/host_vars'
-        state: directory
-
-    - name: Create File Entry Variable File in Image Repo Directory
-      template:
-        src: all.yml.j2
-        dest: '{{ImgMgmtRepoDir}}/host_vars/all.yml'
-        mode: 0644
-    connection: ssh
+  - name: Cache File Entry Lists
+    set_fact: {icx_awx_mgmt: '{{icx_awx_mgmt|combine(tImg)}}', cacheable: true}
     vars:
-      ansible_python_interpreter: '{{icx_awx_mgmt.ssh_interpreter}}'
-      ansible_user: '{{awxssh_user|default(prompt_awxcli_user)}}'
-      ansible_ssh_pass: '{{awxssh_pass|default(prompt_awxcli_pass)}}'
-  when: SwImgList is defined
+      tImg:
+        img_mgmt:
+          awx_image_dir: '{{ImgMgmtRepoDir}}'
+          image_files: '{{SwImgList}}'
+          boot_files: '{{BootImgList|default()}}'
+  when: rImgFiles.files|default("null", true) != "null"

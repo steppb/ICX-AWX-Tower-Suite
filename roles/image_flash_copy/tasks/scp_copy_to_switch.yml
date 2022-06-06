@@ -26,7 +26,7 @@
   - name: Assert Compatibility with New Image
     assert:
       that: ScpFileEntry.software_version is version(MaxCompVer, '<=')
-      msg: "ERROR: Bootrom {{CurBootVer}} is not compatible with {{FileEntry.filename}}"
+      msg: "ERROR: Bootrom {{CurBootVer}} is not compatible with {{ImgEntry.filename}}"
     when: MaxCompVer|default("null", true) != "null"
   when:
     - not ScpFileEntry.is_ufi|bool

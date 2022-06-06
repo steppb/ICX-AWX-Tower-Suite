@@ -52,6 +52,18 @@ image_flash_copy_file_survey:
     Yes
     No
   default: "No"
+- question_name: "Image Repo Server Hostname:"
+  required: true
+  type: multiplechoice
+  variable: prompt_image_repo_hostname
+  default: '{{inventory_hostname}}'
+  choices: '{{inventory_hostname}}'
+- question_name: "SCP Server Address:"
+  required: true
+  type: multiplechoice
+  variable: prompt_image_repo_address
+  default: '{{ansible_host}}'
+  choices: '{{ansible_host}}'
 
 
 image_flash_copy_version_survey:
@@ -68,9 +80,6 @@ image_flash_copy_version_survey:
     Switch
     Router
   default: Router
-- '{{image_flash_copy_file_survey[2]}}'
-- '{{image_flash_copy_file_survey[3]}}'
-- '{{image_flash_copy_file_survey[4]}}'
 - question_name: 'Boot Image Selection Method:'
   required: true
   type: multiplechoice
@@ -79,6 +88,11 @@ image_flash_copy_version_survey:
     None
     Auto Select
   default: Auto Select
+- '{{image_flash_copy_file_survey[2]}}'
+- '{{image_flash_copy_file_survey[3]}}'
+- '{{image_flash_copy_file_survey[4]}}'
+- '{{image_flash_copy_file_survey[5]}}'
+- '{{image_flash_copy_file_survey[6]}}'
 
 
 image_flash_copy_templates:
