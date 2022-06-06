@@ -63,6 +63,19 @@
   set_fact: {RemUser: '{{ansible_user}}'}
   connection: ssh
 
+- name: Import Files
+  fetch: {src: '{{item}}', dest: '/tmp/{{inventory_hostname}}/', flat: yes}
+  connection: ssh
+  register: rFetch
+  vars:
+    ansible_python_interpreter: '{{AwxHostInterpreter}}'
+    ansible_host: '{{prompt_image_repo_address}}'
+    ansible_user: '{{awxssh_user|default(prompt_awxcli_user)}}'
+    ansible_ssh_pass: '{{awxssh_pass|default(prompt_awxcli_pass)}}'
+  with_items:
+    - '{{ScpBootPath}}'
+    - '{{ScpFileEntry.path}}'
+
 - name: Copy Image(s) to Switch Flash
   expect:
     command: scp {{tOpts}} {{tKex}} {{item.src}} {{item.dest}}
@@ -76,13 +89,16 @@
     tOpts: "-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
     tKex: "-o KexAlgorithms=+diffie-hellman-group1-sha1"
     tCpFiles:
-    - src: "{{ScpBootPath}}"
+    - src: '{{rFetch.results[0].dest|default("null", true)}}'
       dest: "{{RemUser}}@{{ansible_host}}:flash:bootrom"
-    - src: "{{ScpFileEntry.path}}"
+    - src: '{{rFetch.results[1].dest|default("null", true)}}'
       dest: "{{RemUser}}@{{ansible_host}}:flash:{{BootPart}}:{{ScpFileEntry.filename}}"
   register: CpStatus
   failed_when: CpStatus.rc != 0 and CpStatus.rc != 1
   when: item.src != "null"
+
+- name: Clean Up Temp Files
+  file: {path: '/tmp/{{inventory_hostname}}', state: absent}
 
 - name: Reload Device
   block:
