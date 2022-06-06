@@ -1,5 +1,181 @@
 ---
-- name: Perform "Image-Flash-Copy" Tasks
-  include_tasks: image_flash_copy.yml
-  vars: {AltCopy: '{{prompt_awxssh_user is defined and prompt_awxssh_pass is defined}}'}
-  when: '"Image-Flash-Copy" in awx_job_template_name'
+- name: Image-Flash-Copy - Verify Connectivity to Device
+  wait_for: {host: '{{ansible_host}}', port: 22, timeout: 30}
+  delegate_to: localhost
+
+- name: Image-Flash-Copy - Gather Switch Info
+  icx_facts: {gather_subset: hardware}
+  connection: network_cli
+  vars: {ansible_network_os: icx, ansible_become: true, ansible_become_method: enable}
+
+- name: Image-Flash-Copy - Assert Switch Access
+  assert:
+    that: ansible_net_model|default("null", true) != "null"
+    fail_msg: "Failed to access switch"
+
+- name: Image-Flash-Copy - Import File Entry Variable File
+  include_vars: '{{template_image_repo_dir}}/host_vars/all.yml'
+  failed_when: false
+
+- name: Image-Flash-Copy - Check Status of Variable File Load
+  assert:
+    that: ansible_image_repo_files is defined
+    fail_msg:
+      - "Error loading {{template_image_repo_dir}}/host_vars/all.yml"
+      - "Run the 'Image-Management' template to rebuild variable file"
+
+- name: Image-Flash-Copy - Get Image From Version
+  block:
+  - name: Image-Flash-Copy - Find Image File
+    set_fact: {FileEntry: '{{tImgList[idx]}}'}
+    loop: '{{range(0, tImgList|length|int)|list}}'
+    loop_control: {index_var: idx}
+    vars: {tImgList: '{{ansible_image_repo_files|selectattr("software_version",
+                        "equalto", prompt_flash_copy_version)|list|selectattr("img_type",
+                        "equalto", prompt_image_mode|lower)|list}}'}
+    when: ansible_net_model|regex_search("ICX[0-9]*") in tImgList[idx].supported_platforms
+
+  - name: Image-Flash-Copy - Verify Valid File Entry
+    assert:
+      that: FileEntry|default("null", true) != "null"
+      fail_msg: 'ERROR: Could not find {{prompt_flash_copy_version}} {{prompt_image_mode}}
+                 image for {{ansible_net_model|regex_search("ICX[0-9]*")}}'
+      success_msg: "{{FileEntry.filename|default()}} found."
+  when: prompt_flash_copy_version|default("null", true) != "null" and
+        prompt_image_mode|default("null", true) != "null"
+
+- name: Image-Flash-Copy - Get Image From Filename
+  block:
+  - name: Image-Flash-Copy - Find File Entry
+    set_fact:
+      FileEntry: '{{(bFL|selectattr("filename", "equalto", bImg)|list)[0]|default()}}'
+
+  - name: Image-Flash-Copy - Verify Valid File
+    assert:
+      that: FileEntry|default("null", true) != "null"
+      fail_msg: "ERROR: File named {{bImg}} not found."
+      success_msg: "{{bImg}} found."
+
+  - name: Image-Flash-Copy - Assert Image Compatibility
+    assert:
+      that: ansible_net_model|regex_search("ICX[0-9]*") in FileEntry.supported_platforms
+      fail_msg: "ERROR: {{bImg}} not compatible with {{ansible_net_model}}"
+  vars: {bImg: '{{prompt_flash_copy_filename}}', bFL: '{{ansible_image_repo_files}}'}
+  when: FileEntry is not defined
+
+- name: Image-Flash-Copy - Auto Select Boot Image
+  set_fact: {BootEntry: '{{item}}'}
+  loop: '{{tBootList}}'
+  vars: {tBootList: '{{(ansible_image_repo_boot_files|selectattr("software_version",
+                        "equalto", FileEntry.supported_bootrom_ver)|list)}}'}
+  when:
+    - prompt_bootflash_copy_filename|default() == "Auto Select"
+    - not FileEntry.is_ufi|bool
+    - tBootList[0]|default("null", true) != "null"
+    - ansible_net_model|regex_search("ICX[0-9]*") in item.supported_platforms
+
+- name: Image-Flash-Copy - User Selected Boot Image Entry
+  set_fact: {BootEntry: '{{tBootList[0]}}'}
+  vars: {tBootList: '{{(ansible_image_repo_boot_files|selectattr("filename",
+                    "equalto", prompt_bootflash_copy_filename)|list)}}'}
+  when:
+    - prompt_bootflash_copy_filename|default("null", true) != "null"
+    - prompt_bootflash_copy_filename != "Auto Select"
+    - prompt_bootflash_copy_filename != "None"
+    - not FileEntry.is_ufi|bool
+    - tBootList[0]|default("null", true) != "null"
+    - ansible_net_model in tBootEntry[0].supported_platforms
+
+- name: Image-Flash-Copy - Get Current Switch Version - ansible_net_image
+  set_fact: {CurSwVer: '{{ansible_net_image|regex_replace(BinVerRe, "\1.\2.\3")}}'}
+  when: ansible_net_image|default("null", true) != "null"
+
+- name: Image-Flash-Copy - Get Current Switch Version - ansible_net_version
+  set_fact: {CurSwVer: '{{ansible_net_version|regex_search(ShVerRe)}}'}
+  when:
+    - CurSwVer|default("null", true) == "null"
+    - ansible_net_version|default("null", true) != "null"
+
+- name: Image-Flash-Copy - Intermediate Image Setup
+  block:
+  - name: Image-Flash-Copy - Assert Existence of Intermediate Image
+    assert:
+      that: FileEntry.intermediate_image|default("null", true) != "null"
+      fail_msg:
+        - "ERROR: Cannot update to {{FileEntry.software_version}} from {{CurSwVer}}"
+        - "without an intermediate version."
+        - "Non-UFI 8.0.80 {{FileEntry.img_type}} image needs to be installed in image repo"
+
+  - name: Image-Flash-Copy - Find File Entry
+    set_fact:
+      ImdFileEntry: '{{(tFL|selectattr("path", "equalto", tPath)|list)[0]|default()}}'
+    vars: {tFL: '{{ansible_image_repo_files}}', tPath: '{{FileEntry.intermediate_image}}'}
+
+  - name: Image-Flash-Copy - Get Intermediate Boot Image Entry
+    set_fact: {ImdBootEntry: '{{item}}'}
+    loop: '{{tBootList}}'
+    vars: {tBootList: '{{(ansible_image_repo_boot_files|selectattr("software_version",
+                          "equalto", "10.1.14")|list)}}'}
+    when:
+      - tBootList[0]|default("null", true) != "null"
+      - ansible_net_model|regex_search("ICX[0-9]*") in item.supported_platforms
+
+  - name: Image-Flash-Copy - Warn on no Bootrom
+    debug: {msg: '{{ansible_net_model}} bootrom for 8.0.80 not found'}
+    when: ImdBootEntry|default("null", true) == "null"
+
+  - name: Image-Flash-Copy - Intermediate Image Config
+    set_fact: {ScpCpCfg: "{{tVar}}"}
+    vars:
+      tVar:
+        - ScpFileEntry: '{{ImdFileEntry}}'
+          ScpBootPath: '{{ImdBootEntry.path|default("null", true)}}'
+  vars: {CurSwVer: '{{ansible_net_image|regex_replace(BinVerRe, "\1.\2.\3")}}'}
+  when:
+    - CurSwVer is version('8.0.80', '<')
+    - FileEntry.software_version is version('8.0.90', '>=')
+
+- name: Image-Flash-Copy - Image Config (Downgrade from 08.0.90)
+  set_fact:
+    UfiDowngrade: true
+    ScpCpCfg:
+      - ScpFileEntry: '{{FileEntry}}'
+        ScpBootPath: "null"
+      - ScpFileEntry: '{{FileEntry}}'
+        ScpBootPath: '{{BootEntry.path}}'
+  when:
+    - CurSwVer is version('8.0.90', '>=')
+    - not FileEntry.is_ufi|bool
+    - BootEntry.path|default("null", true) != "null"
+
+- name: Image-Flash-Copy - Image Config
+  set_fact: {ScpCpCfg: '{{ScpCpCfg|default([])}} + {{tVar}}'}
+  vars:
+    tVar:
+      - ScpFileEntry: '{{FileEntry}}'
+        ScpBootPath: '{{BootEntry.path|default("null", true)}}'
+  when: not UfiDowngrade|default(false, true)|bool
+
+- name: Image-Flash-Copy - SCP Copy to Switch Tasks
+  include_tasks: scp_copy_to_switch.yml
+  loop: '{{ScpCpCfg}}'
+  loop_control: {loop_var: ScpCpEntry}
+  vars:
+    BootPrefChange: '{{prompt_flash_change_boot}}'
+    ReloadDevice: '{{prompt_flash_reload}}'
+    RldTimeout: '{{template_flash_reload_timeout|default(600)}}'
+    ScpBootPath: '{{ScpCpEntry.ScpBootPath}}'
+    ScpFileEntry: '{{ScpCpEntry.ScpFileEntry}}'
+    ScpTimeout: "{{template_flash_copy_timeout|default(300)}}"
+
+- name: Image-Flash-Copy - Post Boot Info
+  block:
+  - name: Image-Flash-Copy - Get Post-Boot Version Information
+    icx_command: {commands: show version}
+    register: IcxVersion
+
+  - name: Image-Flash-Copy - Show Version
+    debug: {msg: '{{IcxVersion.stdout_lines[0]}}'}
+  connection: network_cli
+  vars: {ansible_network_os: icx, ansible_become: true, ansible_become_method: enable}
+  when: prompt_flash_reload|bool

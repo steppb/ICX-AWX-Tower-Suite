@@ -2,6 +2,8 @@
 - hosts: all
   connection: local
   gather_facts: no
+  vars:
+    BootPart: '{{"sec" if prompt_flash_part|lower == "secondary" else "pri"}}'
 
   roles:
   - {role: image_flash_copy.yml}
