@@ -1,33 +1,33 @@
 - name: Get Switch Information
   icx_facts: {gather_subset: hardware}
   connection: network_cli
-  vars: {ansible_network_os: icx, ansible_become: true, ansible_become_method: enable}
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
 
 - name: Check Bootrom for Compatibility
   block:
-  - {name: Load Platform Support Lookup Table, include_vars: platform_support_table.yml}
-
   - name: Get Current Boot Version
     icx_command: {commands: show flash | include Boot}
-    register: IcxShFlash
+    register: rIcxShFlash
     connection: network_cli
-    vars: {ansible_network_os: icx, ansible_become: true, ansible_become_method: enable}
+    vars:
+      ansible_network_os: icx
+      ansible_become: true
+      ansible_become_method: enable
 
-  - name: Store Current Boot Version
-    set_fact: {CurBootVer: '{{IcxShFlash.stdout_lines[0][0]|regex_search(tBootVerRe)}}'}
-    vars: {tBootVerRe: '[0-9]{2}\.[0-9]{1}\.[0-9]{1,2}'}
-
-  - name: Get Max Compatible Image Version
-    set_fact: {MaxCompVer: '{{BootToImgVer[idx].max_comp_ver|default()}}'}
-    loop: '{{range(0, BootToImageVer|length)|list}}'
-    loop_control: {index_var: idx}
-    when: CurBootVer == BootToImageVer[idx].boot_version
-
-  - name: Assert Compatibility with New Image
+  - name: Check Bootrom Compatibility with New Image
     assert:
-      that: ScpFileEntry.software_version is version(MaxCompVer, '<=')
-      msg: "ERROR: Bootrom {{CurBootVer}} is not compatible with {{ImgEntry.filename}}"
-    when: MaxCompVer|default("null", true) != "null"
+      that: ScpFileEntry.software_version is version(tMaxCompVer, '<=')
+      msg: "ERROR: Bootrom {{tCurVer}} incompatible with {{ImgEntry.filename}}"
+    vars:
+      tImgName: '{{ImgEntry.filename}}'
+      tBootVerRe: '[0-9]{2}\.[0-9]{1}\.[0-9]{1,2}'
+      tCurVer: '{{rIcxShFlash.stdout_lines[0][0]|regex_search(tBootVerRe)}}'
+      tMaxCompVer: '{{(BootCompatTbl|selectattr("boot_version", "==", tCurVer)
+                                    |list|last).max_comp_ver|default("null")}}'
+    when: tMaxCompVer != "null"
   when:
     - not ScpFileEntry.is_ufi|bool
     - ScpBootPath == "null"

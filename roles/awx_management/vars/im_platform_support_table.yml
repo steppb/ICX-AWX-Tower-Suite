@@ -56,15 +56,12 @@ BootToImageVer:
   - boot_version: 10.1.04
     img_ver_min: 08.0.20
     img_ver_max: 08.0.20d
-    max_comp_ver: 8.0.30u
   - boot_version: 10.1.05
     img_ver_min: 08.0.30
     img_ver_max: 08.0.30g
-    max_comp_ver: 8.0.30u
   - boot_version: 10.1.06
     img_ver_min: 08.0.30h
     img_ver_max: 08.0.40c
-    max_comp_ver: 8.0.50
   - boot_version: 10.1.08b005
     img_ver_min: 08.0.50
     img_ver_max: 08.0.50
@@ -74,11 +71,9 @@ BootToImageVer:
   - boot_version: 10.1.10
     img_ver_min: 08.0.61
     img_ver_max: 08.0.61a
-    max_comp_ver: 8.0.61c
   - boot_version: 10.1.11b006
     img_ver_min: 08.0.61b
     img_ver_max: 08.0.61b
-    max_comp_ver: 8.0.61c
   - boot_version: 10.1.11
     img_ver_min: 08.0.61c
     img_ver_max: 08.0.61c

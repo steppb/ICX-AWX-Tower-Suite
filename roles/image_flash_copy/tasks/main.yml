@@ -16,6 +16,8 @@
     that: ansible_net_model|default("null", true) != "null"
     fail_msg: "Failed to access switch"
 
+- {name: Load Boot Compatibility Table, include_vars: boot_compat_table.yml}
+
 - name: Set ICX Model
   set_fact: {IcxModel: '{{ansible_net_model|regex_search("ICX[0-9]*")}}'}
 

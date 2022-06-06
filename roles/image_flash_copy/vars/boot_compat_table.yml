@@ -1,0 +1,12 @@
+---
+BootCompatTbl:
+  - boot_version: 10.1.04
+    max_comp_ver: 08.0.30u
+  - boot_version: 10.1.05
+    max_comp_ver: 08.0.30u
+  - boot_version: 10.1.06
+    max_comp_ver: 08.0.50
+  - boot_version: 10.1.10
+    max_comp_ver: 08.0.61c
+  - boot_version: 10.1.11b006
+    max_comp_ver: 08.0.61c
