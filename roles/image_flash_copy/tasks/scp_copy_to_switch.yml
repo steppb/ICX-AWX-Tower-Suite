@@ -1,4 +1,4 @@
-- name: Image-Flash-Copy - Get Switch Information
+- name: Get Switch Information
   icx_facts: {gather_subset: hardware}
   connection: network_cli
   vars: {ansible_network_os: icx, ansible_become: true, ansible_become_method: enable}
@@ -7,7 +7,7 @@
   block:
   - {name: Load Platform Support Lookup Table, include_vars: platform_support_table.yml}
 
-  - name: Image-Flash-Copy - Get Current Boot Version
+  - name: Get Current Boot Version
     icx_command: {commands: show flash | include Boot}
     register: IcxShFlash
     connection: network_cli
@@ -32,15 +32,15 @@
     - not ScpFileEntry.is_ufi|bool
     - ScpBootPath == "null"
 
-- name: Image-Flash-Copy - Change Boot Preference
+- name: Change Boot Preference
   block:
-  - name: Image-Flash-Copy - Get Current Boot Preference from Switch
+  - name: Get Current Boot Preference from Switch
     icx_command: {commands: show boot-preference}
     register: CurBootPref
 
-  - name: Image-Flash-Copy - Check if Boot Preference Change is Needed
+  - name: Check if Boot Preference Change is Needed
     block:
-    - name: Image-Flash-Copy - Remove Boot Statements
+    - name: Remove Boot Statements
       icx_config: {lines: 'no boot system flash {{item}}', save_when: changed}
       with_items:
         - pri
@@ -49,7 +49,7 @@
         - '"use default" not in FirstPart'
         - item in FirstPart or item in CurBootPref.stdout_lines[0][2]|lower
 
-    - name: Image-Flash-Copy - Configure Boot Priority
+    - name: Configure Boot Priority
       icx_config: {lines: 'boot sys fl {{BootPart}}', save_when: changed}
       when: '"pri" not in BootPart'
     vars: {FirstPart: '{{CurBootPref.stdout_lines[0][1]|lower}}'}
@@ -59,7 +59,7 @@
   vars: {ansible_network_os: icx, ansible_become: true, ansible_become_method: enable}
   when: BootPrefChange|bool
 
-- name: Image-Flash-Copy - Save SSH Username
+- name: Save SSH Username
   set_fact: {RemUser: '{{ansible_user}}'}
   connection: ssh
 
@@ -84,20 +84,20 @@
   failed_when: CpStatus.rc != 0 and CpStatus.rc != 1
   when: item.src != "null"
 
-- name: Image-Flash-Copy - Reload Device
+- name: Reload Device
   block:
-  - name: Image-Flash-Copy - Reload Device
+  - name: Reload Device
     include_tasks: reboot_device.yml
     loop: '{{range(0, 10)|list}}'
     when: ReloadSuccess|default('null', true) == 'null'
 
-  - name: Image-Flash-Copy - Wait For Device to Finish Boot
+  - name: Wait For Device to Finish Boot
     wait_for: {host: '{{ansible_host}}', port: 22, delay: 30, timeout: '{{RldTimeout}}'}
     delegate_to: localhost
 
-  - {name: Image-Flash-Copy - Post-Boot Info, icx_facts: {gather_subset: hardware}}
+  - {name: Post-Boot Info, icx_facts: {gather_subset: hardware}}
 
-  - name: Image-Flash-Copy Ensure Successful Image Update
+  - name: Ensure Successful Image Update
     assert:
       that: ImageName|lower in ScpFileEntry.filename|lower
       msg:

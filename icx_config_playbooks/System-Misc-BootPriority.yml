@@ -15,7 +15,7 @@
 
   - name: Check if Boot Preference Change is Needed
     block:
-    - name: Image-Flash-Copy - Remove Boot Statements
+    - name: Remove Boot Statements
       icx_config: {lines: 'no boot sys fl {{item}}', save_when: changed}
       register: IcxCfgStatus
       with_items:
@@ -25,7 +25,7 @@
         - '"Use Default" not in FirstPart'
         - item in FirstPart or item in CurBootPref.stdout_lines[0][2]|lower
 
-    - name: Image-Flash-Copy - Configure Boot Priority
+    - name: Configure Boot Priority
       icx_config: {lines: 'boot sys fl {{FlPart}}', save_when: changed}
       when: FlPart != "pri"
 
