@@ -1,3 +1,28 @@
+vNeedAwxSshCreds: '{{awxssh_user|default("null", true) == "null"}}'
+
+
+awxcli_prompts:
+- question_name: "AWX Server CLI Credential - SSH Login Username:"
+  required: true
+  type: text
+  variable: prompt_awxcli_user
+  min: 1
+  max: 32
+- question_name: "AWX Server CLI Credential - SSH Login Password:"
+  required: true
+  type: password
+  variable: prompt_awxcli_pass
+  min: 1
+  max: 1024
+- question_name: "AWX Server CLI Credential - Sudo Password:"
+  question_description: Leave blank to use SSH login password.
+  required: false
+  type: password
+  variable: prompt_awxcli_sudo
+  min: 1
+  max: 1024
+
+
 awx_tmplt_mgmt_survey:
 - question_name: 'Template management function:'
   required: false
@@ -6,14 +31,20 @@ awx_tmplt_mgmt_survey:
   choices: |-
     Create/Update Templates
     Remove ICX Config Templates
+- '{{awxcli_prompts[0] if vIcxImgDirCreated and vNeedAwxSshCreds else []}}'
+- '{{awxcli_prompts[1] if vIcxImgDirCreated and vNeedAwxSshCreds else []}}'
 
 
+# image_management
 img_mgmt_survey:
 - question_name: 'Image Repository Path:'
   required: true
   type: text
   variable: prompt_imgrepo_path
   default: '/opt/Images'
+- '{{awxcli_prompts[0] if vNeedAwxSshCreds else []}}'
+- '{{awxcli_prompts[1] if vNeedAwxSshCreds else []}}'
+- '{{awxcli_prompts[2] if vNeedAwxSshCreds else []}}'
 
 
 image_flash_copy_file_survey:
@@ -52,6 +83,8 @@ image_flash_copy_file_survey:
     Yes
     No
   default: "No"
+- '{{awxcli_prompts[0] if vNeedAwxSshCreds else []}}'
+- '{{awxcli_prompts[1] if vNeedAwxSshCreds else []}}'
 - question_name: "Image Repo Server Hostname:"
   required: true
   type: multiplechoice
@@ -91,8 +124,10 @@ image_flash_copy_version_survey:
 - '{{image_flash_copy_file_survey[2]}}'
 - '{{image_flash_copy_file_survey[3]}}'
 - '{{image_flash_copy_file_survey[4]}}'
-- '{{image_flash_copy_file_survey[5]}}'
-- '{{image_flash_copy_file_survey[6]}}'
+- '{{awxcli_prompts[0] if vNeedAwxSshCreds else []}}'
+- '{{awxcli_prompts[1] if vNeedAwxSshCreds else []}}'
+- '{{image_flash_copy_file_survey[7]}}'
+- '{{image_flash_copy_file_survey[8]}}'
 
 
 image_flash_copy_templates:
