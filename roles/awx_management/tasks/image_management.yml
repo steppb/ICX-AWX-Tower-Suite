@@ -33,6 +33,12 @@
     vars:
       bImgFileName: '{{bImgFilePath|basename}}'
       bImgFileList: '{{rImgFiles.files|map(attribute="path")|flatten|sort()}}'
+      bPlatCode: '{{bImgFileName|regex_replace(regx_plat_code, "\1")|upper}}'
+      bBinImgVer: '{{bImgFileName|regex_replace(regx_bin_ver, "\1.\2.\3")}}'
+      bImgCode: '{{bImgFileName|regex_replace(regx_image_code, "\1")|upper}}'
+      bIsUfi: "{{'ufi' in bImgFileName|lower}}"
+    when: SoftwarePlatformSupport[bPlatCode] is defined or
+          BootcodePlatformSupport[bPlatCode] is defined
   when: rImgFiles.files is defined
 
 - name: Store File List and Create Utility Templates

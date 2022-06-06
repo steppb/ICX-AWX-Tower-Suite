@@ -1,85 +1,46 @@
 ---
-- name: Set Initial Variables
-  set_fact:
-    BinImgVersion: '{{bImgFileName|regex_replace(BinVerRe, "\1.\2.\3")}}'
-    ImageType: '{{bImgFileName|regex_replace("^.*([RrSsZzUu])[0-9].*", "\1")|upper}}'
-    PlatCode: '{{bImgFileName|regex_replace("^([A-Za-z]{2,3})[RrSsZzUu].*", "\1")|upper}}'
-    IsUfi: "{{'ufi' in bImgFileName|lower}}"
-    SupportedPlatforms: []
-    BootVer:
-    IsSupported: no
-    ImgType:
-
-- {name: Flag as Router Image, set_fact: {ImgType: router}, when: ImageType == "R"}
-- {name: Flag as Switch Image, set_fact: {ImgType: switch}, when: ImageType == "S"}
-- {name: Flag as Boot Code, set_fact: {ImgType: boot}, when: ImageType == "Z"}
-- {name: Flag as Boot Code, set_fact: {ImgType: boot}, when: ImageType == "U"}
-
 - name: Create Boot File Info List
   set_fact:
     BootImgList: '{{BootImgList|default([])}} + {{tBootFileInfo}}'
     BootFileNames: "{{BootFileNames|default('None\nAuto Select\n')}}{{bImgFileName}}\n"
   vars:
     tBootFileInfo:
-      - filename: '{{bImgFileName}}'
-        path: '{{bImgFilePath}}'
-        software_version: '{{BinImgVersion}}'
-        supported_platforms: '{{BootPlatCodeSupport[PlatCode]}}'
-  when:
-    - ImgType == "boot"
-    - BootPlatCodeSupport[PlatCode] is defined
+    - filename: '{{bImgFileName}}'
+      path: '{{bImgFilePath}}'
+      software_version: '{{bBinImgVer}}'
+      supported_platforms: '{{BootcodePlatformSupport[bPlatCode]}}'
+  when: BootcodePlatformSupport[bPlatCode] is defined and
+        (bImgCode == "Z" or bImgCode == "U")
 
 - name: Create Image File Info List
   block:
-  - name: Build List of Supported Platforms
-    set_fact:
-      SupportedPlatforms: '{{SupportedPlatforms}} + {{[item.platform]}}'
-      IsSupported: yes
-    loop: "{{PlatSupportByCode[PlatCode]}}"
-    when:
-      - item[ImgType~'_min_ver'] is defined
-      - BinImgVersion is version(item[ImgType~'_min_ver'], '>=')
-      - (item.ufi_only|bool and IsUfi|bool) or not item.ufi_only|bool
-
   - name: Create and Add File Entry to List
-    block:
-    - name: Find Intermediate Update Images for 8.0.90+
-      find:
-        paths: '{{ImgMgmtRepoDir}}'
-        recurse: yes
-        patterns:
-          - '{{PlatCode}}{{ImageType}}08080[a-zA-Z]{0,2}.bin'
-        use_regex: yes
-      connection: ssh
-      register: ImdImgList
-      vars:
-        ansible_python_interpreter: '{{icx_awx_mgmt.ssh_interpreter}}'
-        ansible_user: '{{awxssh_user|default(prompt_awxcli_user)}}'
-        ansible_ssh_pass: '{{awxssh_pass|default(prompt_awxcli_pass)}}'
-      when: BinImgVersion is version('8.0.90', '>=')
-
-    - name: Get Boot Image Version
-      set_fact: {BootVer: '{{item.boot_version}}'}
-      loop: '{{BootToImageVer}}'
-      when:
-        - not IsUfi|bool
-        - BinImgVersion is version(item.image_ver_min, '>=')
-        - BinImgVersion is version(item.image_ver_max, '<=')
-
-    - name: Create and Add File Entry to List
-      set_fact:
-        SwImgList: '{{SwImgList|default([])}} + {{tSwImgInfo}}'
-        SwImgFileList: "{{SwImgFileList|default()}}{{bImgFileName}}\n"
-        SwImgVerList: "{{SwImgVerList|default([])}} + {{[BinImgVersion]}}"
-      vars:
-        SwImgInfo:
-          - filename: '{{bImgFileName}}'
-            image_type: '{{ImgType}}'
-            is_ufi: '{{IsUfi}}'
-            path: '{{bImgFilePath}}'
-            software_version: '{{BinImgVersion}}'
-            supported_platforms: '{{SupportedPlatforms}}'
-            supported_bootrom_ver: '{{BootVer|default()}}'
-            intermediate_image: '{{ImdImgList.files[0].path|default()}}'
-    when: IsSupported|bool
-  when: ImgType == "router" or ImgType == "switch"
+    set_fact:
+      SwImgList: '{{SwImgList|default([])}} + {{tSwImgInfo}}'
+      SwImgFileList: "{{SwImgFileList|default()}}{{bImgFileName}}\n"
+      SwImgVerList: '{{SwImgVerList|default([])}} + {{[bBinImgVer]}}'
+    vars:
+      tImgDir: '{{ImgMgmtRepoDir}}'
+      tImgType: '{{"router" if bImgCode == "R" else "switch"}}'
+      tImdFileRe: "{{tImgDir}}/{{bPlatCode}}{{bImgCode}}08080[a-zA-Z]{0,2}.bin"
+      tImdImgList: '{{bImgFileList|select("match", tImdFileRe)|list}}'
+      tImdImgReq: '{{bBinImgVer is version("08.0.90", ">=")}}'
+      tBootVer: '{{(BootToImageVer|rejectattr("img_ver_min", ">", bBinImgVer)
+                                  |rejectattr("img_ver_max", "<", bBinImgVer)
+                                  |list|last).boot_version|default()}}'
+      tPS: '{{SoftwarePlatformSupport[bPlatCode]
+             |rejectattr(tImgType~"_min_ver", "undefined")
+             |selectattr(tImgType~"_min_ver", "<=", bBinImgVer)|list}}'
+      tSuppPlat: '{{tPS|rejectattr("ufi_only")|list if not bIsUfi else tPS}}'
+      tSwImgInfo:
+      - filename: '{{bImgFileName}}'
+        img_type: '{{tImgType}}'
+        is_ufi: '{{bIsUfi}}'
+        path: '{{bImgFilePath}}'
+        software_version: '{{bBinImgVer}}'
+        supported_platforms: '{{tSuppPlat|map(attribute="platform")|flatten|sort}}'
+        supported_bootrom_ver: '{{tBootVer|default() if not bIsUfi else ""}}'
+        intermediate_image: '{{tImdImgList[0]|default() if tImdImgReq else ""}}'
+    when: tSuppPlat|default("null", true) != "null"
+  when: SoftwarePlatformSupport[bPlatCode] is defined and
+        (bImgCode == "R" or bImgCode == "S")

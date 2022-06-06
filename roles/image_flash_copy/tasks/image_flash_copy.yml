@@ -31,7 +31,7 @@
     loop: '{{range(0, tImgList|length|int)|list}}'
     loop_control: {index_var: idx}
     vars: {tImgList: '{{ansible_image_repo_files|selectattr("software_version",
-                        "equalto", prompt_flash_copy_version)|list|selectattr("image_type",
+                        "equalto", prompt_flash_copy_version)|list|selectattr("img_type",
                         "equalto", prompt_image_mode|lower)|list}}'}
     when: ansible_net_model|regex_search("ICX[0-9]*") in tImgList[idx].supported_platforms
 
@@ -109,7 +109,7 @@
       fail_msg:
         - "ERROR: Cannot update to {{FileEntry.software_version}} from {{CurSwVer}}"
         - "without an intermediate version."
-        - "Non-UFI 8.0.80 {{FileEntry.image_type}} image needs to be installed in image repo"
+        - "Non-UFI 8.0.80 {{FileEntry.img_type}} image needs to be installed in image repo"
 
   - name: Image-Flash-Copy - Find File Entry
     set_fact:
