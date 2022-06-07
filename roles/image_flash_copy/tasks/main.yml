@@ -29,16 +29,16 @@
       tImg: '{{ImgRepoFiles
               |selectattr("supported_platforms", "contains", IcxModel)
               |selectattr("software_version", "==", prompt_flash_copy_version)
-              |selectattr("img_type", "==", prompt_image_mode|lower)|list}}'
+              |selectattr("img_type", "==", prompt_image_type|lower)|list}}'
 
   - name: Verify Valid File Entry
     assert:
       that: ImgEntry|default("null", true) != "null"
-      fail_msg: 'ERROR: Could not find {{prompt_flash_copy_version}} {{prompt_image_mode}}
-                 image for {{ansible_net_model|regex_search("ICX[0-9]*")}}'
+      fail_msg: 'ERROR: Could not find {{prompt_flash_copy_version}}
+                 {{prompt_image_type}} image for {{IcxModel}}'
       success_msg: "{{ImgEntry.filename|default()}} found."
   when: prompt_flash_copy_version|default("null", true) != "null" and
-        prompt_image_mode|default("null", true) != "null"
+        prompt_image_type|default("null", true) != "null"
 
 - name: Get Image From Filename
   block:

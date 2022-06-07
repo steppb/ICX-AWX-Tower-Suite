@@ -108,7 +108,7 @@ image_flash_copy_version_survey:
 - question_name: 'FastIron Image Type:'
   required: true
   type: multiplechoice
-  variable: prompt_image_mode
+  variable: prompt_image_type
   choices: |-
     Switch
     Router
