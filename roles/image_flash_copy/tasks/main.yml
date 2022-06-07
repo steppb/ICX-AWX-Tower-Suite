@@ -1,7 +1,5 @@
 ---
-- name: Verify Connectivity to Device
-  wait_for: {host: '{{ansible_host}}', port: 22, timeout: 30}
-  delegate_to: localhost
+- {name: Verify Connectivity to Device, wait_for: , delegate_to: localhost}
 
 - name: Gather Switch Info
   icx_facts: {gather_subset: hardware}
@@ -150,13 +148,10 @@
     bScpCfg:
       - ScpFileEntry: '{{ImgEntry}}'
         ScpBootPath: '{{BootEntry.path|default("null", true)}}'
-    BootPrefChange: '{{prompt_flash_change_boot}}'
-    RldTimeout: '{{template_flash_reload_timeout|default(600)}}'
     bCfg: '{{bDowngradeCfg if bUfiDowngrade else bScpCfg}}'
     bScpCpCfg: '{{ScpCpCfg|default([])}} + {{bCfg}}'
     ScpBootPath: '{{ScpCpEntry.ScpBootPath}}'
     ScpFileEntry: '{{ScpCpEntry.ScpFileEntry}}'
-    ScpTimeout: "{{template_flash_copy_timeout|default(300)}}"
 
 - name: Post Boot Info
   block:

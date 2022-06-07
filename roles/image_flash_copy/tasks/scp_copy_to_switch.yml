@@ -36,7 +36,7 @@
   block:
   - name: Get Current Boot Preference from Switch
     icx_command: {commands: show boot-preference}
-    register: CurBootPref
+    register: rCurBootPref
 
   - name: Check if Boot Preference Change is Needed
     block:
@@ -47,16 +47,19 @@
         - sec
       when:
         - '"use default" not in FirstPart'
-        - item in FirstPart or item in CurBootPref.stdout_lines[0][2]|lower
+        - item in FirstPart or item in rCurBootPref.stdout_lines[0][2]|lower
 
     - name: Configure Boot Priority
       icx_config: {lines: 'boot sys fl {{BootPart}}', save_when: changed}
       when: '"pri" not in BootPart'
-    vars: {FirstPart: '{{CurBootPref.stdout_lines[0][1]|lower}}'}
+    vars: {FirstPart: '{{rCurBootPref.stdout_lines[0][1]|lower}}'}
     when: ("use default" not in FirstPart and BootPart not in FirstPart) or
           ("use default" in FirstPart and "sec" in BootPart)
   connection: network_cli
-  vars: {ansible_network_os: icx, ansible_become: true, ansible_become_method: enable}
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
   when: BootPrefChange|bool
 
 - name: Save SSH Username
@@ -100,15 +103,15 @@
 - name: Clean Up Temp Files
   file: {path: '/tmp/{{inventory_hostname}}', state: absent}
 
-- name: Reload Device
+- name: Reboot Device
   block:
-  - name: Reload Device
+  - name: Reboot Device
     include_tasks: reboot_device.yml
     loop: '{{range(0, 10)|list}}'
-    when: ReloadSuccess|default('null', true) == 'null'
+    when: RebootSuccess|default('null', true) == 'null'
 
-  - name: Wait For Device to Finish Boot
-    wait_for: {host: '{{ansible_host}}', port: 22, delay: 30, timeout: '{{RldTimeout}}'}
+  - name: Wait For Boot Completion
+    wait_for: {delay: 30, timeout: '{{RebootTimeout}}'}
     delegate_to: localhost
 
   - {name: Post-Boot Info, icx_facts: {gather_subset: hardware}}
@@ -121,8 +124,7 @@
         - "Current image: {{ansible_net_image}}"
     vars: {ImageName: '{{ansible_net_image|regex_replace(".bin")}}'}
 
-  - name: Reset Reload Return Variable
-    set_fact: {ReloadSuccess: }
+  - {name: Reset Reboot Return Variable, set_fact: {RebootSuccess: }}
   connection: network_cli
   vars:
     ansible_network_os: icx

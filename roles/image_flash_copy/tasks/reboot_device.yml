@@ -1,19 +1,16 @@
-- name: Reload Device
+- name: Reboot Device
   block:
-  - name: Issue Reload Command
+  - name: Issue Reboot Command
     icx_command: {commands: 'boot system flash {{BootPart}} yes'}
-    register: ReloadResult
+    register: rReboot
     failed_when: false
 
   - name: Pause If Error Returned
-    wait_for: {timeout: 30}
-    when: ReloadResult.stdout[0] is defined and
-          "Error" in ReloadResult.stdout[0]
+    wait_for: {host: , port: }
+    when: "'Error' in rReboot.stdout[0]|default()"
 
-  - name: Reload Command Accepted
-    set_fact: {ReloadSuccess: true}
-    when: (ReloadResult.stdout[0] is defined and
-          "Error" not in ReloadResult.stdout[0]) or
-          (ReloadResult.msg is defined and
-          "command timeout triggered" in ReloadResult.msg)
-  when: ReloadSuccess is not defined or not ReloadSuccess|bool
+  - name: Flag Successful Reboot
+    set_fact: {RebootSuccess: true}
+    when: (rReboot.stdout[0] is defined and "Error" not in rReboot.stdout[0])
+          or "command timeout triggered" in rReboot.msg|default()
+  when: RebootSuccess is not defined or not RebootSuccess
