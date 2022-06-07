@@ -36,5 +36,13 @@
       tAwxMgmt: '{{rAwxHostFacts.json.icx_awx_mgmt|default()}}'
       tPyInt: '{{tAwxMgmt.ssh_interpreter|default(ansible_playbook_python)}}'
 
+  - name: Verify Retrieval of Installed Image List
+    assert:
+      that: ImgRepoFiles|default("null", true) != "null"
+      fail_msg:
+        - "Unable to retrieve list of installed images from AWX Server"
+        - "Run the 'Image-Management' or 'AWX-Template-Management'"
+        - "template to rebuild image list"
+
   roles:
   - {role: image_flash_copy}
