@@ -3,6 +3,7 @@
   connection: local
   gather_facts: no
   vars:
+    RebootAllowed: '{{prompt_flash_reload|bool}}'
     BootPart: '{{"sec" if prompt_flash_part|lower == "secondary" else "pri"}}'
 
   pre_tasks:

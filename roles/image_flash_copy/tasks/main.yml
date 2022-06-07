@@ -95,13 +95,17 @@
 
 - name: Intermediate Image Setup
   block:
-  - name: Assert Existence of Intermediate Image
+  - name: Check Existence of Intermediate Image
     assert:
-      that: ImgEntry.intermediate_image|default("null", true) != "null"
-      fail_msg:
-        - "ERROR: Cannot update to {{ImgEntry.software_version}} from {{CurSwVer}}"
-        - "without an intermediate version."
-        - "Non-UFI 8.0.80 {{ImgEntry.img_type}} image needs to be installed in image repo"
+      that: tHasImg and RebootAllowed
+      fail_msg: '{{tNoImgMsg if not tHasImg else tNoRebootMsg}}'
+    vars:
+      tHasImg: '{{ImgEntry.intermediate_image|default("null", true) != "null"}}'
+      tNoImgMsg:
+        - "ERROR: Cannot update to {{ImgEntry.software_version}} from"
+        - "{{CurSwVer}} without an intermediate version."
+        - "Install non-UFI 8.0.80 {{ImgEntry.img_type}} image in image repo"
+      tNoRebootMsg: "ERROR: Reboot required for two-step upgrade"
 
   - name: Find File Entry
     set_fact:
@@ -147,7 +151,6 @@
       - ScpFileEntry: '{{ImgEntry}}'
         ScpBootPath: '{{BootEntry.path|default("null", true)}}'
     BootPrefChange: '{{prompt_flash_change_boot}}'
-    ReloadDevice: '{{prompt_flash_reload}}'
     RldTimeout: '{{template_flash_reload_timeout|default(600)}}'
     bCfg: '{{bDowngradeCfg if bUfiDowngrade else bScpCfg}}'
     bScpCpCfg: '{{ScpCpCfg|default([])}} + {{bCfg}}'
@@ -157,12 +160,11 @@
 
 - name: Post Boot Info
   block:
-  - name: Get Post-Boot Version Information
-    icx_command: {commands: show version}
-    register: IcxVersion
-
-  - name: Show Version
-    debug: {msg: '{{IcxVersion.stdout_lines[0]}}'}
+  - {name: Get Version, icx_command: {commands: show version}, register: rSwVer}
+  - {name: Show Version, debug: {msg: '{{rSwVer.stdout_lines[0]}}'}}
   connection: network_cli
-  vars: {ansible_network_os: icx, ansible_become: true, ansible_become_method: enable}
-  when: prompt_flash_reload|bool
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+  when: RebootAllowed

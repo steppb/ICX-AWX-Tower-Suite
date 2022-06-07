@@ -124,5 +124,8 @@
   - name: Reset Reload Return Variable
     set_fact: {ReloadSuccess: }
   connection: network_cli
-  vars: {ansible_network_os: icx, ansible_become: true, ansible_become_method: enable}
-  when: ReloadDevice|bool
+  vars:
+    ansible_network_os: icx
+    ansible_become: true
+    ansible_become_method: enable
+  when: RebootAllowed
