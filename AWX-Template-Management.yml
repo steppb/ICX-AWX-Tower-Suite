@@ -13,6 +13,7 @@
   vars:
     ansible_python_interpreter: '{{ansible_playbook_python}}'
     AwxApi: https://{{ansible_host}}/api/v2
+    ImgMgmtDir: '{{icx_awx_mgmt.img_mgmt.awx_image_dir|default("null")}}'
     MgmtFunc: '{{prompt_mgmt_role|default("Management Update", true)}}'
     template_validate_certs: no
     IsAwxTmpltMgmt: true

@@ -80,3 +80,14 @@
     loop_control: {index_var: idx}
     register: rTemplateCreds
   when: not rThisTemplate.json.ask_credential_on_launch
+
+- name: Set Flag to Update Image Management Templates
+  set_fact: {DoImgMgmt: '{{tAmUpdate or tImUpdate}}'}
+  vars:
+    tAmNotRmv: '{{"remove" not in prompt_mgmt_role|default()|lower}}'
+    tAmReqUpt: '{{prompt_update_img_mgmt|default(false)}}'
+    tImgDirDefined: '{{ImgMgmtDir|default("null", true) != "null"}}'
+    tIsAm: '{{IsAwxTmpltMgmt|default(false)}}'
+    tIsIm: '{{IsImgMgmt|default(false)}}'
+    tAmUpdate: '{{tIsAm and tAmNotRmv and tImgDirDefined and tAmReqUpt}}'
+    tImUpdate: '{{tIsIm and tImgDirDefined}}'

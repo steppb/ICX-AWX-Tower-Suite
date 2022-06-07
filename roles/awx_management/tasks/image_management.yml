@@ -2,7 +2,7 @@
   block:
   - name: Create Directory for Image Repo in Projects Directory
     file:
-      path: '{{ImgMgmtRepoDir}}'
+      path: '{{ImgMgmtDir}}'
       owner: '{{ansible_user}}'
       group: '{{ansible_user}}'
       state: directory
@@ -14,7 +14,7 @@
     when: IsImgMgmt|default(false)
 
   - name: Search for Binary Files in Repo
-    find: {paths: '{{ImgMgmtRepoDir}}', recurse: yes, patterns: '*.bin'}
+    find: {paths: '{{ImgMgmtDir}}', recurse: yes, patterns: '*.bin'}
     register: rImgFiles
   connection: ssh
   vars:
@@ -45,7 +45,7 @@
     vars:
       tImg:
         img_mgmt:
-          awx_image_dir: '{{ImgMgmtRepoDir}}'
+          awx_image_dir: '{{ImgMgmtDir}}'
           image_files: '{{SwImgList}}'
           boot_files: '{{BootImgList|default()}}'
   when: rImgFiles.files|default("null", true) != "null"

@@ -1,4 +1,6 @@
 vNeedAwxSshCreds: '{{awxssh_user|default("null", true) == "null"}}'
+vIcxImgDirCreated: '{{icx_awx_mgmt.img_mgmt.awx_image_dir is defined}}'
+vAwxImgDir: '{{icx_awx_mgmt.img_mgmt.awx_image_dir|default()}}'
 
 
 awxcli_prompts:
@@ -23,6 +25,18 @@ awxcli_prompts:
   max: 1024
 
 
+awx_tmplt_mgmt_prompts:
+- question_name: 'Update Image Management Templates?'
+  question_description: 'Image Repo Location: {{vAwxImgDir}}'
+  required: true
+  type: multiplechoice
+  variable: prompt_update_img_mgmt
+  default: 'Yes'
+  choices: |-
+    Yes
+    No
+
+
 awx_tmplt_mgmt_survey:
 - question_name: 'Template management function:'
   required: false
@@ -31,6 +45,7 @@ awx_tmplt_mgmt_survey:
   choices: |-
     Create/Update Templates
     Remove ICX Config Templates
+- '{{awx_tmplt_mgmt_prompts[0] if vIcxImgDirCreated else []}}'
 - '{{awxcli_prompts[0] if vIcxImgDirCreated and vNeedAwxSshCreds else []}}'
 - '{{awxcli_prompts[1] if vIcxImgDirCreated and vNeedAwxSshCreds else []}}'
 
@@ -41,7 +56,7 @@ img_mgmt_survey:
   required: true
   type: text
   variable: prompt_imgrepo_path
-  default: '/opt/Images'
+  default: '{{vAwxImgDir|default("/opt/Images", true)}}'
 - '{{awxcli_prompts[0] if vNeedAwxSshCreds else []}}'
 - '{{awxcli_prompts[1] if vNeedAwxSshCreds else []}}'
 - '{{awxcli_prompts[2] if vNeedAwxSshCreds else []}}'
@@ -135,13 +150,13 @@ image_flash_copy_templates:
   playbook_rev: 1.0.0
   description: "Copy files(s) to switch"
   playbook: Image-Flash-Copy.yml
-  survey_spec: '{{image_flash_copy_file_survey}}'
+  survey_spec: '{{image_flash_copy_file_survey|select()|list}}'
 
 - name: Image-Flash-Copy-Version
   playbook_rev: 1.0.0
   description: "Update switch(es) to selected version"
   playbook: Image-Flash-Copy.yml
-  survey_spec: '{{image_flash_copy_version_survey}}'
+  survey_spec: '{{image_flash_copy_version_survey|select()|list}}'
 
 
 mgmt_template_specs:
@@ -153,7 +168,7 @@ mgmt_template_specs:
   ask_credential_on_launch: false
   ask_limit_on_launch: false
   use_fact_cache: true
-  survey_spec: '{{awx_tmplt_mgmt_survey}}'
+  survey_spec: '{{awx_tmplt_mgmt_survey|select()|list}}'
 
 - name: Image-Management
   playbook_rev: 0.1.0
@@ -163,7 +178,7 @@ mgmt_template_specs:
   ask_credential_on_launch: false
   ask_limit_on_launch: false
   use_fact_cache: true
-  survey_spec: '{{img_mgmt_survey}}'
+  survey_spec: '{{img_mgmt_survey|select()|list}}'
 
 - '{{image_flash_copy_templates[0] if SwImgFileList is defined else []}}'
 - '{{image_flash_copy_templates[1] if SwImgVerList is defined else []}}'

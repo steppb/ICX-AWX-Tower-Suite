@@ -20,7 +20,7 @@
       SwImgFileList: "{{SwImgFileList|default()}}{{bImgFileName}}\n"
       SwImgVerList: '{{SwImgVerList|default([])}} + {{[bBinImgVer]}}'
     vars:
-      tImgDir: '{{ImgMgmtRepoDir}}'
+      tImgDir: '{{ImgMgmtDir}}'
       tImgType: '{{"router" if bImgCode == "R" else "switch"}}'
       tImdFileRe: "{{tImgDir}}/{{bPlatCode}}{{bImgCode}}08080[a-zA-Z]{0,2}.bin"
       tImdImgList: '{{bImgFileList|select("match", tImdFileRe)|list}}'
