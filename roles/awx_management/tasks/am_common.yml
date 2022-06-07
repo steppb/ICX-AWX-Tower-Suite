@@ -1,8 +1,15 @@
 ---
+- name: Get This Template Info
+  uri: {url: '{{AwxApi}}/job_templates/{{awx_job_template_id}}/'}
+  register: rThisTemplate
+
 - name: Initial AWX System Host Tasks
   block:
-  - {name: Store Facts, set_fact: {HostFacts: '{{icx_awx_mgmt|default({})}}'}}
-  - {name: Clear Host Facts, meta: clear_facts}
+  - name: Backup 'icx_awx_mgmt' and Clear Host Facts
+    block:
+    - {name: Store Facts, set_fact: {HostFacts: '{{icx_awx_mgmt|default({})}}'}}
+    - {name: Clear Host Facts, meta: clear_facts}
+    when: rThisTemplate.json.use_fact_cache
 
   - name: Gather Host Facts
     setup: gather_subset=!all,!min,network
@@ -11,7 +18,6 @@
     ignore_unreachable: true
     ignore_errors: true
     vars:
-      ansible_python_interpreter: '{{bPyInt}}'
       ansible_user: '{{awxssh_user|default(prompt_awxcli_user)}}'
       ansible_ssh_pass: '{{awxssh_pass|default(prompt_awxcli_pass)}}'
 
@@ -30,19 +36,25 @@
       - not rGather.failed|default(true)
       - tIntIp != ansible_host
 
-  - {name: Clear Host Facts, meta: clear_facts}
+  - name: Clear Gathered Facts and Restore 'icx_awx_mgmt'
+    block:
+    - {name: Clear Host Facts, meta: clear_facts}
 
-  - name: Restore Host Facts
-    set_fact: {icx_awx_mgmt: '{{HostFacts|combine(tPyIntVar)}}', cacheable: true}
-    vars:
-      tFacts: '{{rGather.ansible_facts}}'
-      tPyInt: '{{tFacts.discovered_interpreter_python|default("auto")}}'
-      tPyIntVar: {ssh_interpreter: '{{tPyInt}}'}
+    - name: Restore Host Facts
+      set_fact: {icx_awx_mgmt: '{{HostFacts}}', cacheable: true}
+    when: rThisTemplate.json.use_fact_cache
 
   - name: Check Errors
     assert: {that: not rGather.failed|default(true), fail_msg: "{{tFailMsg}}"}
     vars: {tFailMsg: '{{rNetIntList.msg|default("Error gathering facts")}}'}
-  vars: {bPyInt: "{{HostFacts.ssh_interpreter_python|default('auto', true)}}"}
+
+  - name: Add SSH Python Interpreter to Host Facts
+    set_fact: {icx_awx_mgmt: '{{HostFacts|combine(tSshInt)}}', cacheable: true}
+    vars:
+      tFacts: '{{rGather.ansible_facts}}'
+      tPyInt: '{{tFacts.discovered_interpreter_python|default("auto")}}'
+      tSshInt: {ssh_interpreter: '{{tPyInt}}'}
+    when: rThisTemplate.json.use_fact_cache
   when: awxssh_user|default(prompt_awxcli_user) is defined
 
 - name: Get Python Packages
@@ -54,10 +66,6 @@
   when:
     - rPipInfo.pip.pexpect is not defined
     - rPipInfo.pip3.pexpect is not defined
-
-- name: Get This Template Info
-  uri: {url: '{{AwxApi}}/job_templates/{{awx_job_template_id}}/'}
-  register: rThisTemplate
 
 - name: Store Credentials
   block:
