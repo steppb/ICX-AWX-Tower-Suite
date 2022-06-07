@@ -64,8 +64,8 @@
   vars:
     tBootVer: '{{ImgEntry.supported_bootrom_ver}}'
     tBootEntry: '{{ImgRepoBootFiles
-                 |selectattr("supported_platforms", "contains", IcxModel)
-                 |selectattr("software_version", "==", tBootVer)|list}}'
+                  |selectattr("supported_platforms", "contains", IcxModel)
+                  |selectattr("software_version", "==", tBootVer)|list}}'
   when:
     - prompt_bootflash_copy_filename|default() == "Auto Select"
     - not ImgEntry.is_ufi|bool
@@ -130,35 +130,27 @@
     - CurSwVer is version('8.0.80', '<')
     - ImgEntry.software_version is version('8.0.90', '>=')
 
-- name: Image Config (Downgrade from 08.0.90)
-  set_fact:
-    UfiDowngrade: true
-    ScpCpCfg:
+- name: SCP Copy to Switch Tasks
+  include_tasks: scp_copy_to_switch.yml
+  loop: '{{bScpCpCfg}}'
+  loop_control: {loop_var: ScpCpEntry}
+  vars:
+    bUfiDowngrade: '{{CurSwVer is version("8.0.90", ">=")
+                      and not ImgEntry.is_ufi
+                      and BootEntry.path|default("null", true) != "null"}}'
+    bDowngradeCfg:
       - ScpFileEntry: '{{ImgEntry}}'
         ScpBootPath: "null"
       - ScpFileEntry: '{{ImgEntry}}'
-        ScpBootPath: '{{BootEntry.path}}'
-  when:
-    - CurSwVer is version('8.0.90', '>=')
-    - not ImgEntry.is_ufi|bool
-    - BootEntry.path|default("null", true) != "null"
-
-- name: Image Config
-  set_fact: {ScpCpCfg: '{{ScpCpCfg|default([])}} + {{tVar}}'}
-  vars:
-    tVar:
+        ScpBootPath: '{{BootEntry.path|default("null", true)}}'
+    bScpCfg:
       - ScpFileEntry: '{{ImgEntry}}'
         ScpBootPath: '{{BootEntry.path|default("null", true)}}'
-  when: not UfiDowngrade|default(false, true)|bool
-
-- name: SCP Copy to Switch Tasks
-  include_tasks: scp_copy_to_switch.yml
-  loop: '{{ScpCpCfg}}'
-  loop_control: {loop_var: ScpCpEntry}
-  vars:
     BootPrefChange: '{{prompt_flash_change_boot}}'
     ReloadDevice: '{{prompt_flash_reload}}'
     RldTimeout: '{{template_flash_reload_timeout|default(600)}}'
+    bCfg: '{{bDowngradeCfg if bUfiDowngrade else bScpCfg}}'
+    bScpCpCfg: '{{ScpCpCfg|default([])}} + {{bCfg}}'
     ScpBootPath: '{{ScpCpEntry.ScpBootPath}}'
     ScpFileEntry: '{{ScpCpEntry.ScpFileEntry}}'
     ScpTimeout: "{{template_flash_copy_timeout|default(300)}}"
