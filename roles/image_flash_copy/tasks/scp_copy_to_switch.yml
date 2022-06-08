@@ -75,6 +75,7 @@
   with_items:
     - '{{bScpBootPath}}'
     - '{{bScpFileEntry.path}}'
+  when: item|default("null", true) != "null"
 
 - name: Copy Image(s) to Switch Flash
   expect:
