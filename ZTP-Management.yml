@@ -1,14 +1,3 @@
-#! Description: Install required ZTP components.
-# =====================
-# This template performs the following tasks on first run:
-# - Installs 'netaddr' ansible module
-# - Creates AWX application entry for 'isc-dhcp-server'
-# - Generates Auth Token used by DHCP webhook.
-# - Installs 'isc-dhcp-server'
-# - Creates and installs 'awx-dhcp-webhook' from template
-# - Creates a default ICX credential set
-# - Creates 'ZTP-Configure' template
-# - Creates 'ZTP-Regen-AuthToken' template
 ---
 - hosts: all
   connection: ssh
@@ -28,7 +17,4 @@
     ZtpDefPassword: 'PasswordPassword'
 
   roles:
-  - {role: common}
-  - {role: ztp_install, when: ZtpParams.ZtpInstall|bool}
-  - {role: ztp_config, when: ZtpParams.ZtpConfigure|bool}
-  - {role: create_templates, when: TemplateCreateParams is defined}
+  - {role: awx_management}
