@@ -11,8 +11,18 @@
 
 - name: Assert Switch Access
   assert:
-    that: ansible_net_model|default("null", true) != "null"
-    fail_msg: "Failed to access switch"
+    that: tAccessOk and tVerOk
+    fail_msg: '{{tErr|select()|list}}'
+  vars:
+    tAccessOk: '{{ansible_net_model|default("null", true) != "null"}}'
+    tNetVerOk: '{{ansible_net_version|default("null", true) != "null"}}'
+    tNetImgOk: '{{ansible_net_image|default("null", true) != "null"}}'
+    tVerOk: '{{tNetVerOk or tNetImgOk}}'
+    tAccessErr: "ERROR: Failed to access switch"
+    tVerErr: "ERROR: Unable to read FastIron version from switch"
+    tErr:
+      - '{{tAccessErr if not tAccessOk else []}}'
+      - '{{tVerErr if not tVerOk else []}}'
 
 - {name: Load Boot Compatibility Table, include_vars: boot_compat_table.yml}
 
@@ -81,15 +91,11 @@
     - prompt_bootflash_copy_filename != "None"
     - not ImgEntry.is_ufi|bool
 
-- name: Get Current Switch Version - ansible_net_image
-  set_fact: {CurSwVer: '{{ansible_net_image|regex_replace(BinVerRe, "\1.\2.\3")}}'}
-  when: ansible_net_image|default("null", true) != "null"
-
-- name: Get Current Switch Version - ansible_net_version
-  set_fact: {CurSwVer: '{{ansible_net_version|regex_search(ShVerRe)}}'}
-  when:
-    - CurSwVer|default("null", true) == "null"
-    - ansible_net_version|default("null", true) != "null"
+- name: Get Current Switch Version
+  set_fact:
+    CurSwVer: '{{ansible_net_image|regex_replace(regx_bin_ver, "\1.\2.\3")
+                 if ansible_net_image|default("null", true) != "null"
+                 else ansible_net_version|regex_search(regx_show_ver)}}'
 
 - name: Intermediate Image Setup
   block:
@@ -127,10 +133,9 @@
       tVar:
         - ScpFileEntry: '{{ImdFileEntry}}'
           ScpBootPath: '{{ImdBootEntry.path|default("null", true)}}'
-  vars: {CurSwVer: '{{ansible_net_image|regex_replace(BinVerRe, "\1.\2.\3")}}'}
   when:
-    - CurSwVer is version('8.0.80', '<')
-    - ImgEntry.software_version is version('8.0.90', '>=')
+    - CurSwVer is version('08.0.80', '<')
+    - ImgEntry.software_version is version('08.0.90', '>=')
 
 - name: SCP Copy to Switch Tasks
   include_tasks: scp_copy_to_switch.yml
