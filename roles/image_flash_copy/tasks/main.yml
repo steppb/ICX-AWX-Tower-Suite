@@ -111,28 +111,21 @@
         - "Install non-UFI 8.0.80 {{ImgEntry.img_type}} image in image repo"
       tNoRebootMsg: "ERROR: Reboot required for two-step upgrade"
 
-  - name: Find File Entry
+  - name: Find File Entry for Intermediate Image
     set_fact:
-      ImdFileEntry: '{{(tFL|selectattr("path", "==", tPath)|list)[0]|default()}}'
-    vars: {tFL: '{{ImgRepoFiles}}', tPath: '{{ImgEntry.intermediate_image}}'}
-
-  - name: Get Intermediate Boot Image Entry
-    set_fact: {ImdBootEntry: '{{tImdBootEntry}}'}
+      ScpCpCfg:
+        - ScpFileEntry: '{{tImdImgEntry[0]|default()}}'
+          ScpBootPath: '{{tImdBootEntry[0].path|default()}}'
     vars:
+      tPath: '{{ImgEntry.intermediate_image}}'
+      tImdImgEntry: '{{ImgRepoFiles|selectattr("path", "==", tPath)|list}}'
       tImdBootEntry: '{{ImgRepoBootFiles
                        |selectattr("supported_platforms", "contains", IcxModel)
-                       |selectattr("software_version", "==", "10.1.14")|list)}}'
+                       |selectattr("software_version", "==", "10.1.14")|list}}'
 
   - name: Warn on no Bootrom
-    debug: {msg: '{{ansible_net_model}} bootrom for 8.0.80 not found'}
-    when: ImdBootEntry|default("null", true) == "null"
-
-  - name: Intermediate Image Config
-    set_fact: {ScpCpCfg: "{{tVar}}"}
-    vars:
-      tVar:
-        - ScpFileEntry: '{{ImdFileEntry}}'
-          ScpBootPath: '{{ImdBootEntry.path|default("null", true)}}'
+    debug: {msg: '{{IcxModel}} bootrom for 8.0.80 not found'}
+    when: ScpCpCfg[0].ScpBootPath|default("null", true) == "null"
   when:
     - CurSwVer is version('08.0.80', '<')
     - ImgEntry.software_version is version('08.0.90', '>=')
