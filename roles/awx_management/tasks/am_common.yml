@@ -18,6 +18,7 @@
     ignore_unreachable: true
     ignore_errors: true
     vars:
+      ansible_python_interpreter: auto
       ansible_user: '{{awxssh_user|default(prompt_awxcli_user)}}'
       ansible_ssh_pass: '{{awxssh_pass|default(prompt_awxcli_pass)}}'
 
