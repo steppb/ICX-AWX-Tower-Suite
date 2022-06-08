@@ -6,7 +6,7 @@
     ansible_become: true
     ansible_become_method: enable
 
-- name: Check Bootrom for Compatibility
+- name: Check Bootrom For Compatibility
   block:
   - name: Get Current Boot Version
     icx_command: {commands: show flash | include Boot}
@@ -19,18 +19,15 @@
 
   - name: Check Bootrom Compatibility with New Image
     assert:
-      that: ScpFileEntry.software_version is version(tMaxCompVer, '<=')
+      that: bScpFileEntry.software_version is version(tMaxCompVer, '<=')
       msg: "ERROR: Bootrom {{tCurVer}} incompatible with {{ImgEntry.filename}}"
     vars:
-      tImgName: '{{ImgEntry.filename}}'
       tBootVerRe: '[0-9]{2}\.[0-9]{1}\.[0-9]{1,2}'
       tCurVer: '{{rIcxShFlash.stdout_lines[0][0]|regex_search(tBootVerRe)}}'
       tMaxCompVer: '{{(BootCompatTbl|selectattr("boot_version", "==", tCurVer)
                                     |list|last).max_comp_ver|default("null")}}'
     when: tMaxCompVer != "null"
-  when:
-    - not ScpFileEntry.is_ufi|bool
-    - ScpBootPath == "null"
+  when: not bScpFileEntry.is_ufi and bScpBootPath == "null"
 
 - name: Change Boot Preference
   block:
@@ -76,8 +73,8 @@
     ansible_user: '{{awxssh_user|default(prompt_awxcli_user)}}'
     ansible_ssh_pass: '{{awxssh_pass|default(prompt_awxcli_pass)}}'
   with_items:
-    - '{{ScpBootPath}}'
-    - '{{ScpFileEntry.path}}'
+    - '{{bScpBootPath}}'
+    - '{{bScpFileEntry.path}}'
 
 - name: Copy Image(s) to Switch Flash
   expect:
@@ -85,19 +82,20 @@
     echo: yes
     timeout: '{{ScpTimeout}}'
     responses:
-      'Password:': "{{ansible_password}}"
+      "Password:": '{{ansible_password}}'
   no_log: true
   loop: '{{tCpFiles}}'
   vars:
     tOpts: "-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
     tKex: "-o KexAlgorithms=+diffie-hellman-group1-sha1"
+    tFilename: '{{bScpFileEntry.filename}}'
     tCpFiles:
-    - src: '{{rFetch.results[0].dest|default("null", true)}}'
-      dest: "{{RemUser}}@{{ansible_host}}:flash:bootrom"
-    - src: '{{rFetch.results[1].dest|default("null", true)}}'
-      dest: "{{RemUser}}@{{ansible_host}}:flash:{{BootPart}}:{{ScpFileEntry.filename}}"
-  register: CpStatus
-  failed_when: CpStatus.rc != 0 and CpStatus.rc != 1
+      - src: '{{rFetch.results[0].dest|default("null", true)}}'
+        dest: "{{RemUser}}@{{ansible_host}}:flash:bootrom"
+      - src: '{{rFetch.results[1].dest|default("null", true)}}'
+        dest: "{{RemUser}}@{{ansible_host}}:flash:{{BootPart}}:{{tFilename}}"
+  register: rCpStatus
+  failed_when: rCpStatus.rc != 0 and rCpStatus.rc != 1
   when: item.src != "null"
 
 - name: Clean Up Temp Files
@@ -118,9 +116,9 @@
 
   - name: Ensure Successful Image Update
     assert:
-      that: ImageName|lower in ScpFileEntry.filename|lower
+      that: ImageName|lower in bScpFileEntry.filename|lower
       msg:
-        - "ERROR: Failed to boot into {{ScpFileEntry.filename}}"
+        - "ERROR: Failed to boot into {{bScpFileEntry.filename}}"
         - "Current image: {{ansible_net_image}}"
     vars: {ImageName: '{{ansible_net_image|regex_replace(".bin")}}'}
 

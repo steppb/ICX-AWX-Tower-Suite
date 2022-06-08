@@ -31,7 +31,7 @@
 
 - name: Get Image From Version
   block:
-  - name: Find File Entry from Version
+  - name: Find File Entry From Version
     set_fact: {ImgEntry: '{{tImg[0]|default()}}'}
     vars:
       tImg: '{{ImgRepoFiles
@@ -42,30 +42,31 @@
   - name: Verify Valid File Entry
     assert:
       that: ImgEntry|default("null", true) != "null"
-      fail_msg: 'ERROR: Could not find {{prompt_flash_copy_version}}
-                 {{prompt_image_type}} image for {{IcxModel}}'
+      fail_msg: "ERROR: Could not find {{prompt_flash_copy_version}}
+                 {{prompt_image_type}} image for {{IcxModel}}"
       success_msg: "{{ImgEntry.filename|default()}} found."
-  when: prompt_flash_copy_version|default("null", true) != "null" and
-        prompt_image_type|default("null", true) != "null"
+  when:
+    - prompt_flash_copy_version|default("null", true) != "null"
+    - prompt_image_type|default("null", true) != "null"
 
 - name: Get Image From Filename
   block:
-  - name: Find File Entry
+  - name: Find File Entry From Filename
     set_fact:
       ImgEntry: '{{(bFL|selectattr("filename", "==", bImg)|list)[0]|default()}}'
 
   - name: Verify Valid File
     assert:
-      that: ImgEntry|default("null", true) != "null"
-      fail_msg: "ERROR: File named {{bImg}} not found."
+      that: tValidOk and tCompatOk
+      fail_msg: '{{tValidErr if not tValidOk else tCompatErr}}'
       success_msg: "{{bImg}} found."
-
-  - name: Assert Image Compatibility
-    assert:
-      that: ansible_net_model|regex_search("ICX[0-9]*") in ImgEntry.supported_platforms
-      fail_msg: "ERROR: {{bImg}} not compatible with {{ansible_net_model}}"
+    vars:
+      tValidOk: '{{ImgEntry|default("null", true) != "null"}}'
+      tCompatOk: '{{IcxModel in ImgEntry.supported_platforms}}'
+      tValidErr: "ERROR: File named {{bImg}} not found."
+      tCompatErr: "ERROR: {{bImg}} not compatible with {{IcxModel}}"
   vars: {bImg: '{{prompt_flash_copy_filename}}', bFL: '{{ImgRepoFiles}}'}
-  when: ImgEntry is not defined
+  when: ImgEntry is not defined and prompt_flash_copy_filename is defined
 
 - name: Auto Select Boot Image
   set_fact: {BootEntry: '{{tBootEntry[0]|default()}}'}
@@ -76,10 +77,10 @@
                   |selectattr("software_version", "==", tBootVer)|list}}'
   when:
     - prompt_bootflash_copy_filename|default() == "Auto Select"
-    - not ImgEntry.is_ufi|bool
+    - not ImgEntry.is_ufi
 
 - name: User Selected Boot Image Entry
-  set_fact: {BootEntry: '{{tBootList[0]}}'}
+  set_fact: {BootEntry: '{{tBootList[0]|default()}}'}
   vars:
     tBootList: '{{ImgRepoBootFiles
                  |selectattr("filename", "==", prompt_bootflash_copy_filename)
@@ -89,7 +90,7 @@
     - prompt_bootflash_copy_filename|default("null", true) != "null"
     - prompt_bootflash_copy_filename != "Auto Select"
     - prompt_bootflash_copy_filename != "None"
-    - not ImgEntry.is_ufi|bool
+    - not ImgEntry.is_ufi
 
 - name: Get Current Switch Version
   set_fact:
@@ -111,11 +112,11 @@
         - "Install non-UFI 8.0.80 {{ImgEntry.img_type}} image in image repo"
       tNoRebootMsg: "ERROR: Reboot required for two-step upgrade"
 
-  - name: Find File Entry for Intermediate Image
+  - name: Find File Entry For Intermediate Image
     set_fact:
       ScpCpCfg:
-        - ScpFileEntry: '{{tImdImgEntry[0]|default()}}'
-          ScpBootPath: '{{tImdBootEntry[0].path|default()}}'
+        - file_entry: '{{tImdImgEntry[0]|default()}}'
+          boot_path: '{{tImdBootEntry[0].path|default()}}'
     vars:
       tPath: '{{ImgEntry.intermediate_image}}'
       tImdImgEntry: '{{ImgRepoFiles|selectattr("path", "==", tPath)|list}}'
@@ -125,7 +126,7 @@
 
   - name: Warn on no Bootrom
     debug: {msg: '{{IcxModel}} bootrom for 8.0.80 not found'}
-    when: ScpCpCfg[0].ScpBootPath|default("null", true) == "null"
+    when: ScpCpCfg[0].boot_path|default("null", true) == "null"
   when:
     - CurSwVer is version('08.0.80', '<')
     - ImgEntry.software_version is version('08.0.90', '>=')
@@ -139,17 +140,17 @@
                       and not ImgEntry.is_ufi
                       and BootEntry.path|default("null", true) != "null"}}'
     bDowngradeCfg:
-      - ScpFileEntry: '{{ImgEntry}}'
-        ScpBootPath: "null"
-      - ScpFileEntry: '{{ImgEntry}}'
-        ScpBootPath: '{{BootEntry.path|default("null", true)}}'
+      - file_entry: '{{ImgEntry}}'
+        boot_path: "null"
+      - file_entry: '{{ImgEntry}}'
+        boot_path: '{{BootEntry.path|default("null", true)}}'
     bScpCfg:
-      - ScpFileEntry: '{{ImgEntry}}'
-        ScpBootPath: '{{BootEntry.path|default("null", true)}}'
+      - file_entry: '{{ImgEntry}}'
+        boot_path: '{{BootEntry.path|default("null", true)}}'
     bCfg: '{{bDowngradeCfg if bUfiDowngrade else bScpCfg}}'
     bScpCpCfg: '{{ScpCpCfg|default([])}} + {{bCfg}}'
-    ScpBootPath: '{{ScpCpEntry.ScpBootPath}}'
-    ScpFileEntry: '{{ScpCpEntry.ScpFileEntry}}'
+    bScpBootPath: '{{ScpCpEntry.boot_path}}'
+    bScpFileEntry: '{{ScpCpEntry.file_entry}}'
 
 - name: Post Boot Info
   block:
