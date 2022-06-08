@@ -1,4 +1,11 @@
 ---
+- name: Format Secondary Physical Interfaces
+  set_fact: {PhysInts: "{{PhysInts|default()}} {{tPhysInt}}"}
+  loop: '{{PhysIntInfo}}'
+  loop_control: {loop_var: tInt}
+  vars: {tPhysInt: "{{tInt.interface}}:{{tInt.address}}"}
+  when: PhysIntInfo is defined
+
 - name: Get Job Template Count
   uri: {url: '{{AwxApi}}/job_templates/'}
   register: rJtNum
