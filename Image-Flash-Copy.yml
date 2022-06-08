@@ -25,7 +25,7 @@
     vars: {bAwxApi: "https://{{prompt_image_repo_address}}/api/v2"}
     module_defaults:
       uri:
-        validate_certs: '{{template_validate_certs|default(false)}}'
+        validate_certs: '{{host_validate_certs|default(false)}}'
         method: GET
         user: '{{awxlogin_user}}'
         password: '{{awxlogin_pass}}'

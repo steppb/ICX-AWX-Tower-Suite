@@ -15,7 +15,7 @@
   gather_facts: no
   module_defaults:
     uri:
-      validate_certs: '{{template_validate_certs}}'
+      validate_certs: '{{host_validate_certs|default(false)}}'
       method: GET
       user: '{{awxlogin_user}}'
       password: '{{awxlogin_pass}}'
@@ -23,7 +23,6 @@
       timeout: 60
   vars:
     AwxApi: https://{{ansible_host}}/api/v2
-    template_validate_certs: no
     PhysInts:
     DhcpSubnetRouter:
     ZtpDefPassword: 'PasswordPassword'
