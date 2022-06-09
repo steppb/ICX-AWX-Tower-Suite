@@ -4,6 +4,10 @@
   - name: Check DHCP
     stat: {path: /etc/apparmor.d/usr.sbin.dhcpd}
     register: rDhcpFile
+
+  - name: Check Webhook
+    stat: {path: /etc/dhcp/awx_dhcp_webhook}
+    register: rWebhookFile
   connection: ssh
   vars:
     ansible_python_interpreter: '{{icx_awx_mgmt.ssh_interpreter}}'
@@ -21,17 +25,21 @@
     register: rZtpApp
 
   - name: Check For Existing Webhook Token
-    uri: {url: '{{AwxApi}}/users/{{awx_user_id}}/tokens/?application={{tAppId}}'}
+    uri: {url: '{{AwxApi}}/users/{{awx_user_id}}/tokens/?application={{tApp}}'}
     register: rWebToken
-    vars: {tAppId: '{{rZtpApp.json.results[0].id|default()}}'}
-    when: tAppId|default("null", true) != "null"
+    vars: {tApp: '{{rZtpApp.json.results[0].id|default()}}'}
+    when: tApp|default("null", true) != "null"
 
 - name: ZTP Setup
   block:
   - {name: Setup DHCP, include_tasks: zm_dhcp.yml, when: bDoDhcp}
   - {name: Create Creds, include_tasks: zm_default_creds.yml, when: bDoCred}
-  - {name: Create Token, include_tasks: zm_auth_token.yml}
+  - {name: Create Token, include_tasks: zm_auth_token.yml, when: bDoAuth}
   vars:
     bOrgId: '{{rThisTemplate.json.organization}}'
+    bAppId: '{{rZtpApp.json.results[0].id|default(0)}}'
+    bTokId: '{{rWebToken.json.results[0].id|default(0)}}'
+    bNeedWebhook: '{{not rWebhookFile.stat.exists}}'
     bDoDhcp: '{{not rDhcpFile.stat.exists}}'
     bDoCred: '{{rZtpCreds.json.count == 0}}'
+    bDoAuth: '{{bAppId == "0" or bTokId == "0" or bNeedWebhook or IsZtpRT}}'

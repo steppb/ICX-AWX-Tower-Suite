@@ -1,63 +1,51 @@
 ---
-- name: Create App Entry
-  block:
-    - name: Create AWX Application Entry for ISC-DHCP-Server
-      uri:
-        url: '{{AwxApi}}/applications/'
-        method: POST
-        headers: {Content-Type: "application/json"}
-        body:
-          name: isc-dhcp-server
-          description: DHCP Server
-          client_type: confidential
-          redirect_uris: 'https://localhost/api/v2/*'
-          authorization_grant_type: authorization-code
-          skip_authorization: false
-          organization: '{{bOrgId}}'
-        body_format: json
-        status_code: 201
-      register: AwxPostAppStatus
-
-    - name: Store New Application Id
-      set_fact: {AppId: '{{AwxPostAppStatus.json.id}}'}
-  when: rZtpApp.json.count == 0
-
-- name: Check for Existing Webhook Token
-  uri: {url: '{{AwxApi}}/users/{{awx_user_id}}/tokens/?application={{AppId}}'}
-  register: GetWebhookToken
-
-- name: Check for Existing Webhook
-  stat: {path: /etc/dhcp/awx_dhcp_webhook}
-  register: WebhookFile
+- name: Create AWX Application Entry for ISC-DHCP-Server
+  uri:
+    url: '{{AwxApi}}/applications/'
+    method: POST
+    headers: {Content-Type: "application/json"}
+    body:
+      name: isc-dhcp-server
+      description: DHCP Server
+      client_type: confidential
+      redirect_uris: 'https://localhost/api/v2/*'
+      authorization_grant_type: authorization-code
+      skip_authorization: false
+      organization: '{{bOrgId}}'
+    body_format: json
+    status_code: 201
+  register: rAwxApp
+  when: bAppId|int == 0
 
 - name: Delete Existing Webhook Token
-  uri:
-    url: '{{AwxApi}}/tokens/{{GetWebhookToken.json.results[0].id}}/'
-    method: DELETE
-    status_code: 204
-  register: TokenDelete
-  when:
-    - GetWebhookToken.json.count > 0
-    - not WebhookFile.stat.exists|bool or IsZtpRT
+  uri: {url: '{{AwxApi}}/tokens/{{bTokId}}/', method: DELETE, status_code: 204}
+  register: rTokenDelete
+  when: bTokId|int != 0 and (bNeedWebhook or IsZtpRT)
 
 - name: Generate Auth Token For DHCP Webhook
   uri:
-    url: '{{AwxApi}}/users/{{AwxUserId.json.results[0].id}}/tokens/'
+    url: '{{AwxApi}}/users/{{awx_user_id}}/tokens/'
     method: POST
     headers: {Content-Type: "application/json"}
-    body: {application: '{{AppId}}', scope: write}
+    body: {application: '{{rAwxApp.json.id|default(bAppId)}}', scope: write}
     body_format: json
     status_code: 201
-  register: WebhookToken
-  when: TokenDelete.status is defined or GetWebhookToken.json.count == 0
+  register: rWebhookToken
+  when: rTokenDelete.status is defined or bTokId|int == 0
 
 - name: Create 'awx_dhcp_webhook'
   template:
     src: awx_dhcp_webhook.j2
     dest: /etc/dhcp/awx_dhcp_webhook
     mode: 0755
+  connection: ssh
   vars:
-    AuthToken: '{{WebhookToken.json.token}}'
+    AuthToken: '{{rWebhookToken.json.token}}'
+    ansible_python_interpreter: '{{icx_awx_mgmt.ssh_interpreter}}'
+    ansible_user: '{{awxssh_user|default(prompt_awxcli_user)}}'
+    ansible_ssh_pass: '{{awxssh_pass|default(prompt_awxcli_pass)}}'
     ansible_become: true
     ansible_become_method: sudo
-  when: WebhookToken.json.token is defined
+    ansible_become_password: '{{awxssh_sudo|default(prompt_awxcli_sudo)
+                                           |default(prompt_awxcli_pass)}}'
+  when: rWebhookToken.json.token is defined
