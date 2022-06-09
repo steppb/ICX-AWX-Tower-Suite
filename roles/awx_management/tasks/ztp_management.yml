@@ -1,56 +1,37 @@
 ---
-- name: Get Inventory Info
-  uri: {url: '{{AwxApi}}/inventories/{{awx_inventory_id}}/'}
-  register: InvInfo
-
-- name: Get User ID
-  uri: {url: '{{AwxApi}}/users/?username={{awxlogin_user}}'}
-  register: AwxUserId
-
-- name: Get Credentials for This Job
-  uri: {url: '{{AwxApi}}/jobs/{{awx_job_id}}/credentials/'}
-  register: ThisJobCreds
-
-- name: Store AWX REST API Credential ID
-  set_fact: {Credential: "id: {{ThisJobCreds.json.results[idx].id}}"}
-  loop: "{{range(0, ThisJobCreds.json.results|length)|list}}"
-  loop_control: {index_var: idx}
-  register: RestCredentialList
-  when: ThisJobCreds.json.results[idx].kind != 'ssh'
-
-- name: Store AWX REST API and SSH Credential IDs
-  set_fact: {Credential: "id: {{ThisJobCreds.json.results[idx].id}}"}
-  loop: "{{range(0, ThisJobCreds.json.results|length)|list}}"
-  loop_control: {index_var: idx}
-  register: CredentialList
-
-- name: Set Play Parameters
-  set_fact:
-    ZtpParams:
-      ZtpInstall: '{{IsInstall|bool or IsRegenToken|bool}}'
-      ZtpConfigure: '{{IsConfigure|bool or IsReIp|bool}}'
-      InstallComponents: '{{IsInstall|bool}}'
-      RegenToken: '{{IsRegenToken|bool}}'
-      InstallInv: '{{IsConfigure|bool}}'
-      CfgInterface: '{{IsReIp|bool or IsConfigure|bool}}'
-      CreateTemplates: '{{IsInstall|bool or IsConfigure|bool}}'
-      OrgId: '{{InvInfo.json.organization}}'
-  vars:
-    IsInstall: '{{ThisTemplate.json.name == "ZTP-Install"}}'
-    IsConfigure: '{{ThisTemplate.json.name == "ZTP-Configure"}}'
-    IsRegenToken: '{{ThisTemplate.json.name == "ZTP-Regen-AuthToken"}}'
-    IsReIp: '{{ThisTemplate.json.name == "ZTP-Configure-Server-Address"}}'
-
-- name: Install ZTP Components
+- name: Check Files on AWX Host System
   block:
-    - {name: Install Required ZTP Components, include_tasks: install_components.yml}
+  - name: Check DHCP
+    stat: {path: /etc/apparmor.d/usr.sbin.dhcpd}
+    register: rDhcpFile
+  connection: ssh
+  vars:
+    ansible_python_interpreter: '{{icx_awx_mgmt.ssh_interpreter}}'
+    ansible_user: '{{awxssh_user|default(prompt_awxcli_user)}}'
+    ansible_ssh_pass: '{{awxssh_pass|default(prompt_awxcli_pass)}}'
 
-    - {name: Create Default Login Creds, include_tasks: create_default_credentials.yml}
-  when: ZtpParams.InstallComponents|bool
+- name: Get Info on Installed Reqs From Server
+  block:
+  - name: Check For Existence of ZTP Default Credentials
+    uri: {url: '{{AwxApi}}/credentials/?name=ZTP_Default_Login'}
+    register: rZtpCreds
 
-- name: Build Template Param List
-  include_tasks: create_template_list.yml
-  when: ZtpParams.CreateTemplates|bool
+  - name: Check AWX Applications
+    uri: {url: '{{AwxApi}}/applications/?name=isc-dhcp-server'}
+    register: rZtpApp
 
-- name: Setup App Authentication Token
-  include_tasks: create_auth_token.yml
+  - name: Check For Existing Webhook Token
+    uri: {url: '{{AwxApi}}/users/{{awx_user_id}}/tokens/?application={{tAppId}}'}
+    register: rWebToken
+    vars: {tAppId: '{{rZtpApp.json.results[0].id|default()}}'}
+    when: tAppId|default("null", true) != "null"
+
+- name: ZTP Setup
+  block:
+  - {name: Setup DHCP, include_tasks: zm_dhcp.yml, when: bDoDhcp}
+  - {name: Create Creds, include_tasks: zm_default_creds.yml, when: bDoCred}
+  - {name: Create Token, include_tasks: zm_auth_token.yml}
+  vars:
+    bOrgId: '{{rThisTemplate.json.organization}}'
+    bDoDhcp: '{{not rDhcpFile.stat.exists}}'
+    bDoCred: '{{rZtpCreds.json.count == 0}}'

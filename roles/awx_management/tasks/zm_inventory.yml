@@ -68,7 +68,7 @@
         body:
           name: '{{prompt_ztp_inventory}}'
           description: ''
-          organization: '{{ZtpParams.OrgId}}'
+          organization: '{{bOrgId}}'
         body_format: json
         status_code: 201
       register: NewInventory

@@ -1,6 +1,6 @@
 ---
 - hosts: all
-  connection: ssh
+  connection: local
   gather_facts: no
   module_defaults:
     uri:
@@ -14,7 +14,9 @@
     AwxApi: https://{{ansible_host}}/api/v2
     PhysInts:
     DhcpSubnetRouter:
+    MgmtFunc: ZTP Management
     ZtpDefPassword: 'PasswordPassword'
+    IsZtpRT: '{{this_jt_name == "ZTP-Regen-AuthToken"}}'
 
   roles:
   - {role: awx_management}
