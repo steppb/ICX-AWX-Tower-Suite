@@ -16,7 +16,45 @@
     DhcpSubnetRouter:
     MgmtFunc: ZTP Management
     ZtpDefPassword: 'PasswordPassword'
+    ZtpInv: '{{prompt_ztp_inventory}}'
     IsZtpRT: '{{this_jt_name == "ZTP-Regen-AuthToken"}}'
+
+  pre_tasks:
+  - name: Check DHCP Config
+    block:
+    - name: Ensure Proper DHCP Subnet and Range Provided
+      assert: {that: tNetOk and tRngOk, fail_msg: '{{tErr|select()|list}}'}
+      vars:
+        tNetOk: '{{bDhcpNet|iptest("is_net4")}}'
+        tRngOk: '{{prompt_ztp_dhcp_range|iprange("is_valid")}}'
+        tNetErr: "Error: Subnet {{prompt_ztp_dhcp_subnet}} is improperly formatted"
+        tRngErr: "Error: Range {{prompt_ztp_dhcp_range}} is improperly formatted"
+        tErr: ['{{tNetErr if not tNetOk else []}}', '{{tRngErr if not tRngOk else []}}']
+
+    - name: Ensure DHCP Variables Within Network
+      assert: {that: tRngOk and tRtrOk, fail_msg: '{{tErr|select()|list}}'}
+      vars:
+        tRngOk: '{{bDhcpRng|iprange("in_net", bDhcpNet)}}'
+        tRtrOk: '{{prompt_ztp_dhcp_rtr is not defined or bDhcpRtrOk}}'
+        tRngErr: "Error: Range {{bDhcpRng}} outside of {{bDhcpNet}}"
+        tRtrErr: "Error: Default router address outside of {{bDhcpNet}}"
+        tErr: ['{{tRngErr if not tRngOk else []}}', '{{tRtrErr if not tRtrOk else []}}']
+
+    - name: Set DHCP Variables
+      set_fact:
+        DhcpRtrOpt: '{{bDhcpRtrOpt if bDhcpRtrOk else ""}}'
+        DhcpCfgNew:
+          - name: '{{ZtpInv}}'
+            subnet: '{{bDhcpNet}}'
+            ip_pool: '{{bDhcpRng}}'
+            router_ip: '{{bDhcpRtr}}'
+    vars:
+      bDhcpNet: '{{prompt_ztp_dhcp_subnet|default()|iptest("get_subnet")}}'
+      bDhcpRng: '{{prompt_ztp_dhcp_range|iprange("split")|sort|default()}}'
+      bDhcpRtr: '{{prompt_ztp_dhcp_rtr|default()}}'
+      bDhcpRtrOk: '{{prompt_ztp_dhcp_rtr|default()|iptest("in_net", bDhcpNet)}}'
+      bDhcpRtrOpt: "option routers {{bDhcpRtr}};"
+    when: prompt_ztp_dhcp_subnet is defined and prompt_ztp_dhcp_range is defined
 
   roles:
   - {role: awx_management}

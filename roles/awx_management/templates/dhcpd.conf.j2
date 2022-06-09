@@ -49,8 +49,8 @@ on commit {
   execute ("/etc/dhcp/awx_dhcp_webhook", ClientIP, Name, AwxInventoryName, ClientMac);
 }
 
-subnet {{DhcpSubnetIp}} netmask {{DhcpSubnetMask}} {
-  range {{DhcpRangeLow}} {{DhcpRangeHigh}};
-  set AwxInventoryName = "{{InventoryName}}";
-  {{DhcpSubnetRouter}}
+subnet {{DhcpCfgNew[0].subnet|iptest("get_addr")}} netmask {{DhcpCfgNew[0].subnet|iptest("get_mask")}} {
+  range {{DhcpCfgNew[0].ip_pool[0]}} {{DhcpCfgNew[0].ip_pool[1]}};
+  set AwxInventoryName = "{{ZtpInv}}";
+  {{DhcpRtrOpt}}
 }

@@ -1,17 +1,48 @@
-- name: Attempt to Install ISC-DHCP-Server
-  apt: {name: isc-dhcp-server, update_cache: yes}
-  register: DhcpInstallStatus
-  vars: {ansible_become: true, ansible_become_method: sudo}
+---
+- name: Install and Configure DHCP
+  block:
+  - name: Install DHCP
+    block:
+    - name: Install ISC-DHCP-Server
+      apt: {name: isc-dhcp-server, update_cache: yes}
 
-- name: Add AppArmor entry for 'awx_dhcp_webhook'
-  lineinfile:
-    path: /etc/apparmor.d/usr.sbin.dhcpd
-    regexp: 'awx_dhcp_webhook'
-    insertbefore: '^}'
-    line: "  /etc/dhcp/awx_dhcp_webhook cux,"
-  vars: {ansible_become: true, ansible_become_method: sudo}
+    - name: Add AppArmor entry for 'awx_dhcp_webhook'
+      lineinfile:
+        path: /etc/apparmor.d/usr.sbin.dhcpd
+        regexp: 'awx_dhcp_webhook'
+        insertbefore: '^}'
+        line: "  /etc/dhcp/awx_dhcp_webhook cux,"
 
-- name: Restart AppArmor Service
-  service: {name: apparmor, state: restarted}
-  changed_when: false
-  vars: {ansible_become: true, ansible_become_method: sudo}
+    - {name: Restart AppArmor, service: {name: apparmor, state: restarted}}
+    when: not rDhcpFile.stat.exists
+
+  - name: Configure DHCP
+    block:
+    - name: Update DHCP Config
+      template: {src: dhcpd.conf.j2, dest: /etc/dhcp/dhcpd.conf, mode: 0644}
+
+    - {name: Restart DHCP, service: {name: isc-dhcp-server, state: restarted}}
+    when:
+      - DhcpCfgNew is defined
+      - DhcpCfgOld[0]|default("null", true) != DhcpCfgNew[0]
+  connection: ssh
+  vars:
+    ansible_python_interpreter: '{{icx_awx_mgmt.ssh_interpreter}}'
+    ansible_user: '{{awxssh_user|default(prompt_awxcli_user)}}'
+    ansible_ssh_pass: '{{awxssh_pass|default(prompt_awxcli_pass)}}'
+    ansible_become: true
+    ansible_become_method: sudo
+    ansible_become_password: '{{awxssh_sudo|default(prompt_awxcli_sudo)
+                                           |default(prompt_awxcli_pass)}}'
+
+- name: Update AWX Server DHCP Config
+  set_fact:
+    icx_awx_mgmt: '{{icx_awx_mgmt|default({})|combine(tCfg)}}'
+    cacheable: true
+  vars:
+    tOldCfg: '{{icx_awx_mgmt.ztp
+               |default()|rejectattr("name", "==", ZtpInv)|list}}'
+    tCfg: {ztp: '{{tOldCfg + DhcpCfgNew}}'}
+  when:
+    - DhcpCfgNew is defined
+    - DhcpCfgOld[0]|default("null", true) != DhcpCfgNew[0]
