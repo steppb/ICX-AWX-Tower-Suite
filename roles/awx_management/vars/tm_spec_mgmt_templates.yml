@@ -4,145 +4,145 @@ vAwxImgDir: '{{icx_awx_mgmt.img_mgmt.awx_image_dir|default()}}'
 
 
 awxcli_prompts:
-- question_name: "AWX Server CLI Credential - SSH Login Username:"
-  required: true
-  type: text
-  variable: prompt_awxcli_user
-  min: 1
-  max: 32
-- question_name: "AWX Server CLI Credential - SSH Login Password:"
-  required: true
-  type: password
-  variable: prompt_awxcli_pass
-  min: 1
-  max: 1024
-- question_name: "AWX Server CLI Credential - Sudo Password:"
-  question_description: Leave blank to use SSH login password.
-  required: false
-  type: password
-  variable: prompt_awxcli_sudo
-  min: 1
-  max: 1024
+  - question_name: "AWX Server CLI Credential - SSH Login Username:"
+    required: true
+    type: text
+    variable: prompt_awxcli_user
+    min: 1
+    max: 32
+  - question_name: "AWX Server CLI Credential - SSH Login Password:"
+    required: true
+    type: password
+    variable: prompt_awxcli_pass
+    min: 1
+    max: 1024
+  - question_name: "AWX Server CLI Credential - Sudo Password:"
+    question_description: Leave blank to use SSH login password.
+    required: false
+    type: password
+    variable: prompt_awxcli_sudo
+    min: 1
+    max: 1024
 
 
 awx_tmplt_mgmt_prompts:
-- question_name: 'Update Image Management Templates?'
-  question_description: 'Image Repo Location: {{vAwxImgDir}}'
-  required: true
-  type: multiplechoice
-  variable: prompt_update_img_mgmt
-  default: 'Yes'
-  choices: |-
-    Yes
-    No
+  - question_name: "Update Image Management Templates?"
+    question_description: "Image Repo Location: {{vAwxImgDir}}"
+    required: true
+    type: multiplechoice
+    variable: prompt_update_img_mgmt
+    default: "Yes"
+    choices: |-
+      Yes
+      No
 
 
 awx_tmplt_mgmt_survey:
-- question_name: 'Template management function:'
-  required: false
-  type: multiplechoice
-  variable: prompt_mgmt_role
-  choices: |-
-    Create/Update Templates
-    Remove ICX Config Templates
-- '{{awx_tmplt_mgmt_prompts[0] if vIcxImgDirCreated else []}}'
-- '{{awxcli_prompts[0] if vIcxImgDirCreated and vNeedAwxSshCreds else []}}'
-- '{{awxcli_prompts[1] if vIcxImgDirCreated and vNeedAwxSshCreds else []}}'
+  - question_name: "Template management function:"
+    required: false
+    type: multiplechoice
+    variable: prompt_mgmt_role
+    choices: |-
+      Create/Update Templates
+      Remove ICX Config Templates
+  - '{{awx_tmplt_mgmt_prompts[0] if vIcxImgDirCreated else []}}'
+  - '{{awxcli_prompts[0] if vIcxImgDirCreated and vNeedAwxSshCreds else []}}'
+  - '{{awxcli_prompts[1] if vIcxImgDirCreated and vNeedAwxSshCreds else []}}'
 
 
 # image_management
 img_mgmt_survey:
-- question_name: 'Image Repository Path:'
-  required: true
-  type: text
-  variable: prompt_imgrepo_path
-  default: '{{vAwxImgDir|default("/opt/Images", true)}}'
-- '{{awxcli_prompts[0] if vNeedAwxSshCreds else []}}'
-- '{{awxcli_prompts[1] if vNeedAwxSshCreds else []}}'
-- '{{awxcli_prompts[2] if vNeedAwxSshCreds else []}}'
+  - question_name: "Image Repository Path:"
+    required: true
+    type: text
+    variable: prompt_imgrepo_path
+    default: '{{vAwxImgDir|default("/opt/Images", true)}}'
+  - '{{awxcli_prompts[0] if vNeedAwxSshCreds else []}}'
+  - '{{awxcli_prompts[1] if vNeedAwxSshCreds else []}}'
+  - '{{awxcli_prompts[2] if vNeedAwxSshCreds else []}}'
 
 
 image_flash_copy_file_survey:
-- question_name: 'FastIron Image File:'
-  required: true
-  type: multiplechoice
-  variable: prompt_flash_copy_filename
-  choices: '{{SwImgFileList|default()}}'
-- question_name: 'Boot Image File:'
-  required: true
-  type: multiplechoice
-  variable: prompt_bootflash_copy_filename
-  choices: '{{BootFileNames|default("None\nAuto Select")}}'
-  default: Auto Select
-- question_name: 'Flash Partition:'
-  required: true
-  type: multiplechoice
-  variable: prompt_flash_part
-  choices: |-
-    Primary
-    Secondary
-  default: Secondary
-- question_name: 'Configure Selected Flash Partition as First in Boot Order?'
-  required: true
-  type: multiplechoice
-  variable: prompt_flash_change_boot
-  choices: |-
-    Yes
-    No
-  default: "Yes"
-- question_name: 'Reboot Into New Image After Deployment?'
-  required: true
-  type: multiplechoice
-  variable: prompt_flash_reload
-  choices: |-
-    Yes
-    No
-  default: "No"
-- '{{awxcli_prompts[0] if vNeedAwxSshCreds else []}}'
-- '{{awxcli_prompts[1] if vNeedAwxSshCreds else []}}'
-- question_name: "Image Repo Server Hostname:"
-  required: true
-  type: multiplechoice
-  variable: prompt_image_repo_hostname
-  default: '{{inventory_hostname}}'
-  choices: '{{inventory_hostname}}'
-- question_name: "SCP Server Address:"
-  required: true
-  type: multiplechoice
-  variable: prompt_image_repo_address
-  default: '{{ansible_host}}'
-  choices: '{{ansible_host}}'
+  - question_name: "FastIron Image File:"
+    required: true
+    type: multiplechoice
+    variable: prompt_flash_copy_filename
+    choices: '{{SwImgFileList|default()}}'
+  - question_name: "Boot Image File:"
+    required: true
+    type: multiplechoice
+    variable: prompt_bootflash_copy_filename
+    choices: '{{BootFileNames|default("None\nAuto Select")}}'
+    default: Auto Select
+  - question_name: "Flash Partition:"
+    required: true
+    type: multiplechoice
+    variable: prompt_flash_part
+    choices: |-
+      Primary
+      Secondary
+    default: Secondary
+  - question_name: "Configure Selected Flash Partition as First in Boot Order?"
+    required: true
+    type: multiplechoice
+    variable: prompt_flash_change_boot
+    choices: |-
+      Yes
+      No
+    default: "Yes"
+  - question_name: "Reboot Into New Image After Deployment?"
+    required: true
+    type: multiplechoice
+    variable: prompt_flash_reload
+    choices: |-
+      Yes
+      No
+    default: "No"
+  - '{{awxcli_prompts[0] if vNeedAwxSshCreds else []}}'
+  - '{{awxcli_prompts[1] if vNeedAwxSshCreds else []}}'
+  - question_name: "Image Repo Server Hostname:"
+    required: true
+    type: multiplechoice
+    variable: prompt_image_repo_hostname
+    default: '{{inventory_hostname}}'
+    choices: '{{inventory_hostname}}'
+  - question_name: "SCP Server Address:"
+    required: true
+    type: multiplechoice
+    variable: prompt_image_repo_address
+    default: '{{ansible_host}}'
+    choices: '{{ansible_host}}'
 
 
 image_flash_copy_version_survey:
-- question_name: 'FastIron Version:'
-  required: true
-  type: multiplechoice
-  variable: prompt_flash_copy_version
-  choices: "{{SwImgVerList|default()|unique|sort|join('\n')}}"
-- question_name: 'FastIron Image Type:'
-  required: true
-  type: multiplechoice
-  variable: prompt_image_type
-  choices: |-
-    Switch
-    Router
-  default: Router
-- question_name: 'Boot Image Selection Method:'
-  required: true
-  type: multiplechoice
-  variable: prompt_bootflash_copy_filename
-  choices: |-
-    None
-    Auto Select
-  default: Auto Select
-- '{{image_flash_copy_file_survey[2]}}'
-- '{{image_flash_copy_file_survey[3]}}'
-- '{{image_flash_copy_file_survey[4]}}'
-- '{{awxcli_prompts[0] if vNeedAwxSshCreds else []}}'
-- '{{awxcli_prompts[1] if vNeedAwxSshCreds else []}}'
-- '{{image_flash_copy_file_survey[7]}}'
-- '{{image_flash_copy_file_survey[8]}}'
+  - question_name: "FastIron Version:"
+    required: true
+    type: multiplechoice
+    variable: prompt_flash_copy_version
+    choices: "{{SwImgVerList|default()|unique|sort|join('\n')}}"
+  - question_name: "FastIron Image Type:"
+    required: true
+    type: multiplechoice
+    variable: prompt_image_type
+    choices: |-
+      Switch
+      Router
+    default: Router
+  - question_name: "Boot Image Selection Method:"
+    required: true
+    type: multiplechoice
+    variable: prompt_bootflash_copy_filename
+    choices: |-
+      None
+      Auto Select
+    default: Auto Select
+  - '{{image_flash_copy_file_survey[2]}}'
+  - '{{image_flash_copy_file_survey[3]}}'
+  - '{{image_flash_copy_file_survey[4]}}'
+  - '{{awxcli_prompts[0] if vNeedAwxSshCreds else []}}'
+  - '{{awxcli_prompts[1] if vNeedAwxSshCreds else []}}'
+  - '{{image_flash_copy_file_survey[7]}}'
+  - '{{image_flash_copy_file_survey[8]}}'
 
 
 image_flash_copy_templates:
@@ -233,14 +233,14 @@ ztp_management_survey:
 ztp_server_address_survey:
   - '{{ztp_management_survey[1]}}'
   - '{{ztp_management_survey[2]}}'
-  - question_name: 'IP Route - Destination Network: (e.g. x.x.x.x/x)'
+  - question_name: "IP Route - Destination Network: (e.g. x.x.x.x/x)"
     required: false
     type: text
     variable: prompt_ztp_int_destnet
     min: 9
     max: 18
-  - question_name: 'IP Route - Router Address: (e.g. x.x.x.x)'
-    question_description: 'Next hop to destination network'
+  - question_name: "IP Route - Router Address: (e.g. x.x.x.x)"
+    question_description: "Next hop to destination network"
     required: false
     type: text
     variable: prompt_ztp_int_rtr
@@ -264,7 +264,7 @@ ztp_templates:
 
   - name: ZTP-Configure-Server-Address
     playbook_rev: 0.1.0
-    description: 'Configure IP address on secondary interface'
+    description: "Configure IP address on secondary interface"
     playbook: ZTP-Management.yml
     inventory: '{{awx_inventory_id}}'
     ask_credential_on_launch: false
@@ -286,7 +286,7 @@ ztp_templates:
 mgmt_template_specs:
 - name: AWX-Template-Management
   playbook_rev: 0.1.0
-  description: Create/update or remove templates.
+  description: "Create/update or remove templates"
   playbook: AWX-Template-Management.yml
   inventory: '{{awx_inventory_id}}'
   ask_credential_on_launch: false
@@ -296,7 +296,7 @@ mgmt_template_specs:
 
 - name: Image-Management
   playbook_rev: 0.1.0
-  description: Create image repo, import images and create/update file list.
+  description: "Create image repo, import images and create/update file list"
   playbook: Image-Management.yml
   inventory: '{{awx_inventory_id}}'
   ask_credential_on_launch: false
@@ -309,7 +309,7 @@ mgmt_template_specs:
 
 - name: ZTP-Management
   playbook_rev: 0.1.0
-  description: Zero-Touch Provisioning Setup.
+  description: "Zero-Touch Provisioning Setup"
   playbook: ZTP-Management.yml
   inventory: '{{awx_inventory_id}}'
   ask_credential_on_launch: false
