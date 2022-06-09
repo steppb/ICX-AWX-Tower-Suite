@@ -133,8 +133,8 @@
 
 - name: SCP Copy to Switch Tasks
   include_tasks: scp_copy_to_switch.yml
-  loop: '{{bScpCpCfg}}'
-  loop_control: {loop_var: ScpCpEntry}
+  loop: '{{range(0, bScpCpCfg|length)|list}}'
+  loop_control: {loop_var: bIdx}
   vars:
     bUfiDowngrade: '{{CurSwVer is version("8.0.90", ">=")
                       and not ImgEntry.is_ufi
@@ -149,8 +149,8 @@
         boot_path: '{{BootEntry.path|default("null", true)}}'
     bCfg: '{{bDowngradeCfg if bUfiDowngrade else bScpCfg}}'
     bScpCpCfg: '{{ScpCpCfg|default([])}} + {{bCfg}}'
-    bScpBootPath: '{{ScpCpEntry.boot_path}}'
-    bScpFileEntry: '{{ScpCpEntry.file_entry}}'
+    bScpBootPath: '{{bScpCpCfg[bIdx].boot_path}}'
+    bScpFileEntry: '{{bScpCpCfg[bIdx].file_entry}}'
 
 - name: Post Boot Info
   block:
