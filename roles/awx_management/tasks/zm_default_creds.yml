@@ -1,30 +1,19 @@
 ---
-- name: Check for Existence of ZTP Host Default Credentials
-  uri: {url: '{{AwxApi}}/credentials/?name=ZTP_Default_Login'}
-  register: ZtpCredStatus
+- name: Get ID for 'Machine' Credential Type
+  uri: {url: '{{AwxApi}}/credential_types/?name=Machine'}
+  register: rMachineCredType
 
-- name: Create Initial Login Credentials
-  block:
-    - name: Get Info for This Job
-      uri: {url: '{{AwxApi}}/jobs/{{awx_job_id}}/'}
-      register: ThisJob
-
-    - name: Get ID for 'Machine' Credential Type
-      uri: {url: '{{AwxApi}}/credential_types/?name=Machine'}
-      register: MachineCredType
-
-    - name: Create Initial Login Credentials for ZTP Hosts
-      uri:
-        url: '{{AwxApi}}/credentials/'
-        method: POST
-        headers: {Content-Type: "application/json"}
-        body:
-          name: 'ZTP_Default_Login'
-          credential_type: '{{MachineCredType.json.results[0].id}}'
-          organization: '{{ThisJob.json.summary_fields.inventory.organization_id}}'
-          inputs:
-            password: '{{ZtpDefPass}}'
-            username: super
-        body_format: json
-        status_code: 201
-  when: ZtpCredStatus.json.count == 0
+- name: Create Initial Login Credentials for ZTP Hosts
+  uri:
+    url: '{{AwxApi}}/credentials/'
+    method: POST
+    headers: {Content-Type: "application/json"}
+    body:
+      name: 'ZTP_Default_Login'
+      credential_type: '{{rMachineCredType.json.results[0].id}}'
+      organization: '{{bOrgId}}'
+      inputs:
+        password: '{{ZtpDefPass}}'
+        username: super
+    body_format: json
+    status_code: 201
