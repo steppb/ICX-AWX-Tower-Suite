@@ -23,7 +23,7 @@
           credential_type: '{{MachineCredType.json.results[0].id}}'
           organization: '{{ThisJob.json.summary_fields.inventory.organization_id}}'
           inputs:
-            password: '{{ZtpDefPassword}}'
+            password: '{{ZtpDefPass}}'
             username: super
         body_format: json
         status_code: 201

@@ -15,8 +15,10 @@
     PhysInts:
     DhcpSubnetRouter:
     MgmtFunc: ZTP Management
-    ZtpDefPassword: 'PasswordPassword'
+    ZtpDefPass: 'PasswordPassword'
     ZtpInv: '{{prompt_ztp_inventory}}'
+    ZtpCfgCur: '{{icx_awx_mgmt.ztp|default()}}'
+    DhcpCfgOld: '{{ZtpCfgCur|selectattr("name", "==", ZtpInv)|list}}'
     IsZtpRT: '{{this_jt_name == "ZTP-Regen-AuthToken"}}'
 
   pre_tasks:
@@ -49,9 +51,11 @@
       vars:
         tNetOk: '{{bDhcpNet|iptest("is_net4")}}'
         tRngOk: '{{prompt_ztp_dhcp_range|iprange("is_valid")}}'
-        tNetErr: "Error: Subnet {{prompt_ztp_dhcp_subnet}} is improperly formatted"
-        tRngErr: "Error: Range {{prompt_ztp_dhcp_range}} is improperly formatted"
-        tErr: ['{{tNetErr if not tNetOk else []}}', '{{tRngErr if not tRngOk else []}}']
+        tNetErr: "Error: Subnet {{prompt_ztp_dhcp_subnet}} improperly formatted"
+        tRngErr: "Error: Range {{prompt_ztp_dhcp_range}} improperly formatted"
+        tErr:
+          - '{{tNetErr if not tNetOk else []}}'
+          - '{{tRngErr if not tRngOk else []}}'
 
     - name: Ensure DHCP Variables Within Network
       assert: {that: tRngOk and tRtrOk, fail_msg: '{{tErr|select()|list}}'}
@@ -60,7 +64,9 @@
         tRtrOk: '{{prompt_ztp_dhcp_rtr is not defined or bDhcpRtrOk}}'
         tRngErr: "Error: Range {{bDhcpRng}} outside of {{bDhcpNet}}"
         tRtrErr: "Error: Default router address outside of {{bDhcpNet}}"
-        tErr: ['{{tRngErr if not tRngOk else []}}', '{{tRtrErr if not tRtrOk else []}}']
+        tErr:
+          - '{{tRngErr if not tRngOk else []}}'
+          - '{{tRtrErr if not tRtrOk else []}}'
 
     - name: Set DHCP Variables
       set_fact:
@@ -77,6 +83,56 @@
       bDhcpRtrOk: '{{prompt_ztp_dhcp_rtr|default()|iptest("in_net", bDhcpNet)}}'
       bDhcpRtrOpt: "option routers {{bDhcpRtr}};"
     when: prompt_ztp_dhcp_subnet is defined and prompt_ztp_dhcp_range is defined
+
+  - name: Check IP Pool Config
+    block:
+    - name: Ensure Proper IP Pool Subnet and Range Provided
+      assert: {that: tNetOk and tRngOk, fail_msg: '{{tErr|select()|list}}'}
+      vars:
+        tNetOk: '{{bIpPoolNet|iptest("is_net4")}}'
+        tRngOk: '{{prompt_ztp_ippool_range|iprange("is_valid")}}'
+        tNetErr: "Error: Invalid subnet: {{prompt_ztp_ippool_subnet}}"
+        tRngErr: "Error: Invalid range: {{prompt_ztp_ippool_range}}"
+        tErr:
+          - '{{tNetErr if not tNetOk else []}}'
+          - '{{tRngErr if not tRngOk else []}}'
+
+    - name: Ensure Valid IP Pool Variables
+      assert: {that: tRngOk and tPoolOk, fail_msg: '{{tErr|select()|list}}'}
+      vars:
+        tPoolLoDhcpOk: '{{not bDhcpPool|iprange("has_addr", bIpPoolRng[0])}}'
+        tPoolHiDhcpOk: '{{not bDhcpPool|iprange("has_addr", bIpPoolRng[1])}}'
+        tRngOk: '{{bIpPoolRng|iprange("in_net", bIpPoolNet)}}'
+        tPoolOk: '{{tPoolLoDhcpOk and tPoolHiDhcpOk}}'
+        tRngErr: "Error: Range {{bIpPoolRng}} outside of {{bIpPoolNet}}."
+        tPoolErr: "Error: Static IP pool overlaps with DHCP range."
+        tErr:
+          - '{{tRngErr if not tRngOk else []}}'
+          - '{{tPoolErr if not tPoolOk else []}}'
+
+    - name: Set IP Pool Variables
+      set_fact:
+        IpPoolCfg:
+          static_ip_pool:
+            interface: '{{prompt_ztp_ippool_int|default()}}'
+            subnet: '{{bIpPoolNet}}'
+            pool: '{{bIpPoolRng}}'
+            next_ip: '{{bIpPoolRng[0]}}'
+    vars:
+      bIpPoolRng: '{{prompt_ztp_ippool_range|iprange("split")|sort|default()}}'
+      bIpPoolNet: '{{prompt_ztp_ippool_subnet|iptest("get_subnet")}}'
+      bDhcpPool: '{{DhcpCfgNew[0].ip_pool|default(DhcpCfgOld[0].ip_pool)}}'
+    when:
+      - prompt_ztp_ippool_subnet is defined
+      - prompt_ztp_ippool_range is defined
+
+  - name: Set Hostname Pool Variables
+    set_fact:
+      HnPoolCfg:
+        hostname_pool:
+          base_name: "{{prompt_ztp_hostname_base}}"
+          next_name: "{{prompt_ztp_hostname_base}}01"
+    when: prompt_ztp_hostname_base is defined
 
   roles:
   - {role: awx_management}

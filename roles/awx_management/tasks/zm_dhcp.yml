@@ -40,8 +40,7 @@
     icx_awx_mgmt: '{{icx_awx_mgmt|default({})|combine(tCfg)}}'
     cacheable: true
   vars:
-    tOldCfg: '{{icx_awx_mgmt.ztp
-               |default()|rejectattr("name", "==", ZtpInv)|list}}'
+    tOldCfg: '{{ZtpCfgCur|rejectattr("name", "==", ZtpInv)|list}}'
     tCfg: {ztp: '{{tOldCfg + DhcpCfgNew}}'}
   when:
     - DhcpCfgNew is defined
