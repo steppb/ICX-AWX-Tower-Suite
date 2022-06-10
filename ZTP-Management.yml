@@ -20,6 +20,28 @@
     IsZtpRT: '{{this_jt_name == "ZTP-Regen-AuthToken"}}'
 
   pre_tasks:
+  - name: Check Secondary Interface Config
+    block:
+    - name: Validate IP Variable
+      assert: {that: tFmtOk and tNetOk, fail_msg: '{{tErr|select()|list}}'}
+      vars:
+        tFmtOk: '{{prompt_ztp_int_ipaddr|iptest("is_net4")}}'
+        tNetOk: '{{prompt_ztp_int_ipaddr|iptest("get_addr") != ansible_host}}'
+        tFmtErr: "ERROR: Secondary interface address improperly formatted"
+        tNetErr: "ERROR: New IP cannot be the same as AWX Server"
+        tErr:
+          - '{{tFmtErr if not tFmtOk else []}}'
+          - '{{tNetErr if not tNetOk else []}}'
+
+    - name: Set Secondary Interface Config Variables
+      set_fact:
+        NetIntCfg:
+          interface: '{{prompt_ztp_interface.split(":")[0]}}'
+          address: '{{bIntIp}}'
+    vars:
+      bIntIp: '{{prompt_ztp_int_ipaddr}}'
+    when: prompt_ztp_interface is defined and prompt_ztp_int_ipaddr is defined
+
   - name: Check DHCP Config
     block:
     - name: Ensure Proper DHCP Subnet and Range Provided

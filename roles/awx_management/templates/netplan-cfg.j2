@@ -1,7 +1,7 @@
 network:
     ethernets:
-        {{NetIntName}}:
+        {{NetIntCfg.interface}}:
             dhcp4: false
             addresses:
-              - {{NetIntIp}}
+              - {{NetIntCfg.address}}
     version: 2

@@ -1,50 +1,22 @@
 ---
-- name: Get AWX Server Network Interfaces
-  setup: gather_subset=!all,!min,network
-
 - name: Configure Interface
   block:
-    - name: Set Interface Name
-      set_fact: {NetIntName: '{{prompt_ztp_interface|regex_replace(":.*$")}}'}
+  - name: Create Network Interface Config
+    template:
+      src: netplan-cfg.j2
+      dest: /etc/netplan/02-{{NetIntCfg.interface}}-netcfg.yaml
+      mode: 0644
 
-    - name: Set Initial Variables
-      set_fact:
-        NetIp: '{{prompt_ztp_int_ipaddr|default("")|regex_replace("/.*$")}}'
-        OldIp: "{{vars['ansible_'~NetIntName].ipv4.address|default('')}}"
-
-    - name: Configure Interface IP Address
-      block:
-        - name: Validate IP Variable
-          assert:
-            that: "'/' in prompt_ztp_int_ipaddr"
-            fail_msg:
-              - "ERROR: IP Address improperly formatted"
-              - "Address and mask needs to be formatted as such: x.x.x.x/x"
-
-        - name: Create Network Interface Config
-          template:
-            src: 02-ztp-netcfg.yaml.j2
-            dest: /etc/netplan/02-ztp-netcfg.yaml
-            mode: 0644
-
-        - {name: Apply Network Interface Config, shell: netplan apply}
-
-        - name: Store New IP Address
-          set_fact: {OldIp: "{{NetIp}}"}
-
-        - name: Refresh AWX Network Fact Cache
-          setup: gather_subset=!all,!min,network
-      when:
-        - NetIp != ''
-        - NetIp != ansible_host
-        - NetIp != OldIp
-      vars:
-        NetIntIp: '{{prompt_ztp_int_ipaddr}}'
-        ansible_become: true
-        ansible_become_method: sudo
-
-    - name: Map New IP to Interface
-      set_fact: {PhysInts: "{{NetIntName}}:{{OldIp}}"}
+  - {name: Apply Network Interface Config, shell: netplan apply}
+  connection: ssh
+  vars:
+    ansible_python_interpreter: '{{icx_awx_mgmt.ssh_interpreter}}'
+    ansible_user: '{{awxssh_user|default(prompt_awxcli_user)}}'
+    ansible_ssh_pass: '{{awxssh_pass|default(prompt_awxcli_pass)}}'
+    ansible_become: true
+    ansible_become_method: sudo
+    ansible_become_password: '{{awxssh_sudo|default(prompt_awxcli_sudo)
+                                           |default(prompt_awxcli_pass)}}'
   when:
     - prompt_ztp_interface is defined
     - prompt_ztp_int_ipaddr is defined
