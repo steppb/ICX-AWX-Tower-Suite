@@ -3,7 +3,10 @@
   set_fact: {PhysInts: "{{PhysInts|default()}} {{tPhysInt}}"}
   loop: '{{PhysIntInfo}}'
   loop_control: {loop_var: tInt}
-  vars: {tPhysInt: "{{tInt.interface}}:{{tInt.address}}"}
+  vars:
+    tNewCfg: '{{NetIntCfg.interface|default() == tInt.interface}}'
+    tIntCfg: '{{NetIntCfg if tNewCfg else tInt}}'
+    tPhysInt: "{{tIntCfg.interface}}:{{tIntCfg.address}}"
   when: PhysIntInfo is defined
 
 - name: Get Job Template Count

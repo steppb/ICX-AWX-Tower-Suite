@@ -35,6 +35,7 @@
   - {name: Setup DHCP, include_tasks: zm_dhcp.yml, when: bDoDhcp}
   - {name: Create Creds, include_tasks: zm_default_creds.yml, when: bDoCred}
   - {name: Create Token, include_tasks: zm_auth_token.yml, when: bDoAuth}
+  - {name: Configure Interface, include_tasks: zm_interface.yml, when: bDoInt}
   vars:
     bOrgId: '{{rThisTemplate.json.organization}}'
     bAppId: '{{rZtpApp.json.results[0].id|default(0)}}'
@@ -43,3 +44,4 @@
     bDoDhcp: '{{not rDhcpFile.stat.exists}}'
     bDoCred: '{{rZtpCreds.json.count == 0}}'
     bDoAuth: '{{bAppId == "0" or bTokId == "0" or bNeedWebhook or IsZtpRT}}'
+    bDoInt: '{{NetIntCfg is defined}}'
