@@ -1,15 +1,17 @@
 ---
 - name: Configure Interface
   block:
-  - name: Create Network Interface Config
+  - name: Copy Netplan Yaml Config to AWX Server Host
     template:
-      src: netplan-cfg.j2
-      dest: /etc/netplan/02-{{NetIntCfg.interface}}-netcfg.yaml
+      src: "{{bFile}}.j2"
+      dest: "/etc/netplan/02-{{NetIntCfg.interface}}-netcfg.yaml"
       mode: 0644
 
   - {name: Apply Network Interface Config, shell: netplan apply}
   connection: ssh
   vars:
+    bCfgWithRt: "-with-route"
+    bFile: "netplan-cfg{{bCfgWithRt if NetIntRtCfg is defined else ''}}"
     ansible_python_interpreter: '{{icx_awx_mgmt.ssh_interpreter}}'
     ansible_user: '{{awxssh_user|default(prompt_awxcli_user)}}'
     ansible_ssh_pass: '{{awxssh_pass|default(prompt_awxcli_pass)}}'
@@ -17,6 +19,3 @@
     ansible_become_method: sudo
     ansible_become_password: '{{awxssh_sudo|default(prompt_awxcli_sudo)
                                            |default(prompt_awxcli_pass)}}'
-  when:
-    - prompt_ztp_interface is defined
-    - prompt_ztp_int_ipaddr is defined

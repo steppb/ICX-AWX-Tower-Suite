@@ -12,8 +12,6 @@
       timeout: 60
   vars:
     AwxApi: https://{{ansible_host}}/api/v2
-    PhysInts:
-    DhcpSubnetRouter:
     MgmtFunc: ZTP Management
     ZtpDefPass: 'PasswordPassword'
     ZtpInv: '{{prompt_ztp_inventory}}'
@@ -34,6 +32,37 @@
         tErr:
           - '{{tFmtErr if not tFmtOk else []}}'
           - '{{tNetErr if not tNetOk else []}}'
+      when: prompt_ztp_int_ipaddr is defined
+
+    - name: Check Secondary Interface Route Config
+      block:
+      - name: Validate IP Route Variables
+        assert: {that: tOk, fail_msg: '{{tErr|select()|list}}'}
+        vars:
+          tIpOk: '{{bIntIp|default("null", true) != "null"}}'
+          tRtrOk: '{{prompt_ztp_int_rtr|iptest("in_net", bIntIp)}}'
+          tNetFmtOk: '{{bIpRtNet|iptest("is_net4")}}'
+          tRtrFmtOk: '{{prompt_ztp_int_rtr|iptest("is_addr4")}}'
+          tNetOk: '{{not prompt_ztp_int_rtr|iptest("in_net", bIpRtNet)}}'
+          tIpErr: "Error: No IP address on interface"
+          tRtrErr: "Error: Router address {{prompt_ztp_int_rtr}} not in subnet"
+          tNetFmtErr: "Error: Invalid subnet: {{prompt_ztp_int_destnet}}"
+          tRtrFmtErr: "Error: Invalid router address: {{prompt_ztp_int_rtr}}"
+          tNetErr: "Error: Next hop router address inside destination network"
+          tOk: '{{tIpOk and tRtrOk and tNetFmtOk and tRtrFmtOk and tNetOk}}'
+          tErr:
+            - '{{tIpErr if not tIpOk else []}}'
+            - '{{tRtrErr if not tRtrOk else []}}'
+            - '{{tNetFmtErr if not tNetFmtOk else []}}'
+            - '{{tRtrFmtErr if not tRtrFmtOk else []}}'
+            - '{{tNetErr if not tNetOk else []}}'
+
+      - name: Set IP Route Config
+        set_fact:
+          NetIntRtCfg: {dst: '{{bIpRtNet}}', rtr: '{{prompt_ztp_int_rtr}}'}
+      when:
+        - prompt_ztp_int_destnet|default("null", true) != "null"
+        - prompt_ztp_int_rtr|default("null", true) != "null"
 
     - name: Set Secondary Interface Config Variables
       set_fact:
@@ -41,8 +70,13 @@
           interface: '{{prompt_ztp_interface.split(":")[0]}}'
           address: '{{bIntIp}}'
     vars:
-      bIntIp: '{{prompt_ztp_int_ipaddr}}'
-    when: prompt_ztp_interface is defined and prompt_ztp_int_ipaddr is defined
+      bCfgdIp: '{{prompt_ztp_interface.split(":")[1]}}'
+      bIntIp: '{{prompt_ztp_int_ipaddr|default(bCfgdIp)}}'
+      bIpRtNet: '{{prompt_ztp_int_destnet|iptest("get_subnet")|default()}}'
+    when: prompt_ztp_interface is defined and
+          (prompt_ztp_int_ipaddr is defined or
+          (prompt_ztp_int_destnet is defined and
+          prompt_ztp_int_rtr is defined))
 
   - name: Check DHCP Config
     block:

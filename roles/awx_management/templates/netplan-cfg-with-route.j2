@@ -1,0 +1,10 @@
+network:
+    ethernets:
+        {{NetIntCfg.interface}}:
+            dhcp4: false
+            addresses:
+              - {{NetIntCfg.address}}
+            routes:
+              - to: {{NetIntRtCfg.dst}}
+                via: {{NetIntRtCfg.rtr}}
+    version: 2

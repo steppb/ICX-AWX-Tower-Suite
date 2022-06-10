@@ -1,6 +1,9 @@
 vNeedAwxSshCreds: '{{awxssh_user|default("null", true) == "null"}}'
 vIcxImgDirCreated: '{{icx_awx_mgmt.img_mgmt.awx_image_dir is defined}}'
 vAwxImgDir: '{{icx_awx_mgmt.img_mgmt.awx_image_dir|default()}}'
+vZtpCfgd: '{{icx_awx_mgmt.ztp|default("null", true) != "null"}}'
+vMultihomed: '{{PhysInts|default("null", true) != "null"}}'
+vZtpOptlText: '{{"(optional) " if not vZtpCfgd else ""}}'
 
 
 awxcli_prompts:
@@ -146,20 +149,52 @@ image_flash_copy_version_survey:
 
 
 image_flash_copy_templates:
-- name: Image-Flash-Copy-File
-  playbook_rev: 1.0.0
-  description: "Copy files(s) to switch"
-  playbook: Image-Flash-Copy.yml
-  survey_spec: '{{image_flash_copy_file_survey|select()|list}}'
+  - name: Image-Flash-Copy-File
+    playbook_rev: 1.0.0
+    description: "Copy files(s) to switch"
+    playbook: Image-Flash-Copy.yml
+    survey_spec: '{{image_flash_copy_file_survey|select()|list}}'
 
-- name: Image-Flash-Copy-Version
-  playbook_rev: 1.0.0
-  description: "Update switch(es) to selected version"
-  playbook: Image-Flash-Copy.yml
-  survey_spec: '{{image_flash_copy_version_survey|select()|list}}'
+  - name: Image-Flash-Copy-Version
+    playbook_rev: 1.0.0
+    description: "Update switch(es) to selected version"
+    playbook: Image-Flash-Copy.yml
+    survey_spec: '{{image_flash_copy_version_survey|select()|list}}'
 
 
-# ztp_managment
+# ztp_management
+ztp_server_address_survey:
+  - question_name: "Configure Secondary Interface:"
+    question_description: "{{vZtpOptlText}}Configure IP address on secondary interface"
+    required: '{{vZtpCfgd}}'
+    type: multiplechoice
+    variable: prompt_ztp_interface
+    choices: '{{PhysInts|default("")|regex_replace("^ ")|regex_replace(" ","\n")}}'
+  - question_name: 'Interface IP Address and CIDR Notation: (e.g. x.x.x.x/x)'
+    question_description: "{{vZtpOptlText}}Configure IP address on secondary interface"
+    required: false
+    type: text
+    variable: prompt_ztp_int_ipaddr
+    min: 9
+    max: 18
+  - question_name: "IP Route - Destination Network: (e.g. x.x.x.x/x)"
+    required: false
+    type: text
+    variable: prompt_ztp_int_destnet
+    min: 9
+    max: 18
+  - question_name: "IP Route - Router Address: (e.g. x.x.x.x)"
+    question_description: "Next hop to destination network"
+    required: false
+    type: text
+    variable: prompt_ztp_int_rtr
+    min: 7
+    max: 15
+  - '{{awxcli_prompts[0] if vNeedAwxSshCreds else []}}'
+  - '{{awxcli_prompts[1] if vNeedAwxSshCreds else []}}'
+  - '{{awxcli_prompts[2] if vNeedAwxSshCreds else []}}'
+
+
 ztp_management_survey:
   - question_name: "Provisioning Inventory:"
     question_description: Name of inventory used for ZTP hosts
@@ -169,27 +204,16 @@ ztp_management_survey:
     min: 1
     max: 1024
     default: Provisioning
-  - question_name: "Configure Secondary Interface:"
-    question_description: "(optional) Configure IP address on secondary interface"
-    required: true
-    type: multiplechoice
-    variable: prompt_ztp_interface
-    choices: '{{PhysInts|default("")|regex_replace("^ ")|regex_replace(" ","\n")}}'
-  - question_name: "Interface IP Address and CIDR Notation: (e.g. x.x.x.x/x)"
-    question_description: "(optional) Configure IP address on secondary interface"
-    required: false
-    type: text
-    variable: prompt_ztp_int_ipaddr
-    min: 9
-    max: 18
+  - '{{ztp_server_address_survey[0] if not vZtpCfgd and vMultihomed else []}}'
+  - '{{ztp_server_address_survey[1] if not vZtpCfgd and vMultihomed else []}}'
   - question_name: "DHCP Config - Subnet IP and Mask: (e.g. 192.168.0.0/24)"
-    required: true
+    required: '{{not vZtpCfgd}}'
     type: text
     variable: prompt_ztp_dhcp_subnet
     min: 9
     max: 18
   - question_name: "DHCP Config - Subnet Range: (e.g. 192.168.0.100-192.168.0.200)"
-    required: true
+    required: '{{not vZtpCfgd}}'
     type: text
     variable: prompt_ztp_dhcp_range
     min: 15
@@ -230,27 +254,6 @@ ztp_management_survey:
   - '{{awxcli_prompts[2] if vNeedAwxSshCreds else []}}'
 
 
-ztp_server_address_survey:
-  - '{{ztp_management_survey[1]}}'
-  - '{{ztp_management_survey[2]}}'
-  - question_name: "IP Route - Destination Network: (e.g. x.x.x.x/x)"
-    required: false
-    type: text
-    variable: prompt_ztp_int_destnet
-    min: 9
-    max: 18
-  - question_name: "IP Route - Router Address: (e.g. x.x.x.x)"
-    question_description: "Next hop to destination network"
-    required: false
-    type: text
-    variable: prompt_ztp_int_rtr
-    min: 7
-    max: 15
-  - '{{awxcli_prompts[0] if vNeedAwxSshCreds else []}}'
-  - '{{awxcli_prompts[1] if vNeedAwxSshCreds else []}}'
-  - '{{awxcli_prompts[2] if vNeedAwxSshCreds else []}}'
-
-
 ztp_templates:
   - name: ZTP-Regen-AuthToken
     playbook_rev: 0.1.0
@@ -284,38 +287,41 @@ ztp_templates:
 
 
 mgmt_template_specs:
-- name: AWX-Template-Management
-  playbook_rev: 0.1.0
-  description: "Create/update or remove templates"
-  playbook: AWX-Template-Management.yml
-  inventory: '{{awx_inventory_id}}'
-  ask_credential_on_launch: false
-  ask_limit_on_launch: false
-  use_fact_cache: true
-  survey_spec: '{{awx_tmplt_mgmt_survey|select()|list}}'
+  - name: AWX-Template-Management
+    playbook_rev: 0.1.0
+    description: "Create/update or remove templates"
+    playbook: AWX-Template-Management.yml
+    inventory: '{{awx_inventory_id}}'
+    ask_credential_on_launch: false
+    ask_limit_on_launch: false
+    use_fact_cache: true
+    survey_spec: '{{awx_tmplt_mgmt_survey|select()|list}}'
 
-- name: Image-Management
-  playbook_rev: 0.1.0
-  description: "Create image repo, import images and create/update file list"
-  playbook: Image-Management.yml
-  inventory: '{{awx_inventory_id}}'
-  ask_credential_on_launch: false
-  ask_limit_on_launch: false
-  use_fact_cache: true
-  survey_spec: '{{img_mgmt_survey|select()|list}}'
+  - name: Image-Management
+    playbook_rev: 0.1.0
+    description: "Create image repo, import images and create/update file list"
+    playbook: Image-Management.yml
+    inventory: '{{awx_inventory_id}}'
+    ask_credential_on_launch: false
+    ask_limit_on_launch: false
+    use_fact_cache: true
+    survey_spec: '{{img_mgmt_survey|select()|list}}'
 
-- '{{image_flash_copy_templates[0] if SwImgFileList is defined else []}}'
-- '{{image_flash_copy_templates[1] if SwImgVerList is defined else []}}'
+  - '{{image_flash_copy_templates[0] if SwImgFileList is defined else []}}'
+  - '{{image_flash_copy_templates[1] if SwImgVerList is defined else []}}'
 
-- name: ZTP-Management
-  playbook_rev: 0.1.0
-  description: "Zero-Touch Provisioning Setup"
-  playbook: ZTP-Management.yml
-  inventory: '{{awx_inventory_id}}'
-  ask_credential_on_launch: false
-  ask_limit_on_launch: false
-  use_fact_cache: true
-  survey_spec: '{{ztp_management_survey|select()|list}}'
+  - name: ZTP-Management
+    playbook_rev: 0.1.0
+    description: "Zero-Touch Provisioning Setup"
+    playbook: ZTP-Management.yml
+    inventory: '{{awx_inventory_id}}'
+    ask_credential_on_launch: false
+    ask_limit_on_launch: false
+    use_fact_cache: true
+    survey_spec: '{{ztp_management_survey|select()|list}}'
+
+  - '{{ztp_templates[0] if vZtpCfgd else []}}'
+  - '{{ztp_templates[1] if vZtpCfgd and vMultihomed else []}}'
 
 
 mgmt_templates: '{{mgmt_template_specs|select()|list}}'
