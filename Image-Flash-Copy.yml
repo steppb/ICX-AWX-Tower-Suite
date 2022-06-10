@@ -7,8 +7,8 @@
     RebootAllowed: '{{prompt_flash_reload}}'
     BootPrefChange: '{{prompt_flash_change_boot}}'
     BootPart: '{{"sec" if prompt_flash_part|lower == "secondary" else "pri"}}'
-    ScpTimeout: '{{template_flash_copy_timeout|default(300)}}'
-    RebootTimeout: '{{template_flash_reload_timeout|default(600)}}'
+    ScpTimeout: '{{host_flash_copy_timeout|default(300)}}'
+    RebootTimeout: '{{host_flash_reload_timeout|default(600)}}'
 
   pre_tasks:
   - name: REST API Block
