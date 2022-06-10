@@ -17,6 +17,7 @@
     ZtpInv: '{{prompt_ztp_inventory}}'
     ZtpCfgCur: '{{icx_awx_mgmt.ztp|default()}}'
     DhcpCfgOld: '{{ZtpCfgCur|selectattr("name", "==", ZtpInv)|list}}'
+    IsZtpMgmt: '{{this_jt_name == "ZTP-Management"}}'
     IsZtpRT: '{{this_jt_name == "ZTP-Regen-AuthToken"}}'
 
   pre_tasks:

@@ -1,23 +1,8 @@
 ---
-- name: Get Inventory Count
-  uri: {url: '{{AwxApi}}/inventories/'}
-  register: rInvNum
-
-- name: Get Inventories
-  uri: {url: '{{AwxApi}}/inventories/?page_size={{rInvNum.json.count}}'}
-  register: rInvs
-
-- name: Store Variables From Inventory
-  set_fact:
-    ZtpInvInfo: '{{tZtpInvInfo|default()}}'
-    ZtpInvCfg: '{{tZtpInvInfo[0].variables|from_yaml|default({}, true)}}'
-  vars:
-    tZtpInvInfo: '{{rInvs.json.results|selectattr("name", "==", ZtpInv)|list}}'
-
 - name: Setup General ZTP Config
-  set_fact: {ZtpCfg: '{{ZtpInvCfg.icx_ztp_cfg|default({})|combine(tGenCfg)}}'}
+  set_fact: {ZtpCfg: '{{bZtpInvCfg.icx_ztp_cfg|default({})|combine(tGenCfg)}}'}
   vars:
-    tGenCfgOld: '{{ZtpInvCfg.icx_ztp_cfg.general|default({})}}'
+    tGenCfgOld: '{{bZtpInvCfg.icx_ztp_cfg.general|default({})}}'
     tGenCfg:
       general:
         default_pass: '{{tGenCfgOld.default_pass|default(ZtpDefPass, true)}}'
@@ -33,7 +18,7 @@
     body_format: json
     status_code: 201
   register: rNewInv
-  when: ZtpInvInfo[0] is not defined
+  when: bZtpInvInfo[0] is not defined
 
 - name: Append IP Pool Config
   set_fact: {ZtpCfg: '{{ZtpCfg|combine(IpPoolCfg)}}'}
@@ -53,6 +38,6 @@
         {{tZtpCfg|to_nice_yaml(indent=2)}}
     body_format: json
   vars:
-    tInvId: '{{rNewInv.json.id|default(ZtpInvInfo[0].id)}}'
+    tInvId: '{{rNewInv.json.id|default(bZtpInvInfo[0].id)}}'
     tVars: {icx_ztp_cfg: '{{ZtpCfg}}'}
-    tZtpCfg: '{{ZtpInvCfg|combine(tVars)}}'
+    tZtpCfg: '{{bZtpInvCfg|combine(tVars)}}'

@@ -30,16 +30,27 @@
     vars: {tApp: '{{rZtpApp.json.results[0].id|default()}}'}
     when: tApp|default("null", true) != "null"
 
+  - name: Get Inventory Count
+    uri: {url: '{{AwxApi}}/inventories/'}
+    register: rInvNum
+
+  - name: Get Inventories
+    uri: {url: '{{AwxApi}}/inventories/?page_size={{rInvNum.json.count}}'}
+    register: rInvs
+
 - name: ZTP Setup
   block:
   - {name: Setup DHCP, include_tasks: zm_dhcp.yml, when: bDoDhcp}
   - {name: Create Creds, include_tasks: zm_default_creds.yml, when: bDoCred}
   - {name: Create Token, include_tasks: zm_auth_token.yml, when: bDoAuth}
   - {name: Configure Interface, include_tasks: zm_interface.yml, when: bDoInt}
+  - {name: Create Inventory, include_tasks: zm_inventory.yml, when: IsZtpMgmt}
   vars:
     bOrgId: '{{rThisTemplate.json.organization}}'
     bAppId: '{{rZtpApp.json.results[0].id|default(0)}}'
     bTokId: '{{rWebToken.json.results[0].id|default(0)}}'
+    bZtpInvInfo: '{{rInvs.json.results|selectattr("name", "==", ZtpInv)|list}}'
+    bZtpInvCfg: '{{bZtpInvInfo[0].variables|from_yaml|default({}, true)}}'
     bNeedWebhook: '{{not rWebhookFile.stat.exists}}'
     bDoDhcp: '{{not rDhcpFile.stat.exists}}'
     bDoCred: '{{rZtpCreds.json.count == 0}}'
