@@ -212,7 +212,7 @@ ztp_management_survey:
     variable: prompt_ztp_dhcp_subnet
     min: 9
     max: 18
-  - question_name: "DHCP Config - Subnet Range: (e.g. 192.168.0.100-192.168.0.200)"
+  - question_name: "DHCP Config - Subnet Range: (e.g. 192.168.1.0.0-192.168.0.200)"
     required: '{{not vZtpCfgd}}'
     type: text
     variable: prompt_ztp_dhcp_range
@@ -256,7 +256,7 @@ ztp_management_survey:
 
 ztp_templates:
   - name: ZTP-Regen-AuthToken
-    playbook_rev: 0.1.0
+    playbook_rev: 1.0.0
     description: "Regenerate DHCP Webhook Authentication Token"
     playbook: ZTP-Management.yml
     inventory: '{{awx_inventory_id}}'
@@ -266,7 +266,7 @@ ztp_templates:
     survey_spec: '{{awxcli_prompts if vNeedAwxSshCreds else ""}}'
 
   - name: ZTP-Configure-Server-Address
-    playbook_rev: 0.1.0
+    playbook_rev: 1.0.0
     description: "Configure IP address on secondary interface"
     playbook: ZTP-Management.yml
     inventory: '{{awx_inventory_id}}'
@@ -276,19 +276,19 @@ ztp_templates:
     survey_spec: '{{ztp_server_address_survey|select()|list}}'
 
   - name: Provisioning-Init-Login
-    playbook_rev: 0.1.0
+    playbook_rev: 1.0.0
     description: "Setup ICX initial login"
     playbook: Provisioning-Init-Login.yml
 
   - name: Provisioning-Finalize
-    playbook_rev: 0.1.0
+    playbook_rev: 1.0.0
     description: "Configure static IP and move host to final Inventory"
     playbook: Provisioning-Finalize.yml
 
 
 mgmt_template_specs:
   - name: AWX-Template-Management
-    playbook_rev: 0.1.0
+    playbook_rev: 1.0.0
     description: "Create/update or remove templates"
     playbook: AWX-Template-Management.yml
     inventory: '{{awx_inventory_id}}'
@@ -298,7 +298,7 @@ mgmt_template_specs:
     survey_spec: '{{awx_tmplt_mgmt_survey|select()|list}}'
 
   - name: Image-Management
-    playbook_rev: 0.1.0
+    playbook_rev: 1.0.0
     description: "Create image repo, import images and create/update file list"
     playbook: Image-Management.yml
     inventory: '{{awx_inventory_id}}'
@@ -311,7 +311,7 @@ mgmt_template_specs:
   - '{{image_flash_copy_templates[1] if SwImgVerList is defined else []}}'
 
   - name: ZTP-Management
-    playbook_rev: 0.1.0
+    playbook_rev: 1.0.0
     description: "Zero-Touch Provisioning Setup"
     playbook: ZTP-Management.yml
     inventory: '{{awx_inventory_id}}'
