@@ -29,6 +29,7 @@
         'SSH@': "exit"
     changed_when: false
     failed_when: false
+    vars: {ansible_python_interpreter: '{{ansible_playbook_python}}'}
     register: rSshSetup
 
   - name: Attempt Telnet Login
