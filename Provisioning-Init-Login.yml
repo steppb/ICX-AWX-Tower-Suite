@@ -49,10 +49,10 @@
     when: "'Connection refused' in rSshSetup.stdout"
 
   - name: Get Workflow ID
-    uri: {url: '{{WorkflowUrl}}/?name={{ZtpGenCfg.workflow|urlencode}}'}
+    uri: {url: '{{WorkflowUrl}}/?name={{ZtpGenCfg.primary_workflow|urlencode}}'}
     no_log: '{{not log_secure_tasks}}'
     register: rProvisioningWorkflow
-    when: ZtpGenCfg.workflow|default("null", true) != "null"
+    when: ZtpGenCfg.primary_workflow|default("null", true) != "null"
 
   - name: Launch Workflow
     uri:

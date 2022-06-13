@@ -6,7 +6,8 @@
     tGenCfg:
       general:
         default_pass: '{{tGenCfgOld.default_pass|default(ZtpDefPass, true)}}'
-        workflow: '{{tGenCfgOld.workflow|default()}}'
+        primary_workflow: '{{tGenCfgOld.primary_workflow|default()}}'
+        secondary_workflow: '{{tGenCfgOld.secondary_workflow|default()}}'
         awx_api_cb: '{{AwxApi}}'
 
 - name: Create ZTP Inventory

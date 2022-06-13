@@ -17,6 +17,7 @@
     PortVar: '(^e.*[0-9]{1,2}/[0-9]{1,2}/[0-9]{1,2}|^ve.*[0-9]{1,4})'
     NewHostname: '{{icx_ztp_cfg.hostname_pool.next_name|default("null", true)}}'
     AwxApi: '{{icx_ztp_cfg.general.awx_api_cb}}'
+    WorkflowUrl: '{{icx_ztp_cfg.general.awx_api_cb}}/workflow_job_templates'
 
   tasks:
   - name: Get Info for Current Host
@@ -159,10 +160,14 @@
             static_ip_pool: {next_ip: '{{bZtpIpCfg.next_ip|iptest("add")}}'}
     vars:
       bZtpIpCfg: '{{ZtpCfg.static_ip_pool}}'
+      bHostCfgd: '{{bZtpIpCfg.pool|iprange("has_addr", ansible_host)}}'
+      bPoolExhausted: '{{not bZtpIpCfg.pool
+                        |iprange("has_addr", bZtpIpCfg.next_ip)}}'
+      bDoPoolCfg: '{{not bPoolExhausted and not bHostCfgd}}'
       ansible_network_os: icx
       ansible_become: true
       ansible_become_method: enable
-    when: bZtpIpCfg.pool[0]|default("null", true) != "null"
+    when: bZtpIpCfg.pool[0]|default("null", true) != "null" and bDoPoolCfg
 
   - name: Update Inventory Variables
     uri:
@@ -176,6 +181,34 @@
     vars: {tZtpCfg: {icx_ztp_cfg: '{{ZtpCfg}}'}}
     when: HnChange|default(false) or IpChange|default(false)
 
-  - name: Display Error Message
-    debug: var=ErrMsg
-    when: ErrMsg is defined
+  - name: Provisioning-Finalize Error Block
+    block:
+    - {name: Display Error Message(s), debug: {msg: '{{tErr}}'}}
+    - {name: End Play, meta: end_host}
+    vars:
+      tIpPool: '{{ZtpCfg.static_ip_pool.pool|default("null")}}'
+      tNextIp: '{{ZtpCfg.static_ip_pool.next_ip|default("null")}}'
+      tPoolCfgd: '{{tIpPool != "null" and tNextIp != "null"}}'
+      tNoIp: '{{tPoolCfgd and not tIpPool|iprange("has_addr", tNextIp|iptest("add"))}}'
+      tNoConnErrMsg: "ERROR: Device unreachable after replacing IP address"
+      tNoIpErrMsg: "ERROR: All IPs in static IP pool have been exhausted"
+      tErr: "{{tNoConnErrMsg if rWrMem.rc|default(0) == 1 else tNoIpErrMsg}}"
+    when: rWrMem.rc|default(0) == 1 or tNoIp
+
+  - name: Get Workflow ID
+    uri: {url: '{{WorkflowUrl}}/?name={{tWorkflow|urlencode}}', method: GET}
+    no_log: '{{not log_secure_tasks}}'
+    vars: {tWorkflow: '{{ZtpCfg.general.secondary_workflow}}'}
+    register: rProvisioningWorkflow
+    when: ZtpCfg.general.secondary_workflow|default("null", true) != "null"
+
+  - name: Launch Workflow
+    uri:
+      url: '{{WorkflowUrl}}/{{rProvisioningWorkflow.json.results[0].id}}/launch/'
+      method: POST
+      headers: {Content-Type: "application/json"}
+      body: {limit: '{{NewHostname if HnChange else inventory_hostname}}'}
+      body_format: json
+      status_code: 201
+    no_log: '{{not log_secure_tasks}}'
+    when: rProvisioningWorkflow.json.results[0].id is defined
