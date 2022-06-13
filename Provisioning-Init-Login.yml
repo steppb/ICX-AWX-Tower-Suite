@@ -29,7 +29,7 @@
         'SSH@': "exit"
     changed_when: false
     failed_when: false
-    register: SshSession
+    register: rSshSetup
 
   - name: Attempt Telnet Login
     telnet:
@@ -45,23 +45,20 @@
         - username super password {{ZtpDefPass}}
         - crypto key generate rsa modulus 2048
         - write mem
-    when: "'Connection refused' in SshSession.stdout"
+    when: "'Connection refused' in rSshSetup.stdout"
 
   - name: Get Workflow ID
     uri: {url: '{{WorkflowUrl}}/?name={{ZtpGenCfg.workflow|urlencode}}'}
-    register: ProvisioningWorkflow
-    when:
-      - ZtpGenCfg.workflow is defined
-      - ZtpGenCfg.workflow != ''
-      - ZtpGenCfg.workflow is not none
+    register: rProvisioningWorkflow
+    when: ZtpGenCfg.workflow|default("null", true) != "null"
 
   - name: Launch Workflow
     uri:
-      url: '{{WorkflowUrl}}/{{ProvisioningWorkflow.json.results[0].id}}/launch/'
+      url: '{{WorkflowUrl}}/{{tWorkflowId}}/launch/'
       method: POST
       headers: {Content-Type: "application/json"}
-      body:
-        limit: '{{ansible_host}}'
+      body: {limit: '{{ansible_host}}'}
       body_format: json
       status_code: 201
-    when: ProvisioningWorkflow.json.results[0].id is defined
+    vars: {tWorkflowId: '{{rProvisioningWorkflow.json.results[0].id}}'}
+    when: rProvisioningWorkflow.json.results[0].id is defined

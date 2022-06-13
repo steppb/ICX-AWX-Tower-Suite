@@ -20,11 +20,10 @@
 
   tasks:
   - name: Get Info for Current Host
-    uri: {url: '{{AwxApi}}/hosts/?name={{inventory_hostname|urlencode}}', method: GET}
-    register: HostInfo
-
-  - name: Store Host Description
-    set_fact: {HostDesc: '{{HostInfo.json.results[0].description}}'}
+    uri:
+      url: '{{AwxApi}}/hosts/?name={{inventory_hostname|urlencode}}'
+      method: GET
+    register: rHostInfo
 
   - name: Hostname Configuration
     block:
@@ -46,13 +45,9 @@
         tRawErr: '{{rHnCfg.module_stderr|default()}}'
         tErr: "{{tRawErr|regex_replace('\n')|regex_replace(ErrParse)}}"
 
-    - name: Display Switch Error
-      assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(NewlineVar)}}'}
-      when: ErrMsg is defined
-
     - name: Update Host Name in AWX
       uri:
-        url: '{{AwxApi}}/hosts/{{HostInfo.json.results[0].id}}/'
+        url: '{{AwxApi}}/hosts/{{rHostInfo.json.results[0].id}}/'
         headers: {Content-Type: 'application/json'}
         body: {name: '{{NewHostname}}'}
         body_format: json
@@ -79,39 +74,35 @@
     block:
       - name: Find Current Management Interface
         icx_command: {commands: 'show ip interface | include {{ansible_host}}'}
-        register: IpIntInfo
+        register: rIpInt
         connection: network_cli
-
-      - name: Set Interface Values
-        set_fact:
-          DynInt: '{{"mana1" if DynIntMgmt else DynPortNum}}'
-          StaticInt: '{{"mana1" if StaticIntMgmt else StaticPortNum}}'
-        vars:
-          DynIntMgmt: '{{IpIntInfo.stdout[0].split(" ")[1]|regex_search("^m") == "m"}}'
-          DynPortNum: '{{IpIntInfo.stdout[0].split(" ")[1]}}'
-          StaticIntMgmt: '{{bZtpIpCfg.interface|regex_search("^m") == "m"}}'
-          StaticPortNum: '{{bZtpIpCfg.interface|regex_search(PortVar)}}'
 
       - name: Apply Static IP Configuration
         icx_config:
-          lines: ip address {{bZtpIpCfg.next_ip}} {{bZtpIpCfg.subnet|ipaddr("netmask")}}
-          parents: int {{StaticInt|default(DynInt, true)}}
+          lines: ip address {{bZtpIpCfg.next_ip}}
+                 {{bZtpIpCfg.subnet|iptest("get_mask")}}
+          parents: int {{tStaticInt|default(tDynInt, true)}}
           save_when: changed
         failed_when: false
-        register: IcxStatus
+        register: rIpCfg
         connection: network_cli
+        vars:
+          tIsDynIntMgmt: '{{rIpInt.stdout[0].split(" ")[1]
+                           |regex_search("^m") == "m"}}'
+          tIsStaticIntMgmt: '{{bZtpIpCfg.interface|regex_search("^m") == "m"}}'
+          tDynPortNum: '{{rIpInt.stdout[0].split(" ")[1]}}'
+          tStaticPortNum: '{{bZtpIpCfg.interface|regex_search(PortVar)}}'
+          tDynInt: '{{"mana1" if tIsDynIntMgmt else tDynPortNum}}'
+          tStaticInt: '{{"mana1" if tIsStaticIntMgmt else tStaticPortNum}}'
 
-      - name: Parse Switch Error
-        set_fact:
-          ErrMsg: "{{IcxStatus.module_stderr|regex_replace('\n')|regex_replace(ErrParse)}}"
-        when:
-          - IcxStatus.rc is defined
-          - IcxStatus.rc == 1
-          - "'timeout value' not in IcxStatus.module_stderr"
-
-      - name: Display Switch Error
-        assert: {that: ErrMsg is not defined, fail_msg: '{{ErrMsg.split(NewlineVar)}}'}
-        when: ErrMsg is defined
+      - name: Check For Config Error
+        assert:
+          that: rIpCfg.rc|default(0) != 1
+          fail_msg: '{{tErr.split(NewlineVar)}}'
+        vars:
+          tRawErr: '{{rIpCfg.module_stderr|default()}}'
+          tErr: "{{tRawErr|regex_replace('\n')|regex_replace(ErrParse)}}"
+        when: '"timeout value" not in rIpCfg.module_stderr|default()'
 
       - name: Write Memory if IP Address Replaced
         icx_config: {lines: write mem}
@@ -120,19 +111,12 @@
         register: rWrMem
         vars: {ansible_host: '{{bZtpIpCfg.next_ip}}'}
         when:
-          - IcxStatus.rc is defined
-          - IcxStatus.rc == 1
-          - "'timeout value' in IcxStatus.module_stderr"
-
-      - name: Set Error Message
-        set_fact: {ErrMsg: "ERROR: Device unreachable after replacing IP address"}
-        when:
-          - rWrMem.rc is defined
-          - rWrMem.rc == 1
+          - rIpCfg.rc|default(0) == 1
+          - '"timeout value" in rIpCfg.module_stderr'
 
       - name: Update AWX Host IP Address
         uri:
-          url: '{{AwxApi}}/hosts/{{HostInfo.json.results[0].id}}/'
+          url: '{{AwxApi}}/hosts/{{rHostInfo.json.results[0].id}}/'
           headers: {Content-Type: 'application/json'}
           body:
             variables: >-
@@ -146,8 +130,6 @@
         vars:
           tIpCfg:
             static_ip_pool: {next_ip: '{{bZtpIpCfg.next_ip|iptest("add")}}'}
-
-      - {name: Set Config Change Flag, set_fact: {HostCfgChange: true}}
     vars:
       bZtpIpCfg: '{{ZtpCfg.static_ip_pool}}'
       ansible_network_os: icx
@@ -164,7 +146,7 @@
           {{tZtpCfg|to_nice_yaml(indent=2)}}
       body_format: json
     vars: {tZtpCfg: {icx_ztp_cfg: '{{ZtpCfg}}'}}
-    when: HnChange|default(false or IpChange|default(false)
+    when: HnChange|default(false) or IpChange|default(false)
 
   - name: Display Error Message
     debug: var=ErrMsg

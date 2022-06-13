@@ -1,6 +1,7 @@
 ---
 - {name: Common Tasks, include_tasks: am_common.yml}
 - {name: Image Management, include_tasks: image_management.yml, when: DoImgMgmt}
+- {name: ZTP Management, include_tasks: ztp_management.yml, when: DoZtpMgmt}
 - {name: Template Management, include_tasks: template_management.yml}
 
 - name: Job Status

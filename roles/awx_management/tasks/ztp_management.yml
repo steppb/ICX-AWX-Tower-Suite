@@ -52,7 +52,7 @@
     bZtpInvInfo: '{{rInvs.json.results|selectattr("name", "==", ZtpInv)|list}}'
     bZtpInvCfg: '{{bZtpInvInfo[0].variables|from_yaml|default({}, true)}}'
     bNeedWebhook: '{{not rWebhookFile.stat.exists}}'
-    bDoDhcp: '{{not rDhcpFile.stat.exists}}'
+    bDoDhcp: '{{not rDhcpFile.stat.exists or DhcpCfgNew is defined}}'
     bDoCred: '{{rZtpCreds.json.count == 0}}'
     bDoAuth: '{{bAppId == "0" or bTokId == "0" or bNeedWebhook or IsZtpRT}}'
     bDoInt: '{{NetIntCfg is defined}}'

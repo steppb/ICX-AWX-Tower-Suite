@@ -82,8 +82,8 @@
     register: rTemplateCreds
   when: not rThisTemplate.json.ask_credential_on_launch
 
-- name: Set Flag to Update Image Management Templates
-  set_fact: {DoImgMgmt: '{{tAmUpdate or tImUpdate}}'}
+- name: Set Role Flags
+  set_fact: {DoImgMgmt: '{{tAmUpdate or tImUpdate}}', DoZtpMgmt: '{{tDoZtp}}'}
   vars:
     tAmNotRmv: '{{"remove" not in prompt_mgmt_role|default()|lower}}'
     tAmReqUpt: '{{prompt_update_img_mgmt|default(false)}}'
@@ -92,3 +92,4 @@
     tIsIm: '{{IsImgMgmt|default(false)}}'
     tAmUpdate: '{{tIsAm and tAmNotRmv and tImgDirDefined and tAmReqUpt}}'
     tImUpdate: '{{tIsIm and tImgDirDefined}}'
+    tDoZtp: '{{IsZtp|default(false)}}'

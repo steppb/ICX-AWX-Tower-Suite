@@ -322,6 +322,8 @@ mgmt_template_specs:
 
   - '{{ztp_templates[0] if vZtpCfgd else []}}'
   - '{{ztp_templates[1] if vZtpCfgd and vMultihomed else []}}'
+  - '{{ztp_templates[2] if vZtpCfgd else []}}'
+  - '{{ztp_templates[3] if vZtpCfgd else []}}'
 
 
 mgmt_templates: '{{mgmt_template_specs|select()|list}}'
