@@ -46,7 +46,7 @@
         - username super password {{ZtpDefPass}}
         - crypto key generate rsa modulus 2048
         - write mem
-    when: "'Connection refused' in rSshSetup.stdout"
+    when: rSshSetup.rc is defined and rSshSetup.rc == 255
 
   - name: Get Workflow ID
     uri: {url: '{{WorkflowUrl}}/?name={{ZtpGenCfg.primary_workflow|urlencode}}'}
