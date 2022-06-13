@@ -26,6 +26,30 @@
     no_log: '{{not log_secure_tasks}}'
     register: rHostInfo
 
+  - name: Default User Removal
+    block:
+    - name: Check for default 'super' User
+      icx_command: {commands: show users | include super}
+      register: rUser
+
+    - name: Remove 'super' User
+      icx_config: {lines: no username super}
+      vars: {tUsername: '{{rUser.stdout_lines[0][0].split(" ")[0]}}'}
+      when: tUsername == "super" and tUsername != ansible_user
+
+    - name: Default Credential Warning
+      debug:
+        msg:
+          - 'WARNING: Template launched with default user.'
+          - 'Cannot remove from network device.'
+      vars: {tUsername: '{{rUser.stdout_lines[0][0].split(" ")[0]}}'}
+      when: tUsername == ansible_user
+    connection: network_cli
+    vars:
+      ansible_network_os: icx
+      ansible_become: true
+      ansible_become_method: enable
+
   - name: Hostname Configuration
     block:
     - name: Configure Hostname
