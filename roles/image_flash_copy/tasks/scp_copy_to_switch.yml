@@ -1,11 +1,4 @@
-- name: Get Switch Information
-  icx_facts: {gather_subset: hardware}
-  connection: network_cli
-  vars:
-    ansible_network_os: icx
-    ansible_become: true
-    ansible_become_method: enable
-
+---
 - name: Check Bootrom For Compatibility
   block:
   - name: Get Current Boot Version

@@ -2,7 +2,8 @@
 - name: Create Boot File Info List
   set_fact:
     BootImgList: '{{BootImgList|default([])}} + {{tBootFileInfo}}'
-    BootFileNames: "{{BootFileNames|default('None\nAuto Select\n')}}{{bImgFileName}}\n"
+    BootFileNames: "{{BootFileNames
+                     |default('None\nAuto Select\n')}}{{bImgFileName}}\n"
   vars:
     tBootFileInfo:
     - filename: '{{bImgFileName}}'
@@ -38,7 +39,8 @@
         is_ufi: '{{bIsUfi}}'
         path: '{{bImgFilePath}}'
         software_version: '{{bBinImgVer}}'
-        supported_platforms: '{{tSuppPlat|map(attribute="platform")|flatten|sort}}'
+        supported_platforms: '{{tSuppPlat|map(attribute="platform")
+                                         |flatten|sort}}'
         supported_bootrom_ver: '{{tBootVer|default() if not bIsUfi else ""}}'
         intermediate_image: '{{tImdImgList[0]|default() if tImdImgReq else ""}}'
     when: tSuppPlat|default("null", true) != "null"

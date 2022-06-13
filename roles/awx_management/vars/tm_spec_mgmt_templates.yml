@@ -212,7 +212,7 @@ ztp_management_survey:
     variable: prompt_ztp_dhcp_subnet
     min: 9
     max: 18
-  - question_name: "DHCP Config - Subnet Range: (e.g. 192.168.1.0.0-192.168.0.200)"
+  - question_name: "DHCP Config - Subnet Range: (e.g. 192.168.0.100-192.168.0.200)"
     required: '{{not vZtpCfgd}}'
     type: text
     variable: prompt_ztp_dhcp_range

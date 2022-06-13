@@ -16,7 +16,6 @@
     ImgMgmtDir: '{{icx_awx_mgmt.img_mgmt.awx_image_dir|default("null")}}'
     MgmtFunc: '{{prompt_mgmt_role|default("Management Update", true)}}'
     IsAwxTmpltMgmt: true
-    PbRev: '{{playbook_rev|default("0.0.0")}}'
 
   roles:
   - {role: awx_management}
