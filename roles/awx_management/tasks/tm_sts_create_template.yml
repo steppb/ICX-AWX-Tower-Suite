@@ -16,6 +16,7 @@
       ask_limit_on_launch: '{{bJtSpec.ask_limit_on_launch|default(true)}}'
     body_format: json
     status_code: 201
+  no_log: '{{not log_secure_tasks}}'
   register: rNewJt
   vars: {tAskInv: '{{bJtSpec.inventory|default("null", true) == "null"}}'}
 
@@ -29,6 +30,7 @@
     status_code: 204
   loop: '{{range(0, bCreds.results|length)|list}}'
   loop_control: {index_var: idx}
+  no_log: '{{not log_secure_tasks}}'
   when: bHaveCreds
 
 - name: Add Template to "Created" List

@@ -11,6 +11,7 @@
 
 - name: Get Job Template Count
   uri: {url: '{{AwxApi}}/job_templates/'}
+  no_log: '{{not log_secure_tasks}}'
   register: rJtNum
 
 - name: Load Management Template Specs
@@ -18,6 +19,7 @@
 
 - name: Get Job Templates
   uri: {url: '{{AwxApi}}/job_templates/?page_size={{rJtNum.json.count}}'}
+  no_log: '{{not log_secure_tasks}}'
   register: rJts
 
 - name: Create/Update Management Templates

@@ -23,6 +23,7 @@
     uri:
       url: '{{AwxApi}}/hosts/?name={{inventory_hostname|urlencode}}'
       method: GET
+    no_log: '{{not log_secure_tasks}}'
     register: rHostInfo
 
   - name: Hostname Configuration
@@ -51,6 +52,7 @@
         headers: {Content-Type: 'application/json'}
         body: {name: '{{NewHostname}}'}
         body_format: json
+      no_log: '{{not log_secure_tasks}}'
 
     - name: Update Hostname Config
       set_fact:
@@ -122,6 +124,7 @@
             variables: >-
               ansible_host: '{{bZtpIpCfg.next_ip}}'
           body_format: json
+        no_log: '{{not log_secure_tasks}}'
 
       - name: Increment Next Static IP
         set_fact:
@@ -145,6 +148,7 @@
         variables: >-
           {{tZtpCfg|to_nice_yaml(indent=2)}}
       body_format: json
+    no_log: '{{not log_secure_tasks}}'
     vars: {tZtpCfg: {icx_ztp_cfg: '{{ZtpCfg}}'}}
     when: HnChange|default(false) or IpChange|default(false)
 

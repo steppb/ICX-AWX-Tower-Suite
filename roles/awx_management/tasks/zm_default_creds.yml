@@ -1,6 +1,7 @@
 ---
 - name: Get ID for 'Machine' Credential Type
   uri: {url: '{{AwxApi}}/credential_types/?name=Machine'}
+  no_log: '{{not log_secure_tasks}}'
   register: rMachineCredType
 
 - name: Create Initial Login Credentials for ZTP Hosts
@@ -17,3 +18,4 @@
         username: super
     body_format: json
     status_code: 201
+  no_log: '{{not log_secure_tasks}}'

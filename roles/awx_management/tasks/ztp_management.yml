@@ -37,6 +37,7 @@
   - name: Get Inventories
     uri: {url: '{{AwxApi}}/inventories/?page_size={{rInvNum.json.count}}'}
     register: rInvs
+  no_log: '{{not log_secure_tasks}}'
 
 - name: ZTP Setup
   block:

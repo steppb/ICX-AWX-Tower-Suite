@@ -84,7 +84,7 @@
     timeout: '{{ScpTimeout}}'
     responses:
       "Password:": '{{ansible_password}}'
-  no_log: true
+  no_log: '{{not log_secure_tasks}}'
   loop: '{{tCpFiles}}'
   vars:
     tOpts: "-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"

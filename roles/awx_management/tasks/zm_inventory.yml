@@ -17,6 +17,7 @@
     body: {name: '{{ZtpInv}}', organization: '{{bOrgId}}'}
     body_format: json
     status_code: 201
+  no_log: '{{not log_secure_tasks}}'
   register: rNewInv
   when: bZtpInvInfo[0] is not defined
 
@@ -37,6 +38,7 @@
       variables: >-
         {{tZtpCfg|to_nice_yaml(indent=2)}}
     body_format: json
+  no_log: '{{not log_secure_tasks}}'
   vars:
     tInvId: '{{rNewInv.json.id|default(bZtpInvInfo[0].id)}}'
     tVars: {icx_ztp_cfg: '{{ZtpCfg}}'}

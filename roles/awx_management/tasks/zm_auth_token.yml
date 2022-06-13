@@ -14,11 +14,13 @@
       organization: '{{bOrgId}}'
     body_format: json
     status_code: 201
+  no_log: '{{not log_secure_tasks}}'
   register: rAwxApp
   when: bAppId|int == 0
 
 - name: Delete Existing Webhook Token
   uri: {url: '{{AwxApi}}/tokens/{{bTokId}}/', method: DELETE, status_code: 204}
+  no_log: '{{not log_secure_tasks}}'
   register: rTokenDelete
   when: bTokId|int != 0 and (bNeedWebhook or IsZtpRT)
 
@@ -30,6 +32,7 @@
     body: {application: '{{rAwxApp.json.id|default(bAppId)}}', scope: write}
     body_format: json
     status_code: 201
+  no_log: '{{not log_secure_tasks}}'
   register: rWebhookToken
   when: rTokenDelete.status is defined or bTokId|int == 0
 

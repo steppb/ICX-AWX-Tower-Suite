@@ -1,6 +1,7 @@
 ---
 - name: Get This Template Info
   uri: {url: '{{AwxApi}}/job_templates/{{awx_job_template_id}}/'}
+  no_log: '{{not log_secure_tasks}}'
   register: rThisTemplate
 
 - name: Initial AWX System Host Tasks
@@ -73,6 +74,7 @@
   - name: Get Credentials
     uri:
       url: '{{AwxApi}}/job_templates/{{rThisTemplate.json.id}}/credentials/'
+    no_log: '{{not log_secure_tasks}}'
     register: rThisTemplateCreds
 
   - name: Store Credentials

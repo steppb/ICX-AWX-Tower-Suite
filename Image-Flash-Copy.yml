@@ -23,6 +23,7 @@
       register: rAwxHostFacts
       vars: {tHostId: '{{rAwxHost.json.results[0].id}}'}
     vars: {bAwxApi: "https://{{prompt_image_repo_address}}/api/v2"}
+    no_log: '{{not log_secure_tasks}}'
     module_defaults:
       uri:
         validate_certs: '{{host_validate_certs|default(false)}}'

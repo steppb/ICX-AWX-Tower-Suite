@@ -7,6 +7,7 @@
     method: DELETE
     return_content: no
     status_code: 204
+  no_log: '{{not log_secure_tasks}}'
 
 - name: Add Template to "Removed" List
   set_fact:
