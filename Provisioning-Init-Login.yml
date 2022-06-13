@@ -1,4 +1,3 @@
-#! AwxMgmtIgnore
 ---
 - hosts: all
   connection: local
@@ -12,24 +11,11 @@
       force_basic_auth: yes
       timeout: 60
   vars:
-    WorkflowUrl: '{{icx_inv_ztp_vars.provisioning_vars.awx_api_cb}}/workflow_job_templates'
-    InvProvisioning: '{{icx_inv_ztp_vars.provisioning_vars}}'
+    WorkflowUrl: '{{icx_ztp_cfg.general.awx_api_cb}}/workflow_job_templates'
+    ZtpGenCfg: '{{icx_ztp_cfg.general}}'
+    ZtpDefPass: '{{icx_ztp_cfg.general.default_pass}}'
 
   tasks:
-  - name: Set Password from Template Variable
-    set_fact: {ProvisioningPass: '{{template_provisioning_pass}}'}
-    when:
-      - ProvisioningPass is not defined
-      - template_provisioning_pass is defined
-      - template_provisioning_pass != ''
-
-  - name: Set Password from Inventory Variable
-    set_fact: {ProvisioningPass: '{{InvProvisioning.default_pass}}'}
-    when:
-      - ProvisioningPass is not defined
-      - InvProvisioning.default_pass is defined
-      - InvProvisioning.default_pass != ''
-
   - name: Attempt SSH Login
     expect:
       command: ssh -o UserKnownHostsFile=/dev/null super@{{ansible_host}}
@@ -38,8 +24,8 @@
       responses:
         'want to continue connecting': 'yes'
         'Password:': 'sp-admin'
-        'Enter the new password for user super :': "{{ProvisioningPass}}"
-        'Enter the reconfirm password for user super:': "{{ProvisioningPass}}"
+        'Enter the new password for user super :': "{{ZtpDefPass}}"
+        'Enter the reconfirm password for user super:': "{{ZtpDefPass}}"
         'SSH@': "exit"
     changed_when: false
     failed_when: false
@@ -56,18 +42,18 @@
         - "config"
       command:
         - aaa authentication login default local
-        - username super password {{ProvisioningPass}}
+        - username super password {{ZtpDefPass}}
         - crypto key generate rsa modulus 2048
         - write mem
     when: "'Connection refused' in SshSession.stdout"
 
   - name: Get Workflow ID
-    uri: {url: '{{WorkflowUrl}}/?name={{InvProvisioning.workflow|urlencode}}'}
+    uri: {url: '{{WorkflowUrl}}/?name={{ZtpGenCfg.workflow|urlencode}}'}
     register: ProvisioningWorkflow
     when:
-      - InvProvisioning.workflow is defined
-      - InvProvisioning.workflow != ''
-      - InvProvisioning.workflow is not none
+      - ZtpGenCfg.workflow is defined
+      - ZtpGenCfg.workflow != ''
+      - ZtpGenCfg.workflow is not none
 
   - name: Launch Workflow
     uri:
