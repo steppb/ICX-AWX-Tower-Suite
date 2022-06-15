@@ -282,7 +282,7 @@ ztp_templates:
 
   - name: Provisioning-Finalize
     playbook_rev: 1.0.0
-    description: "Configure static IP and move host to final Inventory"
+    description: "Configure static IP and hostname from inventory pool"
     playbook: Provisioning-Finalize.yml
 
 
