@@ -117,6 +117,7 @@
       ScpCpCfg:
         - file_entry: '{{tImdImgEntry[0]|default()}}'
           boot_path: '{{tImdBootEntry[0].path|default()}}'
+          wait_for_fw: true
     vars:
       tPath: '{{ImgEntry.intermediate_image}}'
       tImdImgEntry: '{{ImgRepoFiles|selectattr("path", "==", tPath)|list}}'
@@ -151,6 +152,7 @@
     bScpCpCfg: '{{ScpCpCfg|default([])}} + {{bCfg}}'
     bScpBootPath: '{{bScpCpCfg[bIdx].boot_path}}'
     bScpFileEntry: '{{bScpCpCfg[bIdx].file_entry}}'
+    bWaitForFw: '{{bScpCpCfg[bIdx].wait_for_fw|default(false)}}'
 
 - name: Post Boot Info
   block:

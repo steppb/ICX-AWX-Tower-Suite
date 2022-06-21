@@ -118,6 +118,17 @@
     vars: {ImageName: '{{ansible_net_image|regex_replace(".bin")}}'}
 
   - {name: Reset Reboot Return Variable, set_fact: {RebootSuccess: }}
+
+  - name: Check and Wait for Firmware Download
+    block:
+    - name: Check For Firmware Download
+      icx_command: {commands: show issu status | include POE-Firmware}
+      register: rFwStatus
+
+    - name: Wait For Firmware Download (Five Minutes)
+      wait_for: {host: , port: , timeout: 300}
+      when: '"yes" in rFwStatus.stdout_lines[0][0]|lower'
+    when: bWaitForFw
   connection: network_cli
   vars:
     ansible_network_os: icx
