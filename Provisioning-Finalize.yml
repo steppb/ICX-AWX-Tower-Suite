@@ -189,11 +189,11 @@
       tIpPool: '{{ZtpCfg.static_ip_pool.pool|default("null")}}'
       tNextIp: '{{ZtpCfg.static_ip_pool.next_ip|default("null")}}'
       tPoolCfgd: '{{tIpPool != "null" and tNextIp != "null"}}'
-      tNoIp: '{{tPoolCfgd and not tIpPool|iprange("has_addr", tNextIp|iptest("add"))}}'
       tNoConnErrMsg: "ERROR: Device unreachable after replacing IP address"
       tNoIpErrMsg: "ERROR: All IPs in static IP pool have been exhausted"
       tErr: "{{tNoConnErrMsg if rWrMem.rc|default(0) == 1 else tNoIpErrMsg}}"
-    when: rWrMem.rc|default(0) == 1 or tNoIp
+    when: rWrMem.rc|default(0) == 1 or
+          tPoolCfgd and not tIpPool|iprange("has_addr", tNextIp|iptest("add"))
 
   - name: Get Workflow ID
     uri: {url: '{{WorkflowUrl}}/?name={{tWorkflow|urlencode}}', method: GET}
