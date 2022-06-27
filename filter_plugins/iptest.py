@@ -72,6 +72,8 @@ def is_host(addr):
 def in_net(addr, value=None):
     if not value:
         raise ValueError("Error: Network not specified")
+    if not addr.address:
+        return False
     subnet = IPAddress(value)
     return (addr.address & subnet.netmask) == subnet.netaddr
 
