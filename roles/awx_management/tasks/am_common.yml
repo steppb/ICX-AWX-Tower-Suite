@@ -1,4 +1,16 @@
 ---
+- name: Set Role Flags
+  set_fact: {DoImgMgmt: '{{tAmUpdate or tImUpdate}}', DoZtpMgmt: '{{tDoZtp}}'}
+  vars:
+    tAmNotRmv: '{{"remove" not in prompt_mgmt_role|default()|lower}}'
+    tAmReqUpt: '{{prompt_update_img_mgmt|default(false)}}'
+    tImgDirDefined: '{{ImgMgmtDir|default("null", true) != "null"}}'
+    tIsAm: '{{IsAwxTmpltMgmt|default(false)}}'
+    tIsIm: '{{IsImgMgmt|default(false)}}'
+    tAmUpdate: '{{tIsAm and tAmNotRmv and tImgDirDefined and tAmReqUpt}}'
+    tImUpdate: '{{tIsIm and tImgDirDefined}}'
+    tDoZtp: '{{IsZtp|default(false)}}'
+
 - name: Get This Template Info
   uri: {url: '{{AwxApi}}/job_templates/{{awx_job_template_id}}/'}
   no_log: '{{not log_secure_tasks}}'
@@ -13,15 +25,25 @@
     when: rThisTemplate.json.use_fact_cache
 
   - name: Gather Host Facts
-    setup: gather_subset=!all,!min,network
-    register: rGather
-    connection: ssh
+    block:
+    - name: Gather Network Facts
+      setup: gather_subset=!all,!min,network
+      register: rGather
+
+    - {name: Gather Service Facts, service_facts: , when: DoZtpMgmt}
     ignore_unreachable: true
     ignore_errors: true
+    connection: ssh
     vars:
       ansible_python_interpreter: auto
       ansible_user: '{{awxssh_user|default(prompt_awxcli_user)}}'
       ansible_ssh_pass: '{{awxssh_pass|default(prompt_awxcli_pass)}}'
+
+  - {name: Store Distribution, set_fact: {HostDist: '{{ansible_distribution}}'}}
+
+  - name: Store Host Service Info
+    set_fact: {HostServices: '{{services}}'}
+    when: DoZtpMgmt
 
   - name: Parse and Save Secondary Physical Interface Facts
     set_fact: {PhysIntInfo: '{{PhysIntInfo|default([]) + [tIntInfo]}}'}
@@ -83,15 +105,3 @@
     loop_control: {index_var: idx}
     register: rTemplateCreds
   when: not rThisTemplate.json.ask_credential_on_launch
-
-- name: Set Role Flags
-  set_fact: {DoImgMgmt: '{{tAmUpdate or tImUpdate}}', DoZtpMgmt: '{{tDoZtp}}'}
-  vars:
-    tAmNotRmv: '{{"remove" not in prompt_mgmt_role|default()|lower}}'
-    tAmReqUpt: '{{prompt_update_img_mgmt|default(false)}}'
-    tImgDirDefined: '{{ImgMgmtDir|default("null", true) != "null"}}'
-    tIsAm: '{{IsAwxTmpltMgmt|default(false)}}'
-    tIsIm: '{{IsImgMgmt|default(false)}}'
-    tAmUpdate: '{{tIsAm and tAmNotRmv and tImgDirDefined and tAmReqUpt}}'
-    tImUpdate: '{{tIsIm and tImgDirDefined}}'
-    tDoZtp: '{{IsZtp|default(false)}}'

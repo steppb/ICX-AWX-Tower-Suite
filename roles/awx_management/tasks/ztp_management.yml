@@ -13,6 +13,10 @@
     ansible_python_interpreter: '{{icx_awx_mgmt.ssh_interpreter}}'
     ansible_user: '{{awxssh_user|default(prompt_awxcli_user)}}'
     ansible_ssh_pass: '{{awxssh_pass|default(prompt_awxcli_pass)}}'
+    ansible_become: true
+    ansible_become_method: sudo
+    ansible_become_password: '{{awxssh_sudo|default(prompt_awxcli_sudo)
+                                           |default(prompt_awxcli_pass)}}'
 
 - name: Get Info on Installed Reqs From Server
   block:
@@ -47,13 +51,16 @@
   - {name: Configure Interface, include_tasks: zm_interface.yml, when: bDoInt}
   - {name: Create Inventory, include_tasks: zm_inventory.yml, when: IsZtpMgmt}
   vars:
+    bHasDhcp: '{{HostServices["isc-dhcp-server"] is defined or
+                 HostServices["dhcpd"] is defined}}'
+    bHasAppArmor: '{{HostServices["apparmor"] is defined}}'
     bOrgId: '{{rThisTemplate.json.organization}}'
     bAppId: '{{rZtpApp.json.results[0].id|default(0)}}'
     bTokId: '{{rWebToken.json.results[0].id|default(0)}}'
     bZtpInvInfo: '{{rInvs.json.results|selectattr("name", "==", ZtpInv)|list}}'
     bZtpInvCfg: '{{bZtpInvInfo[0].variables|from_yaml|default({}, true)}}'
     bNeedWebhook: '{{not rWebhookFile.stat.exists}}'
-    bDoDhcp: '{{not rDhcpFile.stat.exists or DhcpCfgNew is defined}}'
+    bDoDhcp: '{{not bHasDhcp or DhcpCfgNew is defined}}'
     bDoCred: '{{rZtpCreds.json.count == 0}}'
     bDoAuth: '{{bAppId == "0" or bTokId == "0" or bNeedWebhook or IsZtpRT}}'
     bDoInt: '{{NetIntCfg is defined}}'
