@@ -3,6 +3,7 @@
   connection: network_cli
   gather_facts: no
   vars:
+    ansible_network_cli_ssh_type: paramiko
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable

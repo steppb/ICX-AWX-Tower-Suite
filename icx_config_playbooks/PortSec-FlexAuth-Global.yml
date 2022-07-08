@@ -6,6 +6,7 @@
     icx_config:
       parents: authenticatio
   vars:
+    ansible_network_cli_ssh_type: paramiko
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable

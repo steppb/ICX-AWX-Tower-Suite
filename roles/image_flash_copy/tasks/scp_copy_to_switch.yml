@@ -6,6 +6,7 @@
     register: rIcxShFlash
     connection: network_cli
     vars:
+      ansible_network_cli_ssh_type: paramiko
       ansible_network_os: icx
       ansible_become: true
       ansible_become_method: enable
@@ -47,6 +48,7 @@
           ("use default" in FirstPart and "sec" in BootPart)
   connection: network_cli
   vars:
+    ansible_network_cli_ssh_type: paramiko
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
@@ -131,6 +133,7 @@
     when: bWaitForFw
   connection: network_cli
   vars:
+    ansible_network_cli_ssh_type: paramiko
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable

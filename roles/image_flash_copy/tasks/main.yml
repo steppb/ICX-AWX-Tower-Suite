@@ -5,6 +5,7 @@
   icx_facts: {gather_subset: hardware}
   connection: network_cli
   vars:
+    ansible_network_cli_ssh_type: paramiko
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable
@@ -160,6 +161,7 @@
   - {name: Show Version, debug: {msg: '{{rSwVer.stdout_lines[0]}}'}}
   connection: network_cli
   vars:
+    ansible_network_cli_ssh_type: paramiko
     ansible_network_os: icx
     ansible_become: true
     ansible_become_method: enable

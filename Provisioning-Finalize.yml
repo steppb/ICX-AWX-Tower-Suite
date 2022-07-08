@@ -47,6 +47,7 @@
       when: tUsername == ansible_user
     connection: network_cli
     vars:
+      ansible_network_cli_ssh_type: paramiko
       ansible_network_os: icx
       ansible_become: true
       ansible_become_method: enable
@@ -59,6 +60,7 @@
       register: rHnCfg
       connection: network_cli
       vars:
+        ansible_network_cli_ssh_type: paramiko
         ansible_network_os: icx
         ansible_become: true
         ansible_become_method: enable
@@ -164,6 +166,7 @@
       bPoolExhausted: '{{not bZtpIpCfg.pool
                         |iprange("has_addr", bZtpIpCfg.next_ip)}}'
       bDoPoolCfg: '{{not bPoolExhausted and not bHostCfgd}}'
+      ansible_network_cli_ssh_type: paramiko
       ansible_network_os: icx
       ansible_become: true
       ansible_become_method: enable
