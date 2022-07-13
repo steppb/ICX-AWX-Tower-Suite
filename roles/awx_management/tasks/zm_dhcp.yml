@@ -8,6 +8,9 @@
         name: '{{bDistDhcp[HostDist].pkg_name|default("isc-dhcp-server")}}'
         state: present
 
+    - name: Change Group Permissions of /etc/dhcp to 'dhcpd'
+      file: {path: /etc/dhcp, group: dhcpd, state: directory}
+
     - name: Allow DHCP to Run Webhook
       block:
       - name: Add AppArmor entry for 'awx_dhcp_webhook'

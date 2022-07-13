@@ -1,13 +1,7 @@
 ---
-- name: Check Files on AWX Host System
-  block:
-  - name: Check DHCP
-    stat: {path: /etc/apparmor.d/usr.sbin.dhcpd}
-    register: rDhcpFile
-
-  - name: Check Webhook
-    stat: {path: /etc/dhcp/awx_dhcp_webhook}
-    register: rWebhookFile
+- name: Check Status of Webhook File
+  stat: {path: /etc/dhcp/awx_dhcp_webhook}
+  register: rWebhookFile
   connection: ssh
   vars:
     ansible_python_interpreter: '{{icx_awx_mgmt.ssh_interpreter}}'
