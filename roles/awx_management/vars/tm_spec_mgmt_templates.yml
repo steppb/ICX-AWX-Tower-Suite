@@ -4,6 +4,7 @@ vAwxImgDir: '{{icx_awx_mgmt.img_mgmt.awx_image_dir|default()}}'
 vZtpCfgd: '{{icx_awx_mgmt.ztp|default("null", true) != "null"}}'
 vMultihomed: '{{PhysInts|default("null", true) != "null"}}'
 vZtpOptlText: '{{"(optional) " if not vZtpCfgd else ""}}'
+vHasNetplan: '{{rNetplan.stat.exists|default(false)}}'
 
 
 awxcli_prompts:
@@ -321,7 +322,7 @@ mgmt_template_specs:
     survey_spec: '{{ztp_management_survey|select()|list}}'
 
   - '{{ztp_templates[0] if vZtpCfgd else []}}'
-  - '{{ztp_templates[1] if vZtpCfgd and vMultihomed else []}}'
+  - '{{ztp_templates[1] if vZtpCfgd and vMultihomed and vHasNetplan else []}}'
   - '{{ztp_templates[2] if vZtpCfgd else []}}'
   - '{{ztp_templates[3] if vZtpCfgd else []}}'
 
