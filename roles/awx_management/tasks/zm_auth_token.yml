@@ -41,6 +41,7 @@
     src: awx_dhcp_webhook.j2
     dest: /etc/dhcp/awx_dhcp_webhook
     mode: 0755
+    setype: dhcpd_exec_t
   connection: ssh
   vars:
     AuthToken: '{{rWebhookToken.json.token}}'
