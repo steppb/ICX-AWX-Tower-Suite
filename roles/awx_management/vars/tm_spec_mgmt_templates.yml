@@ -2,9 +2,9 @@ vNeedAwxSshCreds: '{{awxssh_user|default("null", true) == "null"}}'
 vIcxImgDirCreated: '{{icx_awx_mgmt.img_mgmt.awx_image_dir is defined}}'
 vAwxImgDir: '{{icx_awx_mgmt.img_mgmt.awx_image_dir|default()}}'
 vZtpCfgd: '{{icx_awx_mgmt.ztp|default("null", true) != "null"}}'
-vMultihomed: '{{PhysInts|default("null", true) != "null"}}'
+vIntCfgCap: '{{PhysInts|default("null", true) != "null" and
+               rNetplan.stat.exists|default(false)}}'
 vZtpOptlText: '{{"(optional) " if not vZtpCfgd else ""}}'
-vHasNetplan: '{{rNetplan.stat.exists|default(false)}}'
 
 
 awxcli_prompts:
@@ -205,8 +205,8 @@ ztp_management_survey:
     min: 1
     max: 1024
     default: Provisioning
-  - '{{ztp_server_address_survey[0] if not vZtpCfgd and vMultihomed else []}}'
-  - '{{ztp_server_address_survey[1] if not vZtpCfgd and vMultihomed else []}}'
+  - '{{ztp_server_address_survey[0] if not vZtpCfgd and vIntCfgCap else []}}'
+  - '{{ztp_server_address_survey[1] if not vZtpCfgd and vIntCfgCap else []}}'
   - question_name: "DHCP Config - Subnet IP and Mask: (e.g. 192.168.0.0/24)"
     required: '{{not vZtpCfgd}}'
     type: text
@@ -322,7 +322,7 @@ mgmt_template_specs:
     survey_spec: '{{ztp_management_survey|select()|list}}'
 
   - '{{ztp_templates[0] if vZtpCfgd else []}}'
-  - '{{ztp_templates[1] if vZtpCfgd and vMultihomed and vHasNetplan else []}}'
+  - '{{ztp_templates[1] if vZtpCfgd and vIntCfgCap else []}}'
   - '{{ztp_templates[2] if vZtpCfgd else []}}'
   - '{{ztp_templates[3] if vZtpCfgd else []}}'
 
