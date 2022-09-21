@@ -38,9 +38,6 @@
       - DhcpCfgOld[0]|default("null", true) != DhcpCfgNew[0]
   connection: ssh
   vars:
-    bDistDhcp:
-      Ubuntu: {pkg_name: isc-dhcp-server, svc_name: isc-dhcp-server}
-      RedHat: {pkg_name: dhcp-server, svc_name: dhcpd}
     ansible_python_interpreter: '{{icx_awx_mgmt.ssh_interpreter}}'
     ansible_user: '{{awxssh_user|default(prompt_awxcli_user)}}'
     ansible_ssh_pass: '{{awxssh_pass|default(prompt_awxcli_pass)}}'

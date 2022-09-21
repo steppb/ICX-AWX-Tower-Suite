@@ -58,3 +58,6 @@
     bDoCred: '{{rZtpCreds.json.count == 0}}'
     bDoAuth: '{{bAppId == "0" or bTokId == "0" or bNeedWebhook or IsZtpRT}}'
     bDoInt: '{{NetIntCfg is defined}}'
+    bDistDhcp:
+      Ubuntu: {pkg_name: isc-dhcp-server, svc_name: isc-dhcp-server}
+      RedHat: {pkg_name: dhcp-server, svc_name: dhcpd}

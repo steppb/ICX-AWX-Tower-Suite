@@ -36,12 +36,19 @@
   register: rWebhookToken
   when: rTokenDelete.status is defined or bTokId|int == 0
 
-- name: Create 'awx_dhcp_webhook'
-  template:
-    src: awx_dhcp_webhook.j2
-    dest: /etc/dhcp/awx_dhcp_webhook
-    mode: 0755
-    setype: dhcpd_exec_t
+- name: WebHook Block
+  block:
+  - name: Create 'awx_dhcp_webhook'
+    template:
+      src: awx_dhcp_webhook.j2
+      dest: /etc/dhcp/awx_dhcp_webhook
+      mode: 0755
+      setype: dhcpd_exec_t
+
+  - name: Restart DHCP
+    service:
+      name: '{{bDistDhcp[HostDist].svc_name|default("isc-dhcp-server")}}'
+      state: restarted
   connection: ssh
   vars:
     AuthToken: '{{rWebhookToken.json.token}}'
