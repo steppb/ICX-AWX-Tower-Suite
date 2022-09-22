@@ -8,6 +8,11 @@
       mode: 0644
 
   - {name: Apply Network Interface Config, shell: netplan apply}
+
+  - name: Restart DHCP
+    service:
+      name: '{{bDistDhcp[HostDist].svc_name|default("isc-dhcp-server")}}'
+      state: restarted
   connection: ssh
   vars:
     bCfgWithRt: "-with-route"
