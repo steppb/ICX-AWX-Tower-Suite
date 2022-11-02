@@ -4,7 +4,7 @@
   gather_facts: no
   module_defaults: {wait_for: {host: '{{ansible_host}}', port: 22, timeout: 30}}
   vars:
-    RebootAllowed: '{{prompt_flash_reload}}'
+    RebootAllowed: '{{prompt_flash_reload|bool}}'
     BootPrefChange: '{{prompt_flash_change_boot}}'
     BootPart: '{{"sec" if prompt_flash_part|lower == "secondary" else "pri"}}'
     ScpTimeout: '{{host_flash_copy_timeout|default(300)}}'
